@@ -1,0 +1,8 @@
+# Build output from tools/build.ps1
+/dist/
+
+# Files the OS or the file-sync tools drops into folders
+@eaDir/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,5 @@
+version=1
+title=ZedComm
+description=Modular wired electronics and simulated digital signals.
+tags=Build 42
+visibility=private

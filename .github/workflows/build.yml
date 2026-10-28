@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the Workshop item
+        shell: pwsh
+        run: .\tools\build.ps1 -Zip
+
+      - name: Check the dev link and the deploy guard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $w = Join-Path $env:RUNNER_TEMP 'Workshop'
+          $mod = 'ZedComm\Contents\mods\ZedComm\42\mod.info'
+
+          .\tools\link-dev.ps1 -WorkshopDir $w
+          if (-not (Test-Path (Join-Path $w $mod))) { throw 'The link does not reach the mod.' }
+          .\tools\link-dev.ps1 -WorkshopDir $w
+
+          $refused = $false
+          try { .\tools\build.ps1 -Deploy -WorkshopDir $w } catch { $refused = $true }
+          if (-not $refused) { throw 'Deploy did not refuse the dev link.' }
+
+          .\tools\link-dev.ps1 -Remove -WorkshopDir $w
+          if (-not (Test-Path ".\workshop\$mod")) { throw 'Removing the link deleted the repo copy.' }
+
+          .\tools\build.ps1 -Deploy -WorkshopDir $w
+          if (-not (Test-Path (Join-Path $w 'ZedComm\Contents\mods\ZedComm\common'))) { throw 'Deploy lost the empty common folder.' }
+          if (Get-ChildItem (Join-Path $w 'ZedComm') -Recurse -Filter .gitkeep) { throw 'Deploy shipped .gitkeep files.' }
+
+      - name: Check that a stray file stops the build
+        shell: pwsh
+        run: |
+          Set-Content .\workshop\ZedComm\notes.md 'stray'
+          $stopped = $false
+          try { .\tools\build.ps1 } catch { $stopped = $true }
+          Remove-Item .\workshop\ZedComm\notes.md
+          if (-not $stopped) { throw 'The build accepted a stray .md file.' }
+
+      - name: Bash tools (Git Bash)
+        shell: bash
+        run: tools/selftest.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZedComm-build
+          path: dist/
+
+  bash-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash tools
+        run: tools/selftest.sh
