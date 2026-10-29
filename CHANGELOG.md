@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ADR-305: the simulation marks changed networks and updates them once per `OnTick`; pausing freezes it.
+
 - Repo scaffold: the Workshop item lives in `workshop/ZedComm/`, kept apart from docs, tests and tools (ADR-401).
 - `tools/link-dev.ps1` links the game's Workshop folder to the repo for testing; `tools/build.ps1` checks and copies the item to `dist/`, with `-Zip` and `-Deploy`.
 - Bash versions of both tools (`build.sh`, `link-dev.sh`, shared `lib.sh`) for Linux and Git Bash, plus `selftest.sh`.
