@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Shared simulation entry point: `Simulation.markDirty` and a once-per-tick `Simulation.tick`, with `Local` and stub `Server` dispatch adapters, registered on `OnTick` in singleplayer and on a multiplayer server only.
+- `tests/simulation_test.lua` and `tests/run.sh`: Lua 5.1 tests of the pass in singleplayer, server and client modes; CI on Linux runs them.
 - ADR-305: the simulation marks changed networks and updates them once per `OnTick`; pausing freezes it.
 
 - Repo scaffold: the Workshop item lives in `workshop/ZedComm/`, kept apart from docs, tests and tools (ADR-401).

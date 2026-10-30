@@ -59,5 +59,9 @@ CI (`.github/workflows/build.yml`) runs both tool sets on every push: PowerShell
 
 One pass per game tick on `Events.OnTick` (ADR-305). Events only mark a network as needing an update; the pass recomputes each marked network once, samples loaded sensors and delivers values in the same tick. `OnTick` does not run while the game is paused, so the simulation freezes with the game. In singleplayer the pass runs in the game process; in multiplayer it will run on the server tick (validated after the MVP).
 
+The pass lives in `shared/ZedComm/Simulation.lua` (`markDirty` from event handlers, `tick` once per tick) and sends each recomputed value through an adapter in `shared/ZedComm/Dispatch.lua`: `Local` in singleplayer, `Server` on a multiplayer server (a stub until multiplayer is validated). `server/ZedComm/SimulationRunner.lua` registers it on `OnTick` in singleplayer and on a multiplayer server, never on a multiplayer client, and logs `[ZedComm] simulation pass running (singleplayer)` to console.txt on the first tick.
+
+`tests/run.sh` runs the simulation tests with a Lua 5.1 interpreter (`lua5.1`, `luajit` or `lua`); the bash build calls it and skips the tests with a warning when none is installed. CI on Linux installs Lua 5.1 and fails if the tests cannot run.
+
 ## Decisions
 
