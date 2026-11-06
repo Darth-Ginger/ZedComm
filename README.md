@@ -8,7 +8,7 @@ Status: scaffold only. No gameplay code yet. The first goal is a pressure sensor
 
 ```
 docs/adr/              decision records (canonical copy, see ADR-401)
-tests/                 tests of the simulation core, run outside the game
+tests/                 tests of the simulation core, network model and registry, run outside the game
 tools/link-dev.ps1|sh  links the game's Workshop folder to workshop/ZedComm
 tools/build.ps1|sh     checks and copies workshop/ZedComm into dist/
 tools/selftest.sh      exercises the bash tools against a scratch Workshop folder
@@ -61,7 +61,7 @@ One pass per game tick on `Events.OnTick` (ADR-305). Events only mark a network 
 
 The pass lives in `shared/ZedComm/Simulation.lua` (`markDirty` from event handlers, `tick` once per tick) and sends each recomputed value through an adapter in `shared/ZedComm/Dispatch.lua`: `Local` in singleplayer, `Server` on a multiplayer server (a stub until multiplayer is validated). `server/ZedComm/SimulationRunner.lua` registers it on `OnTick` in singleplayer and on a multiplayer server, never on a multiplayer client, and logs `[ZedComm] simulation pass running (singleplayer)` to console.txt on the first tick.
 
-`tests/run.sh` runs the simulation tests with a Lua 5.1 interpreter (`lua5.1`, `luajit` or `lua`); the bash build calls it and skips the tests with a warning when none is installed. CI on Linux installs Lua 5.1 and fails if the tests cannot run.
+`tests/run.sh` runs every `tests/*_test.lua` with a Lua 5.1 interpreter (`lua5.1`, `luajit` or `lua`); the bash build calls it and skips the tests with a warning when none is installed. CI on Linux installs Lua 5.1 and fails if the tests cannot run.
 
 ## Decisions
 
