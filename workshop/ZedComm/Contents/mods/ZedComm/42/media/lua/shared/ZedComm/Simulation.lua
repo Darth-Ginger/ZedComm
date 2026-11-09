@@ -29,7 +29,9 @@ function Simulation.markDirty(networkId)
 end
 
 function Simulation.hasPending()
-    return next(pending) ~= nil
+    -- PZ Kahlua does not reliably expose the standard Lua next global.
+    for _ in pairs(pending) do return true end
+    return false
 end
 
 -- The per-tick pass (ADR-305, step 2). Returns how many networks it updated.
@@ -38,7 +40,7 @@ end
 -- network is recomputed at most once per pass.
 function Simulation.tick()
     Simulation.passes = Simulation.passes + 1
-    if next(pending) == nil then return 0 end
+    if not Simulation.hasPending() then return 0 end
 
     local batch = pending
     pending = {}

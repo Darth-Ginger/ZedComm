@@ -2,7 +2,7 @@
 
 A Project Zomboid (Build 42) mod for modular wired electronics and simulated digital signals: redstone-style on/off signaling, with a path toward counters, addressed communication and player-built networks.
 
-Status: scaffold only. No gameplay code yet. The first goal is a pressure sensor sending a value through placed, connected cable to a numeric display (ADR-102).
+Status: shared simulation, network model and cable/lamp persistence spikes implemented. Singleplayer spike and compatibility fix verified on 2026-11-09; see [test evidence](docs/research/2026-11-09-singleplayer-spike.md). The first gameplay goal remains a pressure sensor sending a value through placed, connected cable to a numeric display (ADR-102).
 
 ## Layout
 

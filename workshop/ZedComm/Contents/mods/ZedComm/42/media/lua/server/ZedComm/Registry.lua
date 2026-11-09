@@ -127,7 +127,9 @@ function SZedCommSystem:syncPiece(id, x, y, z)
         tile.pieces[id] = r
     elseif tile then
         tile.pieces[id] = nil
-        if next(tile.pieces) == nil then self:removeLuaObject(tile) end
+        -- Keep the tile while another piece remains; avoid the next global.
+        for _ in pairs(tile.pieces) do return end
+        self:removeLuaObject(tile)
     end
 end
 

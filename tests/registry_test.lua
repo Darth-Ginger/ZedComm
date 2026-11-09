@@ -9,6 +9,9 @@
 -- Usage: lua5.1 tests/registry_test.lua   (from the repo root)
 --   PZ_LUA=/path/to/ProjectZomboid/media/lua   (required)
 
+-- Regression: the game failed when the standard Lua next global was nil.
+next = nil
+
 local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
 local PZ = os.getenv("PZ_LUA") or "/path/to/ProjectZomboid/media/lua"
 

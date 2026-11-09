@@ -5,6 +5,9 @@
 --
 -- Usage: lua5.1 tests/simulation_test.lua   (from the repo root)
 
+-- Regression: the game failed when the standard Lua next global was nil.
+next = nil
+
 local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
 package.path = LUA .. "shared/?.lua;" .. package.path
 
