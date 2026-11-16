@@ -1,4 +1,4 @@
--- Test fixture for the shared On/Off receiver (ADR-308).
+-- Lamp binding for the shared On/Off receiver (ADR-308).
 require "ZedComm/DeviceDefinitions"
 require "ZedComm/SignalModules"
 require "ZedComm/InternalCircuit"

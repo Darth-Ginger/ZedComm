@@ -1,4 +1,5 @@
--- Bind loaded world objects to the single-port device definitions.
+-- Bind loaded world objects to their device definitions, sample sources and
+-- run lamp and cabinet circuits around each simulation pass.
 -- Display readings and availability live in memory and are rebuilt on load.
 require "ZedComm/NativeDevices"
 require "ZedComm/Simulation"
@@ -426,8 +427,8 @@ function Runtime.prepare(registry)
             loadedCabinets[id] = prepareCabinet(cell, piece, cabinets[id])
         elseif piece.definitionId and not piece.definitionUnavailable then
             local definition = Definitions.get(piece.definitionId)
-            -- The MVP runtime has a single value per callback. Multi-port
-            -- modules need an explicit per-port delivery contract.
+            -- A definition callback takes or returns one value, so only
+            -- single-port definitions are bound. Cabinets are handled above.
             local port = definition and #definition.ports == 1 and definition.ports[1]
             local object = port and piece.ports[port] ~= nil and findObject(cell, piece)
             local expectedRole = piece.role == "source" and "source" or "receiver"

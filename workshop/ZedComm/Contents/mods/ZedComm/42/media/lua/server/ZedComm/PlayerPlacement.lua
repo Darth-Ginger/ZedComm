@@ -1,4 +1,4 @@
--- Singleplayer inventory actions backed by the existing saved registry.
+-- Singleplayer inventory actions backed by the saved registry.
 if isClient() or isServer() then return end
 
 require "ZedComm/Network"

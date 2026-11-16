@@ -2,7 +2,7 @@
 
 A Project Zomboid (Build 42) mod for modular wired electronics and simulated digital signals: redstone-style on/off signaling, with a path toward counters, addressed communication and player-built networks.
 
-Status: shared simulation, network model and cable/lamp persistence spikes implemented. Singleplayer spike and compatibility fix verified on 2026-11-09; see [test evidence](docs/research/2026-11-09-singleplayer-spike.md). The first gameplay goal remains a pressure sensor sending a value through placed, connected cable to a numeric display (ADR-102).
+Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through Small Cabinets that hold a 6×6 circuit of logic, arithmetic and timing modules. Adapters, cabinets, the Splitter and the switch have recipes; the other items and lamp conversion are debug-only. Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
 
 ## Layout
 

@@ -308,7 +308,7 @@ check(reported, "a one-sided link is reported on load")
 check(java3:getObjectAt(1, 0, 0).data.pieces.c2.links.c1 == nil, "the dropped link is removed from the save")
 check(reg3.network:networkOf("c1") ~= reg3.network:networkOf("c2"), "the dropped link does not connect")
 
--- Defined endpoints share the same record path as the old cable spike.
+-- Defined endpoints are saved through the same record path.
 local defined, definedJava = start()
 local sensorSquare, displaySquare = square(20, 20, 0), square(21, 20, 0)
 local seed = { calibration = { threshold = 10 }, enabled = false }
@@ -2459,7 +2459,7 @@ do
             end,
         }
     end
-    dofile(LUA .. "client/ZedComm/CableSpike.lua")
+    dofile(LUA .. "client/ZedComm/DebugCircuits.lua")
     local sourceTile, wireTile, displayTile = floorTile(140, 125), floorTile(141, 125), floorTile(142, 125)
     check(menuAt(sourceTile).children.Debug == nil, "debug controls stay hidden during ordinary play")
     getDebug = function() return true end

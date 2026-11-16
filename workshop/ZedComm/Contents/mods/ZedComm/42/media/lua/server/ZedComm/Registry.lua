@@ -1,5 +1,5 @@
 -- ZedComm server registry: saves every ZedComm piece and rebuilds the network
--- model from it on load (Implement Endpoints And Cables).
+-- model from it on load.
 --
 -- Built on the game's global object system (SGlobalObjectSystem), which saves
 -- one record per x,y,z to its own file and keeps it while the chunk is
@@ -19,8 +19,8 @@
 -- Durable device state and links live in the square records. The model is rebuilt from these records when the
 -- system starts, so connectivity is derived, not stored twice.
 --
--- Multiplayer client sync is not done yet: the client hooks are no-ops until
--- the post-MVP multiplayer work (ADR-305, step 7).
+-- Multiplayer clients are not synced: the client hooks are no-ops (ADR-305,
+-- step 7).
 
 if isClient() then return end
 
@@ -107,7 +107,7 @@ function SZedCommSystem:isValidIsoObject(isoObject)
     return tagOf(isoObject) ~= nil
 end
 
--- Multiplayer sync comes later; nothing on the client listens yet.
+-- No client sync: nothing on the client listens.
 function SZedCommSystem:newLuaObjectOnClient(luaObject) end
 function SZedCommSystem:removeLuaObjectOnClient(luaObject) end
 function SZedCommSystem:updateLuaObjectOnClient(luaObject) end

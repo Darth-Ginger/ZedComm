@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Cabinet jacks can be given a label. The Network Switch mounts on a chosen wall, shows a lead toward its wire and toggles on a click. Output Extensions face right by default.
+- Small Cabinet: a placed 6×6 circuit board with its own input and output jacks, in Basic and Advanced tiers, with an in-place upgrade that returns the Basic Adapter. A cabinet circuit that would feed back into itself through the external wiring is refused.
+- Circuit modules: AND, OR, XOR, NOT, Adder, Subtractor, Multiplier, Cache, Splitter, Timer, Wait, Mains Source, Battery Source, and Input and Output Extensions. Arithmetic modules can work on the full reading in an Advanced cabinet.
+- Network Switch and Advanced Display. Recipes for both adapters, both cabinets, the Splitter and the switch.
+- Adapter editor: opens from up to two tiles away over an open path, edits only from an adjacent tile, and shows a legend for the contact colours.
+- Device definitions (`shared/ZedComm/DeviceDefinitions.lua`) and the device runtime (`server/ZedComm/DeviceRuntime.lua`): pressure, occupancy and weight plates, the numeric display, and a relay fitted to vanilla lamps.
+- Maintained signal packets (ADR-309): a basic byte, or an advanced reading with a byte fallback. Sender and receiver modules in `shared/ZedComm/SignalModules.lua`.
+- Internal circuits (`shared/ZedComm/InternalCircuit.lua`) and the Advanced Adapter's 3×3 editor, starting with a Threshold module.
+- Player placement: context-menu and cursor placement, wire runs with explicit joins, pickup, and named runs. Wires sharing a tile are drawn in separate lanes.
+- Placeholder sprite pack built by `tools/pack-placeholder-sprites.py`.
+- Tests for the definitions, modules and circuits, and registry tests covering the runtime, placement, menus and editor against the game's own Lua.
+- `client/ZedComm/CableSpike.lua` is now `client/ZedComm/DebugCircuits.lua`; it holds the debug menu.
+
 - ADR-306: cable runs are explicit chains (two ends per piece, no branching) with one source per network for the MVP. ADR-307: four network object roles, source, receiver, cable and infrastructure, with infrastructure kept out of the endpoint class. ADR-308: existing objects such as lamps join ZedComm by a skill-gated install action, keep the modification through pickup, and behave normally when no cable is attached.
 - Network model (`shared/ZedComm/Network.lua`): cable pieces and endpoints with named ports, explicit links (adjacent squares only, never by adjacency alone), networks derived from the links, one source per network, `nil` for disconnected as distinct from a valid zero. It marks changed networks on the simulation and is its recompute step.
 - Server registry (`server/ZedComm/Registry.lua`): saves every piece through the game's global object system, several pieces per square, and rebuilds the network from those records on load; drops records whose world object is gone and links only one side remembers.

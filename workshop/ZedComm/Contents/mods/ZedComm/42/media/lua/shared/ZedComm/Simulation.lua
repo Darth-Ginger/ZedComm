@@ -3,8 +3,8 @@
 -- Events only mark a network as needing an update; one pass per game tick
 -- recomputes each marked network once and hands the result to a dispatch
 -- adapter. The same pass runs in singleplayer and on a multiplayer server;
--- only the adapter differs. The network model and sensor sampling arrive with
--- later cards: until then the recompute step is a function they register.
+-- only the adapter differs. Network:attach registers the recompute step, and
+-- DeviceRuntime samples sensors before each pass.
 --
 -- Kahlua (Lua 5.1): no goto, no integer division, no io/os.
 
