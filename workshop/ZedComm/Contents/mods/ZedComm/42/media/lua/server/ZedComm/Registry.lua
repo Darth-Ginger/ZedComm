@@ -50,7 +50,7 @@ end
 local function syncFixture(self, object, tag)
     if tag.definitionId == Switch.ID then
         local piece = self.network.pieces[tag.id]
-        if piece and piece.definitionId == Switch.ID then Switch.updateSprite(object, piece.state) end
+        if piece and piece.definitionId == Switch.ID then Switch.updateSprite(object, piece.state, self.network, piece) end
         return
     end
     if tag.definitionId ~= Relay.ID then return end
@@ -253,6 +253,15 @@ end
 
 function SZedCommSystem:renameRun(cableId, name)
     return self.runLabels:rename(cableId, name)
+end
+
+function SZedCommSystem:renameCabinetPort(id, port, name)
+    local ok, result = self.network:renameCabinetPort(id, port, name)
+    if ok then
+        local piece = self.network.pieces[id]
+        self:syncPiece(id, piece.x, piece.y, piece.z)
+    end
+    return ok, result
 end
 
 -- Replace a defined endpoint's durable state and sync its square record.

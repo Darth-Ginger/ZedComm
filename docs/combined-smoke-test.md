@@ -50,6 +50,13 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
 
 **Check-in 2.** Report the arm behavior, lamp editor and power results, and any problems with extension placement. If convenient, test switch pickup and remount on south and east walls without a corner tile. Check the saved latch and both sprite positions.
 
+### Checkpoint 2 follow-up - Wall switches and jack labels
+
+1. At a corner where the same tile borders two walls, preview a Network Switch on both walls. Use **Shift + Rotate Building** in native **Place**, or **Rotate Building** in **Place with ZedComm cursor**. The ZedComm world menu also offers the eligible wall choices. Place on the second wall and verify the placed switch matches its preview. Walk between the camera and the switch to check the wall and character layering.
+2. Connect a cable to the switch from an adjacent tile. Verify the lead meets the cable. Left-click the switch within reach and confirm it changes state and sends `255` or `0`. Click again with the placement cursor active and confirm the click is available to the tool. Disconnect the cable and verify the lead disappears. Try a same-tile connection if practical.
+3. Use **ZedComm → Label cabinet jack** to label Fixed IN **Load** and the switch input **Arm**. Use a label on an output jack too. Confirm the labels appear in the editor and connection menu, and the existing runs keep their names and signals. A blank entry clears the custom label. Leave a label for the reload check.
+4. Drag a fresh Input Extension to the left edge and a fresh Output Extension to the right edge without rotating. The gold jack marks should face out. Verify their internal terminals face the board. Previously installed extensions keep their rotations.
+
 ## Checkpoint 3 - Plate loads, arithmetic and Boolean controls
 
 ```lua
@@ -124,11 +131,11 @@ getPlayer():getInventory():AddItem("Base.Battery")
 
 ## Checkpoint 6 - Reload, wiring regression and final capture
 
-1. Reload the same save. Verify the cabinet tier, Threshold value, module positions and rotations, names, and splitter output modes survived. Change a load or arm switch and confirm the wired outputs follow without any rewiring. A Timer window from the old session should clear and rearm after a valid zero.
+1. Reload the same save. Verify the cabinet tier, Threshold value, module positions and rotations, jack labels, run names, switch wall and lead, and splitter output modes survived. Change a load or arm switch and confirm the wired outputs follow without any rewiring. A Timer window from the old session should clear and rearm after a valid zero.
 2. Use native **Pickup** on the upgraded cabinet. Verify it returns as an Advanced Small Cabinet and the old runs are left with free ends. Place it back and explicitly reconnect. Its board and output modes should still be present. Pick up and replace the vanilla lamp with the normal moveable tools. Reattach its run and check that the saved adapter circuit resumes.
 3. Route two independent circuits across a shared tile using normal placement. Include a bend if there is room. Hover the numbered wires to check that the cyan outline follows the exact segment. Use native **Pickup** to remove one wire. Expect one item back and only that route to lose signal. Use an active run to reconnect a compatible existing free end, and confirm an attempted join between two driven runs is rejected. Verify name and reading when the repaired run is inspected.
 4. Leave the game running for the final console capture. Report reload, selective pickup, and any unresolved error, visual issue, or skipped case.
 
 ## Verification baseline
 
-The Windows package contains 51 files. All 832 offline Lua checks passed using installed Build 42 Lua wrappers with simulated game objects. The six checkpoints above cover native crafting, live placement, graphics, power, and save reload in Project Zomboid.
+The Windows package contains 51 files. All 837 offline Lua checks passed using installed Build 42 Lua wrappers with simulated game objects. The six checkpoints above cover native crafting, live placement, graphics, power, and save reload in Project Zomboid.

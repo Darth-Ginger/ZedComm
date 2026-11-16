@@ -58,6 +58,10 @@ Circuit.adapterModules = { "threshold", "not", "timer", "wait", "mainsSource", "
 
 function Circuit.size(cabinet) return cabinet and 6 or 3 end
 
+function Circuit.defaultRotation(kind)
+    return kind == "outputExtension" and 180 or 0
+end
+
 -- Untagged playtest cabinets already supported full packets.
 function Circuit.cabinetAdapter(state)
     if state and state.adapter ~= nil then return state.adapter end
@@ -98,9 +102,10 @@ function Circuit.jackAt(part)
     return x, y
 end
 
-function Circuit.jackLabel(id, direction)
+function Circuit.jackLabel(id, direction, custom)
     local number = id:match("%-(%d+)$")
-    return (direction == "sink" and "IN" or "OUT") .. (number and (" " .. number) or "")
+    local label = (direction == "sink" and "IN" or "OUT") .. (number and (" " .. number) or "")
+    return custom and label .. " (" .. custom .. ")" or label
 end
 
 function Circuit.fixedParts(cabinet)

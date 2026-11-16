@@ -4,9 +4,11 @@ if isClient() or isServer() then return end
 require "ZedComm/WireShape"
 require "ZedComm/ModuleVisuals"
 require "ZedComm/Devices/RelayLamp"
+require "ZedComm/Devices/NetworkSwitch"
 local Shape = ZedComm.WireShape
 local ModuleVisuals = ZedComm.ModuleVisuals
 local Relay = ZedComm.RelayLamp
+local Switch = ZedComm.NetworkSwitch
 local pressureSensor = "ZedComm.PressureSensor"
 local plateSprites = {
     [pressureSensor] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
@@ -59,6 +61,8 @@ local function refreshSquare(square, network)
                     setWorldSprite(object, sprites[tag.id])
                 elseif piece.definitionId == Relay.ID and tag.definitionId == Relay.ID then
                     ModuleVisuals.refresh(object, network, piece, "signal")
+                elseif piece.definitionId == Switch.ID and tag.definitionId == Switch.ID then
+                    Switch.updateSprite(object, piece.state, network, piece)
                 elseif plate and piece.definitionId == tag.definitionId
                     and (tag.placedItem == plate.itemType or (piece.definitionId == pressureSensor and tag.spikeWire)) then
                     local direction = Shape.portDirection(network, piece, "signal")
@@ -85,7 +89,8 @@ local function onTick()
     for square in pairs(seen) do refreshSquare(square, network) end
     if network == lastNetwork and network.version == lastVersion then return end
     for _, piece in pairs(network.pieces) do
-        if piece.kind == "cable" or piece.definitionId == Relay.ID or plateSprites[piece.definitionId] then
+        if piece.kind == "cable" or piece.definitionId == Relay.ID
+            or piece.definitionId == Switch.ID or plateSprites[piece.definitionId] then
             local square = cell:getGridSquare(piece.x, piece.y, piece.z)
             if square and not seen[square] then
                 seen[square] = true

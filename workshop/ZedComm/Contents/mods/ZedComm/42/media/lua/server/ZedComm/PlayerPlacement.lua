@@ -45,13 +45,19 @@ function Placement.getSpec(itemType)
     return specFor(itemType)
 end
 
-function Placement.previewSprite(square, item)
+function Placement.switchMount(square, item, preferred)
+    local saved = item:getModData().zedcommPlacement
+    local state = type(saved) == "table" and saved.state
+    return Switch.mount(square, preferred or (type(state) == "table" and state.mount))
+end
+
+function Placement.previewSprite(square, item, mount)
     local spec = specFor(item:getFullType())
     if not spec then return nil end
     if spec.definitionId ~= Switch.ID or not square then return spec.sprite end
     local saved = item:getModData().zedcommPlacement
     local state = type(saved) == "table" and saved.state
-    return Switch.sprite(Switch.mount(square), type(state) == "table" and state.on == true)
+    return Switch.sprite(Placement.switchMount(square, item, mount), type(state) == "table" and state.on == true)
 end
 
 function Placement.getRegistry()
@@ -262,7 +268,7 @@ local function removeWorldPiece(registry, entry)
     return true
 end
 
-local function place(registry, character, square, item, anchor, anchorPort, laying)
+local function place(registry, character, square, item, anchor, anchorPort, laying, mount)
     local inventory = character:getInventory()
     local spec = item and specFor(item:getFullType())
     if not spec or item:getContainer() ~= inventory or not inventory:contains(item) then
@@ -274,7 +280,12 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     if laying and not canExtend(anchor, anchorPort, square) then
         return false, "Select a free end on this tile or a neighboring tile."
     end
-    local sprite = Placement.previewSprite(square, item)
+    if spec.definitionId == Switch.ID then
+        local facing = Placement.switchMount(square, item, mount)
+        if mount and mount ~= facing then return false, "That wall is no longer available." end
+        mount = facing
+    end
+    local sprite = Placement.previewSprite(square, item, mount)
     if not getSprite(sprite) then return false, "The ZedComm sprite is missing." end
     if spec.definitionId and spec.definitionId ~= Circuit.CABINET_ID and not definitions.get(spec.definitionId) then
         return false, "The device definition is missing."
@@ -286,10 +297,11 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     local object = IsoObject.new(square, sprite, item:getName())
     local state = retained and retained.state
     if spec.adapter then
-        state = { adapter = spec.adapter, circuit = state and state.circuit or { modules = {}, links = {} } }
+        state = { adapter = spec.adapter, circuit = state and state.circuit or { modules = {}, links = {} },
+            portLabels = state and state.portLabels }
     end
     if spec.definitionId == Switch.ID then
-        state = { on = type(state) == "table" and state.on == true, mount = Switch.mount(square) }
+        state = { on = type(state) == "table" and state.on == true, mount = mount }
     end
     object:getModData().zedcomm = {
         id = id, kind = spec.kind, definitionId = spec.definitionId, placedItem = spec.itemType,
@@ -551,7 +563,7 @@ function Placement.perform(character, command)
     end
     if command.kind == "place" or command.kind == "lay" then
         return place(registry, character, command.square, command.item,
-            Placement.resolve(registry, command.anchorId), command.anchorPort, command.kind == "lay")
+            Placement.resolve(registry, command.anchorId), command.anchorPort, command.kind == "lay", command.mount)
     end
     local target = Placement.resolve(registry, command.targetId)
     if not target or target.square ~= command.square or target.object ~= command.object then
@@ -570,10 +582,15 @@ function Placement.perform(character, command)
     if command.kind == "upgrade-cabinet" and target.piece.board then
         return upgradeCabinet(registry, character, target, command.item)
     end
-    if command.kind == "set-network-switch" and target.piece.definitionId == Switch.ID then
-        if type(command.on) ~= "boolean" then return false, "Choose an on or off state." end
+    if (command.kind == "set-network-switch" or command.kind == "toggle-network-switch")
+        and target.piece.definitionId == Switch.ID then
         local state = registry.network:record(target.id).state or { mount = Switch.mount(target.square) }
-        state.on = command.on
+        if command.kind == "toggle-network-switch" then
+            state.on = not state.on
+        else
+            if type(command.on) ~= "boolean" then return false, "Choose an on or off state." end
+            state.on = command.on
+        end
         return registry:setDeviceState(target.id, state)
     end
     if command.kind == "pickup" then

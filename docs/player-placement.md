@@ -33,6 +33,12 @@ Connected runs get a saved number such as **Run 1**. Unconnected segments show *
 
 When runs join, a custom name takes precedence over a default. If both names are custom or both are defaults, the active run keeps its name. If a run is split, the connected part with the saved name anchor keeps the old name and other connected parts get new numbers. If the anchor is removed or becomes loose, a surviving connected part keeps the name.
 
+Use **ZedComm → Label cabinet jack** to name a fixed jack or extension on the cabinet. The label follows that jack through rotation, pickup, and reload. It appears in the cabinet editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
+
+## Wall switches
+
+At a corner, press **Shift + Rotate Building** with the Network Switch selected in native **Place** to cycle the eligible walls. In **Place with ZedComm cursor**, use **Rotate Building** alone. The ZedComm world placement menu also lists the available walls at a corner. Left-click a placed switch within reach to toggle it. Its wall sprite retains a lead to the connected wire while the switch is ON or OFF.
+
 ## Multiple wires on one tile
 
 Select the free end of the intended run and left-click an occupied wire tile with the placement cursor. If the connection menu opens, choose **Lay wire here**. The new piece consumes one wire and connects only to the selected run. The context menu also offers **Lay another wire here (N present)** after you exit the cursor. On a shared tile, open **ZedComm → Wire 1 of 2** (or the appropriate wire number). **Inspect**, **Select free end**, **Connect selected run**, and **Pick up** appear inside that wire’s submenu when applicable. Hover a wire’s submenu or one of its actions to outline that exact segment in cyan. Inspect a wire to see the direction of its links and how many ends are free. Numbering uses saved piece IDs, so load order does not change it while the same wires are present. Picking up a wire removes only that segment. Parallel runs use up to five separate lanes across shared tile edges. Wires that turn together follow nested curves. A device lead keeps its centered connection and passing cables use separate lanes. Use the exact-wire outline when inspecting or picking up a segment.

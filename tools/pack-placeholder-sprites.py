@@ -16,6 +16,7 @@ DISPLAY_ART = CONCEPT_ART / "numeric-display-blank-face.png"
 FLOOR_CABINET = ROOT / "art" / "cabinet-prototypes" / "network-cabinet-floor-frame.png"
 CABINET_FRAME = 466
 SWITCH_FRAME = 467
+SWITCH_LEAD_SET = "zedcomm_switch_01"
 SWITCH_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
 SWITCH_ART = (CONCEPT_ART / "manual-network-switch.png", CONCEPT_ART / "manual-network-switch-on.png")
 OCCUPANCY_FIRST_FRAME = 419
@@ -298,6 +299,9 @@ def switch_page(textures):
     height = round(width * (bottom - top) / (right - left))
     atlas = Image.new("RGBA", (256, 64))
     metadata = bytearray()
+    wired = Image.new("RGBA", (1024, 640))
+    wired_metadata = bytearray()
+    directions = ((0, 0), *WIRE_DIRECTIONS)
     for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
         for state, frame in enumerate(body):
             slot = facing * len(body) + state
@@ -307,11 +311,29 @@ def switch_page(textures):
             atlas.alpha_composite(frame, (slot * width, 0))
             metadata.extend(sprite_record(SWITCH_FRAME + slot, slot * width, 0, width, height,
                                           center - width // 2, baseline - height))
+            for direction, (dx, dy) in enumerate(directions):
+                tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
+                socket = (center, baseline - 3)
+                foot = (center, 216 if facing < 2 else 232)
+                seam = (TILE_CENTER[0] + dx, TILE_CENTER[1] + dy)
+                draw = ImageDraw.Draw(tile)
+                for stroke, color in LEAD_STROKES:
+                    draw.line((socket, foot, seam), fill=color, width=stroke, joint="curve")
+                tile.alpha_composite(frame, (center - width // 2, baseline - height))
+                x, y, right, bottom = tile.getbbox()
+                index = slot * len(directions) + direction
+                atlas_x, atlas_y = (index % 8) * 128, (index // 8) * 128
+                assert bottom - y <= 128
+                wired.alpha_composite(tile.crop((x, y, right, bottom)), (atlas_x, atlas_y))
+                wired_metadata.extend(sprite_record(index, atlas_x, atlas_y, right - x, bottom - y,
+                                                    x, y, SWITCH_LEAD_SET))
     icon = Image.new("RGBA", (64, 64))
     body[0].thumbnail((52, 52), Image.Resampling.LANCZOS)
     icon.alpha_composite(body[0], ((64 - body[0].width) // 2, (64 - body[0].height) // 2))
     icon.save(textures / "Item_ZedCommNetworkSwitch.png")
-    return texture_page(SET + "_switch", atlas, metadata, len(SWITCH_MOUNTS) * len(body))
+    count = len(SWITCH_MOUNTS) * len(body)
+    return (texture_page(SET + "_switch", atlas, metadata, count)
+            + texture_page(SWITCH_LEAD_SET, wired, wired_metadata, count * len(directions)))
 
 
 def route_page(start):
@@ -535,11 +557,11 @@ def main():
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 6) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        b"PZPK" + ints(1, 7) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 2) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 3) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
     switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
@@ -551,11 +573,17 @@ def main():
         else:
             tiles += ints(1) + b"FloorOverlay\n\n"
     tiles += ints(0)  # Cabinet uses the ordinary object layer.
-    tiles += ints(0) * switch_count  # Switch faces draw at wall height.
+    wall_overlays = tuple(ints(2) + f"WallOverlay\n\nattached{side}\n\n".encode("ascii") for side in "NWSE")
+    for props in wall_overlays:
+        tiles += props * len(SWITCH_ART)
     # Build 42 reserves 512 sprite IDs per tileset. Keep saved device IDs stable.
     tiles += f"{DISPLAY_SET}\n{DISPLAY_SET}.png\n".encode("ascii")
     tiles += ints(257, 1, 2, 257)
     tiles += (ints(1) + b"FloorOverlay\n\n") * 257
+    tiles += f"{SWITCH_LEAD_SET}\n{SWITCH_LEAD_SET}.png\n".encode("ascii")
+    tiles += ints(8, 5, 3, switch_count * 5)
+    for props in wall_overlays:
+        tiles += props * (len(SWITCH_ART) * 5)
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 

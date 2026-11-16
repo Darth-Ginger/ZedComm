@@ -180,7 +180,10 @@ local function orderedPieces(placement, registry, square)
 end
 
 local function portLabel(entry, port)
-    if entry.piece.board then return ZedComm.InternalCircuit.jackLabel(port, entry.piece.board.directions[port]) end
+    if entry.piece.board then
+        local labels = entry.piece.state.portLabels
+        return ZedComm.InternalCircuit.jackLabel(port, entry.piece.board.directions[port], labels and labels[port])
+    end
     return port
 end
 
@@ -240,13 +243,27 @@ end
 function Cursor:isValid(square)
     local run = self:target(square)
     if run and run.item and run.item:getFullType() == ZedComm.NetworkSwitch.ID then
-        local sprite = ZedComm.PlayerPlacement.previewSprite(square, run.item)
+        self.zedcommSwitchSquare = square
+        local sprite = ZedComm.PlayerPlacement.previewSprite(square, run.item, self.zedcommMount)
         if sprite ~= self.previewSprite then
             self:setSprite(sprite)
             self.previewSprite = sprite
         end
     end
     return run ~= nil
+end
+
+function Cursor:rotateKey(key)
+    local run = runs[self.character]
+    if self.zedcommSwitchSquare and run and run.item and run.item:getFullType() == ZedComm.NetworkSwitch.ID
+        and getCore():isKey(KeybindId.ROTATE_BUILDING, key) then
+        local square = self.zedcommSwitchSquare
+        local current = ZedComm.PlayerPlacement.switchMount(square, run.item, self.zedcommMount)
+        self.zedcommMount = ZedComm.NetworkSwitch.nextMount(square, current)
+        self:isValid(square)
+        return
+    end
+    ISBuildingObject.rotateKey(self, key)
 end
 
 local function drawInvalidTile(x, y, z)
@@ -263,9 +280,13 @@ function Cursor:render(x, y, z)
 end
 
 local function placeFromCursor(player, run, item, square, anchorId, port)
+    local mount
+    if item:getFullType() == ZedComm.NetworkSwitch.ID then
+        mount = ZedComm.PlayerPlacement.switchMount(square, item, run.cursor.zedcommMount)
+    end
     queue(player, {
         kind = anchorId and "lay" or "place", item = item, square = square,
-        network = run.network, anchorId = anchorId, anchorPort = port, run = run,
+        network = run.network, anchorId = anchorId, anchorPort = port, run = run, mount = mount,
     }, true)
 end
 
@@ -392,6 +413,15 @@ local function renameRun(player, registry, target)
         local ok, result = registry:renameRun(target.id, value)
         return ok and ("Run name updated to " .. result .. ".") or result
     end)
+end
+
+local function labelCabinetJack(player, registry, target, port)
+    local labels = target.piece.state.portLabels
+    editSetting(player, registry, target, "Label " .. portLabel(target, port) .. " (blank resets)",
+        labels and labels[port] or "", function(value)
+            local ok, result = registry:renameCabinetPort(target.id, port, value)
+            return ok and ("Jack label updated to " .. result .. ".") or result
+        end)
 end
 
 local function configurePressurePlate(player, registry, target)
@@ -713,7 +743,16 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             counts[spec.itemType] = count
             local label = "Place " .. spec.name
             if count > 1 then label = label .. " (" .. count .. ")" end
-            action(label, { kind = "place", item = item }, placements)
+            local mounts = spec.definitionId == ZedComm.NetworkSwitch.ID and ZedComm.NetworkSwitch.mounts(square)
+            if mounts and #mounts > 1 then
+                local walls = {}
+                placements[#placements + 1] = { label, children = walls }
+                for _, mount in ipairs(mounts) do
+                    action("Mount on " .. mount .. " wall", { kind = "place", item = item, mount = mount }, walls)
+                end
+            else
+                action(label, { kind = "place", item = item }, placements)
+            end
         end
     end
     if #placements == 1 then
@@ -794,16 +833,21 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                     })
                 end
             end
-            local wired = {}
-            for port, cable in pairs(entry.piece.ports) do
-                if cable then wired[#wired + 1] = port end
+            local ports, labels = {}, {}
+            for port in pairs(entry.piece.ports) do
+                ports[#ports + 1] = port
             end
-            table.sort(wired)
-            for _, port in ipairs(wired) do
-                action("Disconnect cabinet jack (" .. portLabel(entry, port) .. ")", {
-                    kind = "disconnect-port", targetId = entry.id, object = entry.object,
-                    port = port, cableId = entry.piece.ports[port],
-                })
+            table.sort(ports)
+            options[#options + 1] = { "Label cabinet jack", children = labels }
+            for _, port in ipairs(ports) do
+                local label, cable = portLabel(entry, port), entry.piece.ports[port]
+                addTo(labels, label, labelCabinetJack, registry, entry, port)
+                if cable then
+                    action("Disconnect cabinet jack (" .. label .. ")", {
+                        kind = "disconnect-port", targetId = entry.id, object = entry.object,
+                        port = port, cableId = cable,
+                    })
+                end
             end
         end
         if entry.spec.nativePickup then
@@ -836,6 +880,23 @@ Events.SetDragItem.Add(function(nextCursor, playerNum)
 end)
 Events.OnFillWorldObjectContextMenu.Add(onFillMenu)
 Events.OnFillInventoryObjectContextMenu.Add(onFillInventoryMenu)
+Events.OnObjectLeftMouseButtonDown.Add(function(object)
+    if not object or not object:hasModData() then return end
+    local tag = object:getModData().zedcomm
+    if type(tag) ~= "table" or tag.definitionId ~= ZedComm.NetworkSwitch.ID then return end
+    local player, cell = getSpecificPlayer(0), getCell()
+    if not player or not cell or cell:getDrag(0) or player:isDead() or player:isAiming()
+        or player:isIgnoreContextKey() or player:isClimbingLadder() or player:isClimbingDownLadder() then return end
+    local speed = UIManager.getSpeedControls()
+    if speed and speed:getCurrentGameSpeed() == 0 then return end
+    local placement = ZedComm.PlayerPlacement
+    local registry = placement.getRegistry()
+    local entry = registry and placement.resolve(registry, tag.id)
+    if entry and entry.object == object and placement.canReach(player, entry.square) then
+        queue(player, { kind = "toggle-network-switch", targetId = entry.id, object = object,
+            square = entry.square, network = registry.network })
+    end
+end)
 Events.OnTick.Add(function()
     for player, run in pairs(runs) do
         if run.item and not carries(player, run.item) then

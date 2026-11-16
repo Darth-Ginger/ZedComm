@@ -39,7 +39,9 @@ local function addInventoryItems(cursor, objects, placement, actions)
             local key = inventoryKey(item, spec)
             if not seen[key] then
                 seen[key] = true
-                addCandidate(cursor, objects, item, spec, key, key == wireType and runLabel)
+                local detail = key == wireType and runLabel
+                if spec.definitionId == ZedComm.NetworkSwitch.ID then detail = "Shift + Rotate Building changes wall" end
+                addCandidate(cursor, objects, item, spec, key, detail)
             end
         end
     end
@@ -102,6 +104,7 @@ end
 
 local function cancelSelection(cursor, actions)
     cursor.zedcommKey = nil
+    cursor.zedcommMount = nil
     actions.changeSelection(cursor)
 end
 
@@ -147,7 +150,7 @@ local function install()
             self.colorMod = class.normalColor
         else
             self.canCreate = actions.canPlace(self, selected.object, square)
-            local name = placement.previewSprite(square, selected.object)
+            local name = placement.previewSprite(square, selected.object, self.zedcommMount)
             self.objectSprite = (name and getSprite(name)) or props.sprite
             self.colorMod = self.canCreate and class.normalColor or class.invalidColor
         end
@@ -182,6 +185,15 @@ local function install()
 
     local rotateKey = class.rotateKey
     function class:rotateKey(key, joypad)
+        if not joypad and getCore():isKey(KeybindId.ROTATE_BUILDING, key)
+            and (isKeyDown(Keyboard.KEY_LSHIFT) or isKeyDown(Keyboard.KEY_RSHIFT)) then
+            local selected = selectedAt(self, self.currentSquare)
+            if selected and selected.zedcommKey and selected.object:getFullType() == ZedComm.NetworkSwitch.ID then
+                local current = placement.switchMount(self.currentSquare, selected.object, self.zedcommMount)
+                self.zedcommMount = ZedComm.NetworkSwitch.nextMount(self.currentSquare, current)
+                return
+            end
+        end
         local index = self.objectIndex
         rotateKey(self, key, joypad)
         if self.objectIndex ~= index then cancelSelection(self, actions) end

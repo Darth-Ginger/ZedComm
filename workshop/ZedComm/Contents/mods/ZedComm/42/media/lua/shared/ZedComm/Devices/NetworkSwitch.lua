@@ -1,5 +1,6 @@
 -- A latched source with one wire jack.
 require "ZedComm/DeviceDefinitions"
+require "ZedComm/WireShape"
 
 local Switch = {
     ID = "ZedComm.NetworkSwitch",
@@ -7,24 +8,51 @@ local Switch = {
 }
 
 local offFrames = { north = 467, west = 469, south = 471, east = 473 }
+local facings = { "north", "west", "south", "east" }
+local leadFrames = { [0] = 0, [1] = 1, [2] = 2, [4] = 3, [8] = 4 }
 local southWall, eastWall = 2, 8 -- IsoGridSquare.getWallType() masks
 
-function Switch.mount(square)
-    if square:getWall(true) then return "north" end
-    if square:getWall(false) then return "west" end
+function Switch.mounts(square)
+    if not square then return {} end
     -- The south and east edges can belong to the next square's wall.
     local walls = square:getWallType()
-    if math.floor(walls / southWall) % 2 == 1 then return "south" end
-    if math.floor(walls / eastWall) % 2 == 1 then return "east" end
+    local eligible = { not not square:getWall(true), not not square:getWall(false),
+        math.floor(walls / southWall) % 2 == 1, math.floor(walls / eastWall) % 2 == 1 }
+    local mounts = {}
+    for index, facing in ipairs(facings) do
+        if eligible[index] then mounts[#mounts + 1] = facing end
+    end
+    return mounts
 end
 
-function Switch.sprite(mount, on)
-    return "zedcomm_devices_01_" .. ((offFrames[mount] or offFrames.north) + (on and 1 or 0))
+function Switch.mount(square, preferred)
+    local mounts = Switch.mounts(square)
+    for _, facing in ipairs(mounts) do
+        if facing == preferred then return facing end
+    end
+    return mounts[1]
 end
 
-function Switch.updateSprite(object, state)
+function Switch.nextMount(square, current)
+    local mounts = Switch.mounts(square)
+    for i, facing in ipairs(mounts) do
+        if facing == current then return mounts[i % #mounts + 1] end
+    end
+    return mounts[1]
+end
+
+function Switch.sprite(mount, on, direction)
+    local frame = (offFrames[mount] or offFrames.north) + (on and 1 or 0)
+    if leadFrames[direction] then
+        return "zedcomm_switch_01_" .. ((frame - 467) * 5 + leadFrames[direction])
+    end
+    return "zedcomm_devices_01_" .. frame
+end
+
+function Switch.updateSprite(object, state, network, piece)
     if not state then return end
-    local sprite = getSprite(Switch.sprite(state.mount, state.on))
+    local direction = ZedComm.WireShape.portDirection(network, piece, "signal")
+    local sprite = getSprite(Switch.sprite(state.mount, state.on, direction))
     if sprite and object:getSprite() ~= sprite then object:setSprite(sprite) end
 end
 

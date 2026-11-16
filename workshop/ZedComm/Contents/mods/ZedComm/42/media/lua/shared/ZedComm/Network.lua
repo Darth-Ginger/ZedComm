@@ -527,6 +527,7 @@ function Network:setDeviceState(id, state)
             if ports[port] == nil then
                 if cable then self.pieces[cable].links[id] = nil end
                 piece.packets[port] = nil
+                if stateCopy.portLabels then stateCopy.portLabels[port] = nil end
             end
         end
         piece.ports, piece.board, piece.evaluate = ports, board, evaluate
@@ -536,6 +537,19 @@ function Network:setDeviceState(id, state)
     end
     piece.state = stateCopy
     return true
+end
+
+-- A label edit changes the saved record without rebuilding the board or restarting timers.
+function Network:renameCabinetPort(id, port, name)
+    local piece = self.pieces[id]
+    if not piece or not piece.board or not piece.board.directions[port] then return false, "That cabinet jack is gone." end
+    if type(name) ~= "string" or name:find("[%c]") then return false, "Use a single-line jack label." end
+    name = name:match("^%s*(.-)%s*$")
+    if #name > 64 then return false, "Use a shorter jack label." end
+    local labels = piece.state.portLabels or {}
+    piece.state.portLabels = labels
+    labels[port] = name ~= "" and name or nil
+    return true, Circuit.jackLabel(port, piece.board.directions[port], labels[port])
 end
 
 -- One plain record per piece, a copy the caller may keep. Each side of a

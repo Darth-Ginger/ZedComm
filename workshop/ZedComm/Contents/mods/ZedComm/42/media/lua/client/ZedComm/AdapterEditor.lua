@@ -147,6 +147,7 @@ function Editor:refresh()
     local entry = selectedHost(self.player, self.registry, self.target, true)
     local circuit = entry and entry.piece.state and entry.piece.state.circuit
     if not circuit then self:endDrag(); return false end
+    self.jackLabels = entry.piece.state.portLabels
     self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square) and true or false
     if not self.reachable then self:endDrag() end
     if circuit ~= self.expected then
@@ -207,7 +208,8 @@ function Editor:beginDrag(id, item, grabX, grabY, kind)
         while layout.modules[kind .. "-" .. index] do index = index + 1 end
         id = kind .. "-" .. index
         if self.cabinet then layout.nextModule = index + 1 end
-        local part = { kind = kind, rotation = 0, threshold = kind == "threshold" and 50 or nil }
+        local part = { kind = kind, rotation = Circuit.defaultRotation(kind),
+            threshold = kind == "threshold" and 50 or nil }
         if Circuit.kinds[kind].source then part.level = item:getModData().zedcommSourceLevel end
         if kind == "batterySource" then part.charge = item:getModData().zedcommCharge end
         layout.modules[id] = part
@@ -399,8 +401,8 @@ function Editor:onMouseDown(x, y)
             if self:inReach() then
                 local item = self.carried[Circuit.kinds[kind].item].item
                 if item then
-                    local _, height = Circuit.footprint(0, kind)
-                    self:beginDrag(nil, item, self.cell / 2, height * self.cell / 2, kind)
+                    local width, height = Circuit.footprint(Circuit.defaultRotation(kind), kind)
+                    self:beginDrag(nil, item, width * self.cell / 2, height * self.cell / 2, kind)
                 end
             end
             return true
@@ -487,6 +489,7 @@ function Editor:render()
             self:drawRectBorder(gridX + column * cell, gridY + row * cell, cell, cell, 0.8, 0.34, 0.43, 0.35)
         end
     end
+    local hoveredJack
     for id, part in pairs(self.parts) do
         drawPart(self, part.kind, part.rotation, part.x + 2, part.y + 2, part.width - 4, part.height - 4)
         if id == self.selected then
@@ -505,6 +508,15 @@ function Editor:render()
             end
             self:drawTextCentre(tostring(reading), part.x + part.width / 2,
                 part.y + 25, 1, 1, 0.91, 1, UIFont.Small)
+            local custom = self.jackLabels and self.jackLabels[id]
+            if custom then
+                self:setStencilRect(part.x + 6, part.y + 41, part.width - 12, 17)
+                self:drawText(custom, part.x + 6, part.y + 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
+                self:clearStencilRect()
+                if inside(self:getMouseX(), self:getMouseY(), part.x, part.y, part.width, part.height) then
+                    hoveredJack = Circuit.jackLabel(id, spec.jack, custom)
+                end
+            end
             local jackX, jackY = Circuit.jackAt(part)
             local px = math.max(4, math.min(part.width - 4, jackX * cell))
             local py = math.max(4, math.min(part.height - 4, jackY * cell))
@@ -581,7 +593,7 @@ function Editor:render()
         self:drawRectBorder(carriedX, y, carriedWidth, carriedHeight, 0.8, 0.34, 0.43, 0.35)
         self:drawText(spec.label .. "  x" .. self.carried[spec.item].count,
             carriedX + 23, y + 7, 0.91, 0.93, 0.86, 1, UIFont.Small)
-        drawPart(self, kind, 0, carriedX + 3, y + 2, 13, carriedHeight - 4)
+        drawPart(self, kind, Circuit.defaultRotation(kind), carriedX + 3, y + 2, 13, carriedHeight - 4)
     end
     -- Legend for the contact squares until the parts get clearer art.
     for i, row in ipairs(LEGEND) do
@@ -590,7 +602,7 @@ function Editor:render()
         self:drawRect(carriedX + 4, y + 2, 10, 10, 1, r, g, b)
         self:drawText(row[2], carriedX + 20, y, 0.85, 0.90, 0.85, 1, UIFont.Small)
     end
-    self:drawText((self.reachable and self.message) or hint, 16, gridY + self.gridWidth + 16,
+    self:drawText((self.reachable and self.message) or hoveredJack or hint, 16, gridY + self.gridWidth + 16,
         0.90, 0.90, 0.80, 1, UIFont.Small)
     local reach = self.reachable and not drag
     local selected = self.layout.modules[self.selected]

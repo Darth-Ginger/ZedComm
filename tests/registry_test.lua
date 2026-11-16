@@ -493,7 +493,8 @@ local registeredSprites = {}
 getSprite = function(name)
     local index = tonumber(string.match(name, "^zedcomm_devices_01_(%d+)$"))
     local displayIndex = tonumber(string.match(name, "^zedcomm_display_01_(%d+)$"))
-    if (index and index <= 474) or (displayIndex and displayIndex < 257) then
+    local switchIndex = tonumber(string.match(name, "^zedcomm_switch_01_(%d+)$"))
+    if (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40) then
         if not registeredSprites[name] then
             registeredSprites[name] = { getName = function() return name end }
         end
@@ -2639,9 +2640,10 @@ do
         return { initialise = function() end, setEnable = function() end, click = function() action(target) end }
     end }
     ISTextBox = { new = function(_, _, _, _, _, _, _, _, action)
-        return { initialise = function() end, addToUIManager = function()
+        local entry = { getText = function() return input end }
+        return { entry = entry, initialise = function() end, addToUIManager = function()
             confirm = function()
-                action(nil, { internal = "OK", parent = { entry = { getText = function() return input end } } })
+                action(nil, { internal = "OK", parent = { entry = entry } })
             end
         end }
     end }
@@ -2934,6 +2936,28 @@ do
         end
         tick()
         local net = playerRegistry.network
+        local labelMenu = assert(menuAt(cabinetTile).children["Label cabinet jack"])
+        local boardBefore = cabinetPiece().board
+        assert(labelMenu.options.IN)()
+        input = "Load"
+        confirm()
+        check(cabinetPiece().state.portLabels.input == "Load" and cabinetPiece().board == boardBefore
+            and cabinetPiece().ports.input == inputWire and optionsAt(cabinetTile)["Disconnect cabinet jack (IN (Load))"],
+            "labeling a wired jack preserves its board, port identity and cable")
+        player.isDead, player.isAiming, player.isIgnoreContextKey = function() return false end, function() return false end,
+            function() return false end
+        player.isClimbingLadder, player.isClimbingDownLadder = player.isDead, player.isDead
+        local previousUI = UIManager
+        UIManager = { getSpeedControls = function() return nil end }
+        player.tile = armTile
+        fire("OnObjectLeftMouseButtonDown", armObject())
+        assert(queued and queued:isValid() and queued:complete())
+        tick()
+        check(armPiece().state.on and runtime.inspect(arm).sourceByte == 255
+            and armObject().sprite == "zedcomm_switch_01_7", "a direct click toggles the mounted, wired switch")
+        UIManager = previousUI
+        flipArm(false)
+        tick()
         check(net:networkOf(inputWire) ~= net:networkOf(armWire) and net:networkOf(armWire) ~= net:networkOf(outputWire)
             and net:networkOf(inputWire) ~= net:networkOf(outputWire), "the three cabinet runs stay independent")
         local load = 80
@@ -2941,13 +2965,13 @@ do
         flipArm(true)
         tick()
         check(output() == 0 and not lamp.active and runtime.inspect(arm).sourceByte == 255
-            and armObject().sprite == "zedcomm_devices_01_468",
+            and armObject().sprite == "zedcomm_switch_01_7",
             "the arm latches at 255 and shows the on sprite while a low load leaves the receiver off")
         load = 1150
         flipArm(false)
         fire("OnTick")
         check(output() == 0 and runtime.inspect(arm).sourceByte == 0
-            and armObject().sprite == "zedcomm_devices_01_467" and not ZedComm.Simulation.hasPending(),
+            and armObject().sprite == "zedcomm_switch_01_2" and not ZedComm.Simulation.hasPending(),
             "coalesced input changes do not publish a transient ON or requeue an equal output")
         local packets = ZedComm.SignalModules.Packet
         runtime.prepare(playerRegistry)
@@ -2996,16 +3020,19 @@ do
         tick()
         check(output() == 255 and lamp.active, "restoring an internal arm link uses the existing wire reading")
 
+        assert(playerRegistry:renameCabinetPort(cabinetId, "inputExtension-3", "Arm"))
         panel:onMouseDown(160, 89) -- top-edge extension body
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(365, 289)
         check(cabinetPiece().ports["inputExtension-3"] == armWire
-            and cabinetPiece().state.circuit.modules["inputExtension-3"].rotation == 180,
+            and cabinetPiece().state.circuit.modules["inputExtension-3"].rotation == 180
+            and cabinetPiece().state.portLabels["inputExtension-3"] == "Arm",
             "moving a wired extension to another edge preserves its jack identity")
         panel:removePart()
         tick()
         check(output() == nil and not lamp.active and not net:record(armWire).links[cabinetId]
-            and inventory:getFirstType("ZedComm.InputExtension"), "extension removal returns the item and frees the cable")
+            and not cabinetPiece().state.portLabels["inputExtension-3"]
+            and inventory:getFirstType("ZedComm.InputExtension"), "extension removal returns the item and clears its label")
         panel:onMouseDown(420, 152)
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(207, 104)
@@ -3024,6 +3051,7 @@ do
         local _, runName = playerRegistry:getRunName(inputWire)
         check(runName == "Load" and armPiece().state.on and runtime.inspect(arm).sourceByte == 255
             and cabinetPiece().ports["inputExtension-4"] == armWire
+            and cabinetPiece().state.portLabels.input == "Load"
             and #cabinetPiece().state.circuit.links == 4 and output() == 0 and not lamp.active,
             "reload restores layout, jack identities and names and uses the new load")
         load = 1150
@@ -3157,6 +3185,20 @@ do
             "toggling keeps the east face and publishes 255")
         southTile.northWall, southTile.westWall = {}, {}
         check(ZedComm.NetworkSwitch.mount(southTile) == "north", "multiple walls keep north-first preference")
+        check(ZedComm.NetworkSwitch.nextMount(southTile, "north") == "west"
+            and ZedComm.NetworkSwitch.nextMount(southTile, "west") == "south"
+            and ZedComm.NetworkSwitch.nextMount(southTile, "south") == "north",
+            "corner rotation cycles eligible walls and skips the open edge")
+        assert(target(eastTile, arm, "pickup"))
+        savedSwitch = assert(inventory:getFirstType("ZedComm.NetworkSwitch"))
+        check(not runPlacement(southTile, { kind = "place", item = savedSwitch, mount = "east" })
+            and inventory:contains(savedSwitch), "an ineligible chosen wall cannot consume the switch")
+        local corner = menuAt(southTile)
+        local placeMenu = corner.children["Place device"] or corner
+        assert(placeMenu.children["Place network switch"].options["Mount on west wall"])()
+        assert(queued:isValid() and queued:complete())
+        check(armPiece().state.mount == "west" and armObject().sprite == "zedcomm_devices_01_470",
+            "the corner context menu can mount the carried switch on its non-default wall")
 
         local logicTile = floorTile(185, 125)
         local logicPlaced, logicId = runPlacement(logicTile, { kind = "place", item = give("ZedComm.SmallCabinet") })
@@ -3305,12 +3347,10 @@ do
         local splitterId = assert(panel.selected)
         panel.previousPage.click()
         panel:onMouseDown(420, 186)
-        panel:onKeyPress(rotateKey)
-        panel:onKeyPress(rotateKey)
         panel:onMouseUp(346, 244)
         local extensionId = assert(panel.selected)
         check(not inventory:contains(splitter) and not inventory:contains(extension),
-            "the editor installs the splitter and rotated output extension")
+            "the editor installs the output extension on the right without rotating it")
         panel:linkTerminal("input", "out")
         panel:linkTerminal(splitterId, "in")
         panel:linkTerminal(splitterId, "outA")
