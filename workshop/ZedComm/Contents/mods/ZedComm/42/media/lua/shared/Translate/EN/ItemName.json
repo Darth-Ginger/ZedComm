@@ -1,0 +1,9 @@
+{
+    "ZedComm.PressurePlate": "ZedComm Pressure Plate",
+    "ZedComm.OccupancyPlate": "ZedComm Occupancy Plate",
+    "ZedComm.WeightPlate": "ZedComm Weight Plate",
+    "ZedComm.SignalWire": "ZedComm Signal Wire",
+    "ZedComm.NumericDisplay": "ZedComm Numeric Display",
+    "ZedComm.AdvancedAdapter": "ZedComm Advanced Adapter",
+    "ZedComm.ThresholdModule": "ZedComm Threshold Module"
+}

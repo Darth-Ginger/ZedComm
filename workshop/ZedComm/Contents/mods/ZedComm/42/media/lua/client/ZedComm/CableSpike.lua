@@ -1,44 +1,15 @@
--- ZedComm spikes (Implement Endpoints And Cables): two throwaway in-game
--- experiments, each answering one question before the real feature is built.
---
--- Cable spike: does a plain IsoObject placed by a mod, carrying a ZedComm id
--- in its modData, come back after save and load?
--- Pickup spike (ADR-308): does a "networked" mark stored in a lamp's
--- modData.movableData survive pickup and placement? Vanilla copies that one
--- table onto the inventory item on pickup and back onto the object on
--- placement (ISMoveableSpriteProps), so no ZedComm hook should be needed.
---
--- Singleplayer only, and temporary: options in the right-click menu of any
--- square, under "ZedComm spike":
---   Place test cable      - adds a tagged IsoObject to the square
---   Show pieces here      - says how many tagged objects the square holds
---   Remove test cables    - removes them again
---   Mark lamp as networked - only on a square with a lamp: writes the mark
---   Check lamp            - only on a square with a lamp: says if it is marked
--- On load, every tagged object and marked lamp found while chunks load is
--- printed to console.txt as "[ZedComm spike] found ...". Remove this file
--- once the real cable placement and install action replace it.
+-- Singleplayer debug controls for inspecting circuits and testing sender modules.
+if isClient() or isServer() then return end
 
-if isClient() or isServer() then return end -- multiplayer is out of scope for the spike
+require "ISUI/ISTextBox"
 
-local Spike = {}
-
--- A vanilla sprite stands in until ZedComm has its own art. The first name
--- the game knows is used; if none is known the menu says so.
-Spike.SPRITES = { "trash_01_9", "trash_01_40", "carpentry_02_53" }
-Spike.found = 0
-
-local function pickSprite()
-    for i = 1, #Spike.SPRITES do
-        if getSprite(Spike.SPRITES[i]) then return Spike.SPRITES[i] end
-    end
-    return nil
-end
+local Debug = {}
 
 local function tagOf(object)
     if not object or not object.hasModData or not object:hasModData() then return nil end
     local data = object:getModData()
-    return data and data.zedcomm
+    local tag = data and data.zedcomm
+    return type(tag) == "table" and type(tag.id) == "string" and tag or nil
 end
 
 local function taggedOn(square)
@@ -56,118 +27,243 @@ local function where(square)
 end
 
 local function say(player, text)
-    local p = getSpecificPlayer(player)
-    if p then p:Say(text) end
-    print("[ZedComm spike] " .. text)
+    if player then player:Say(text) end
+    print("[ZedComm debug] " .. text)
 end
 
-function Spike.place(player, square)
-    local sprite = pickSprite()
-    if not sprite then
-        say(player, "no stand-in sprite found; edit Spike.SPRITES")
+function Debug.placeByteRig(player, square)
+    local registry = ZedComm.Registry and ZedComm.Registry.instance
+    if not registry then
+        say(player, "device test requires the server registry")
         return
     end
-    local n = #taggedOn(square) + 1
-    local id = "spike-" .. where(square) .. "-" .. n .. "-" .. getTimestampMs()
-    local object = IsoObject.new(square, sprite, "ZedCommTestCable")
-    object:getModData().zedcomm = { id = id, kind = "cable", spike = 1 }
-    square:AddTileObject(object)
-    -- AddTileObject does not fire this in singleplayer; vanilla traps and
-    -- rain barrels fire it by hand so their server systems register them.
-    triggerEvent("OnObjectAdded", object)
-    say(player, "placed " .. id .. " (" .. sprite .. "), " .. n .. " on this square")
-end
-
-function Spike.show(player, square)
-    local tagged = taggedOn(square)
-    local ids = {}
-    for i = 1, #tagged do ids[i] = tagOf(tagged[i]).id end
-    say(player, #tagged .. " ZedComm piece(s) at " .. where(square)
-        .. (#ids > 0 and (": " .. table.concat(ids, ", ")) or ""))
-end
-
-function Spike.remove(player, square)
-    local tagged = taggedOn(square)
-    for i = 1, #tagged do
-        square:transmitRemoveItemFromSquare(tagged[i])
+    local sprites = { "zedcomm_devices_01_0", "zedcomm_devices_01_1", "zedcomm_devices_01_431" }
+    for _, sprite in ipairs(sprites) do
+        if not getSprite(sprite) then
+            say(player, "device rig missing sprite: " .. sprite)
+            return
+        end
     end
-    say(player, "removed " .. #tagged .. " test cable(s) at " .. where(square))
-end
 
--- Pickup spike: the mark lives where vanilla carries it through pickup.
-local function lampOn(square)
-    local objects = square:getObjects()
-    for i = 0, objects:size() - 1 do
-        local object = objects:get(i)
-        if instanceof(object, "IsoLightSwitch") then return object end
+    local cell = getCell()
+    local x, y, z = square:getX(), square:getY(), square:getZ()
+    local tiles = { square, cell:getGridSquare(x + 1, y, z), cell:getGridSquare(x + 2, y, z) }
+    for i = 1, 3 do
+        if not tiles[i] or #taggedOn(tiles[i]) > 0 then
+            say(player, "choose three loaded tiles clear of ZedComm pieces along +X")
+            return
+        end
     end
-    return nil
+
+    local prefix = "device-spike-" .. where(square) .. "-" .. getTimestampMs()
+    local wireId = prefix .. "-wire"
+    local tags = {
+        { id = prefix .. "-sensor", kind = "endpoint", spikeWire = wireId,
+            definitionId = "ZedComm.DebugByteSource" },
+        { id = wireId, kind = "cable", useRouteSprite = true },
+        { id = prefix .. "-display", kind = "endpoint", definitionId = "ZedComm.NumericDisplay", spikeWire = wireId },
+    }
+    local names = { "ZedCommTestByteSource", "ZedCommTestCable", "ZedCommTestDisplay" }
+    local objects = {}
+    local ok, err = pcall(function()
+        for i = 1, 3 do
+            local object = IsoObject.new(tiles[i], sprites[i], names[i])
+            object:getModData().zedcomm = tags[i]
+            objects[i] = object
+            tiles[i]:AddTileObject(object)
+            triggerEvent("OnObjectAdded", object)
+            if not registry.network.pieces[tags[i].id] then error(names[i] .. " failed to register") end
+        end
+        for _, i in ipairs({ 1, 3 }) do
+            local linked, reason = registry:link(wireId, tags[i].id, "signal")
+            if not linked then error(reason) end
+        end
+    end)
+    if not ok then
+        for i = #objects, 1, -1 do
+            tiles[i]:transmitRemoveItemFromSquare(objects[i])
+        end
+        say(player, "device rig failed: " .. tostring(err))
+        return
+    end
+    say(player, "byte source at " .. where(tiles[1]) .. ", wire at " .. where(tiles[2])
+        .. ", display at " .. where(tiles[3]))
 end
 
-local function markOf(object)
-    if not object:hasModData() then return nil end
-    local movable = object:getModData().movableData
-    return type(movable) == "table" and movable.zedcommDevice or nil
-end
-
-function Spike.markLamp(player, lamp)
-    local data = lamp:getModData()
-    if type(data.movableData) ~= "table" then data.movableData = {} end
-    data.movableData.zedcommDevice = { def = "SpikeLamp", marked = getTimestampMs() }
-    say(player, "lamp marked as networked at " .. where(lamp:getSquare()))
-end
-
-function Spike.checkLamp(player, lamp)
-    local mark = markOf(lamp)
-    if mark then
-        say(player, "lamp is networked (" .. tostring(mark.def) .. ", marked " .. tostring(mark.marked) .. ")")
+function Debug.toggleDeviceLink(player, object)
+    local registry = ZedComm.Registry and ZedComm.Registry.instance
+    local tag = tagOf(object)
+    local piece = registry and tag and registry.network.pieces[tag.id]
+    if not piece or not tag.spikeWire then return end
+    local linked = piece.ports.signal
+    local ok, err
+    if linked then
+        ok, err = registry:unlink(linked, tag.id)
     else
-        say(player, "lamp is not networked")
+        ok, err = registry:link(tag.spikeWire, tag.id, "signal")
     end
+    say(player, ok and (linked and "test device disconnected" or "test device connected")
+        or tostring(err))
 end
 
-local function onFillMenu(player, context, worldObjects, test)
-    if test then return end -- probe pass: no menu changes
-    local square = nil
-    for _, object in ipairs(worldObjects) do
-        square = object:getSquare()
-        if square then break end
-    end
-    if not square then return end
-
-    local root = context:addOption("ZedComm spike", nil, nil)
-    local sub = ISContextMenu:getNew(context)
-    context:addSubMenu(root, sub)
-    sub:addOption("Place test cable", player, Spike.place, square)
-    sub:addOption("Show pieces here", player, Spike.show, square)
-    sub:addOption("Remove test cables", player, Spike.remove, square)
-    local lamp = lampOn(square)
-    if lamp then
-        sub:addOption("Mark lamp as networked", player, Spike.markLamp, lamp)
-        sub:addOption("Check lamp", player, Spike.checkLamp, lamp)
-    end
+function Debug.showDeviceDisplay(player, object)
+    local runtime = ZedComm.DeviceRuntime
+    if not runtime then return end
+    local value, _, hasReading = runtime.getDisplay(object)
+    local label = "unattached or awaiting update"
+    if hasReading then label = value == nil and "no signal" or tostring(value) end
+    say(player, "test display: " .. label)
 end
 
--- Report every tagged object that comes back as its chunk loads.
-local function onLoadSquare(square)
+function Debug.inspectCircuit(player, object)
+    local runtime = ZedComm.DeviceRuntime
+    local tag = tagOf(object)
+    local report = runtime and tag and runtime.inspect(tag.id)
+    if not report then
+        say(player, "Circuit is awaiting the simulation.")
+        return
+    end
+    local lines = { report.status }
+    local packet = report.sourcePacket
+    if not packet then
+        lines[#lines + 1] = "source no signal"
+    elseif packet.type == "signal.advanced" then
+        local weight = packet.value
+        lines[#lines + 1] = "source " .. packet.type .. " " .. weight.kind .. " " .. weight.amount .. " " .. weight.unit
+        lines[#lines + 1] = "fallback " .. (report.sourceByte == nil and "none" or tostring(report.sourceByte))
+    else
+        lines[#lines + 1] = "source " .. packet.type .. " " .. packet.value
+    end
+    for _, receiver in ipairs(report.receivers) do
+        local value = "unattached or unavailable"
+        if receiver.reading then value = receiver.value == nil and "no signal" or tostring(receiver.value) end
+        lines[#lines + 1] = "receiver " .. value
+    end
+    if #report.receivers == 0 then lines[#lines + 1] = "no receiver" end
+    say(player, table.concat(lines, " | "))
+end
+
+function Debug.setByte(player, object)
+    local tag = tagOf(object)
+    local registry = ZedComm.Registry and ZedComm.Registry.instance
+    local runtime = ZedComm.DeviceRuntime
+    local piece = registry and tag and registry.network.pieces[tag.id]
+    if not runtime or not piece then return end
+    local box = ISTextBox:new(0, 0, 280, 150, "Test byte (0 to 255):",
+        tostring(piece.state and piece.state.byte or 0), nil, function(_, button)
+            if button.internal ~= "OK" then return end
+            local current = ZedComm.Registry and ZedComm.Registry.instance
+            if current ~= registry then return end
+            local value = button.parent.entry:getText()
+            local ok, reason = runtime.setTestByte(registry, tag.id, value)
+            say(player, ok and ("test source set to " .. value) or tostring(reason))
+        end, player:getPlayerNum())
+    box:initialise()
+    box:addToUIManager()
+end
+
+local function resolveDebugTarget(object)
+    if not getDebug() then return nil end
+    local tag = tagOf(object)
+    local registry = ZedComm.Registry and ZedComm.Registry.instance
+    local placement = ZedComm.PlayerPlacement
+    local entry = tag and registry and placement and placement.resolve(registry, tag.id)
+    if entry and entry.object == object then return registry, entry end
+end
+
+local function selectWeightPlateSender(player, object, moduleId)
+    local registry, entry = resolveDebugTarget(object)
+    if not entry then return end
+    local ok, reason = ZedComm.DeviceRuntime.setWeightPlateSender(registry, entry.id, moduleId)
+    local modules = ZedComm.SignalModules
+    local name = moduleId == modules.ADVANCED_SENDER and "Advanced Sender" or "Basic Sender"
+    say(player, ok and ("Weight plate sender set to " .. name .. ".") or reason)
+end
+
+local function thresholdModule(circuit)
+    local threshold = type(circuit) == "table" and type(circuit.modules) == "table" and circuit.modules.threshold
+    if type(threshold) == "table" and threshold.kind == "threshold" then return threshold end
+end
+
+local function installThresholdPreset(player, object)
+    local registry, entry = resolveDebugTarget(object)
+    if not entry or thresholdModule(entry.piece.state and entry.piece.state.circuit) then return end
+    local ok, reason = ZedComm.DeviceRuntime.setLampCircuit(registry, entry.id,
+        ZedComm.InternalCircuit.thresholdPreset())
+    say(player, ok and "Installed test threshold at 50." or reason)
+end
+
+local function editLampThreshold(player, object)
+    local registry, entry = resolveDebugTarget(object)
+    local circuit = entry and entry.piece.state and entry.piece.state.circuit
+    local threshold = thresholdModule(circuit)
+    if not threshold then return end
+    local box = ISTextBox:new(0, 0, 280, 150, "Lamp threshold (0 to 255):",
+        tostring(threshold.threshold), nil, function(_, button)
+            if button.internal ~= "OK" then return end
+            local current, target = resolveDebugTarget(object)
+            if current ~= registry or not target or not target.piece.state or target.piece.state.circuit ~= circuit then return end
+            local layout = registry.network:record(entry.id).state.circuit
+            layout.modules.threshold.threshold = tonumber(button.parent.entry:getText())
+            local ok, reason = ZedComm.DeviceRuntime.setLampCircuit(registry, entry.id, layout)
+            say(player, ok and ("Lamp threshold set to " .. layout.modules.threshold.threshold .. ".") or reason)
+        end, player:getPlayerNum())
+    box:initialise()
+    box:addToUIManager()
+end
+
+function Debug.optionsAt(registry, square)
+    local options = {}
+    local function add(label, callback, target)
+        options[#options + 1] = { label, callback, target }
+    end
+
+    add("Place wired byte test rig", Debug.placeByteRig, square)
     local tagged = taggedOn(square)
-    for i = 1, #tagged do
-        Spike.found = Spike.found + 1
-        print("[ZedComm spike] found " .. tostring(tagOf(tagged[i]).id) .. " at " .. where(square))
+    for _, object in ipairs(tagged) do
+        local tag = tagOf(object)
+        local piece = registry.network.pieces[tag.id]
+        if piece then
+            local label = #tagged > 1 and ("Inspect circuit (" .. tag.id .. ")") or "Inspect circuit"
+            add(label, Debug.inspectCircuit, object)
+            if piece.definitionId == ZedComm.RelayLamp.ID then
+                local circuit = piece.state and piece.state.circuit
+                if thresholdModule(circuit) then
+                    add("Set test lamp threshold", editLampThreshold, object)
+                else
+                    add("Install test lamp threshold", installThresholdPreset, object)
+                end
+            end
+            if piece.definitionId == "ZedComm.WeightPlate" then
+                local modules = ZedComm.SignalModules
+                local moduleId = ZedComm.DeviceRuntime.getSenderModule(piece)
+                local current = "unavailable"
+                if moduleId == modules.BASIC_SENDER then current = "Basic Sender" end
+                if moduleId == modules.ADVANCED_SENDER then current = "Advanced Sender" end
+                options[#options + 1] = {
+                    "Weight plate sender (" .. current .. ")",
+                    children = {
+                        { "Basic Sender", selectWeightPlateSender, object, modules.BASIC_SENDER },
+                        { "Advanced Sender", selectWeightPlateSender, object, modules.ADVANCED_SENDER },
+                    },
+                }
+            end
+            if tag.spikeWire then
+                if tag.definitionId == "ZedComm.DebugByteSource" then
+                    add("Set test byte", Debug.setByte, object)
+                    add("Toggle test source link", Debug.toggleDeviceLink, object)
+                elseif tag.definitionId == "ZedComm.NumericDisplay" then
+                    add("Read test display", Debug.showDeviceDisplay, object)
+                    add("Toggle test display link", Debug.toggleDeviceLink, object)
+                elseif tag.definitionId == "ZedComm.PressureSensor" then
+                    -- Existing pressure rigs retain their link control.
+                    add("Toggle test sensor link", Debug.toggleDeviceLink, object)
+                end
+            end
+        end
     end
-    local lamp = lampOn(square)
-    if lamp and markOf(lamp) then
-        print("[ZedComm spike] found networked lamp at " .. where(square))
-    end
+    return options
 end
-
-local function onGameStart()
-    print("[ZedComm spike] ready; " .. Spike.found .. " tagged object(s) loaded so far")
-end
-
-Events.OnFillWorldObjectContextMenu.Add(onFillMenu)
-Events.LoadGridsquare.Add(onLoadSquare)
-Events.OnGameStart.Add(onGameStart)
 
 ZedComm = ZedComm or {}
-ZedComm.CableSpike = Spike
+ZedComm.DebugCircuits = Debug

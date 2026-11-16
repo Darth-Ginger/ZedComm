@@ -17,6 +17,7 @@ end
 
 ZedComm = nil
 local Network = require("ZedComm/Network")
+local Packet = ZedComm.SignalModules.Packet
 
 -- A stub simulation that records dirty marks.
 local function stubSim()
@@ -42,6 +43,7 @@ end
 local function layout()
     local net = Network.new()
     assert(net:addEndpoint("S", 0, 0, 0, "source"))
+    assert(net:setPacket("S", Packet.basic(0)))
     assert(net:addEndpoint("D", 2, 2, 0, "sink"))
     assert(net:addCable("c1", 1, 0, 0))
     assert(net:addCable("c2", 2, 0, 0))
@@ -64,11 +66,11 @@ do
     check(id ~= nil and id == net:networkOf("D"), "sensor and display share a network across a bent run")
     check(net:networkOf("c2") == id, "every cable piece is on the run's network")
     check(net:status(id) == Network.OK, "a run with one source is OK")
-    check(net:recompute(id) == 0, "a clear sensor delivers valid zero, not disconnected")
-    net:setValue("S", 255)
-    check(net:recompute(id) == 255, "an occupied sensor delivers 255")
-    net:setValue("S", 170)
-    check(net:recompute(id) == 170, "mixed byte patterns pass unchanged")
+    check(Packet.basicValue(net:recompute(id)) == 0, "a clear sensor delivers valid zero, not disconnected")
+    net:setPacket("S", Packet.basic(255))
+    check(Packet.basicValue(net:recompute(id)) == 255, "an occupied sensor delivers 255")
+    net:setPacket("S", Packet.basic(170))
+    check(Packet.basicValue(net:recompute(id)) == 170, "mixed byte patterns pass unchanged")
     local sinks = net:sinksOf(id)
     check(#sinks == 1 and sinks[1] == "D", "the display is the run's only receiver")
     check(net:networkCount() == 1, "one connected run is one network")
@@ -136,17 +138,17 @@ end
 do
     local net = layout()
     wire(net)
-    net:setValue("S", 255)
+    net:setPacket("S", Packet.basic(255))
     check(net:networkCount() == 1, "the wired layout starts as one network")
     assert(net:remove("c2"))
     check(net:networkOf("S") ~= net:networkOf("D"), "removing a middle segment splits the run")
     check(net:recompute(net:networkOf("D")) == nil, "the cut-off display is disconnected")
-    check(net:recompute(net:networkOf("S")) == 255, "the sensor side still carries its byte")
+    check(Packet.basicValue(net:recompute(net:networkOf("S"))) == 255, "the sensor side still carries its byte")
     check(net:networkCount() == 2, "the split leaves exactly two networks")
     check(not net:link("c1", "c3"), "the gap cannot be bridged without a cable")
     assert(net:addCable("c2", 2, 0, 0))
     assert(net:link("c1", "c2")); assert(net:link("c2", "c3"))
-    check(net:recompute(net:networkOf("D")) == 255, "relaying the segment restores the current value with no new toggle")
+    check(Packet.basicValue(net:recompute(net:networkOf("D"))) == 255, "relaying the segment restores the current value with no new toggle")
     check(net:networkCount() == 1, "the repaired run is one network again")
     assert(net:unlink("c2", "c3"))
     check(net:networkOf("S") ~= net:networkOf("D"), "unlinking breaks reachability like removal")
@@ -170,7 +172,7 @@ end
 do
     local net = layout()
     wire(net)
-    net:setValue("S", 85)
+    net:setPacket("S", Packet.basic(85))
     local records = net:records()
     check(#records == 5, "one record per piece")
 
@@ -178,7 +180,11 @@ do
     local dropped = loaded:load(records)
     check(#dropped == 0, "a clean save loads with nothing dropped")
     check(loaded:networkOf("S") == loaded:networkOf("D"), "connectivity is derived again from the records")
-    check(loaded:recompute(loaded:networkOf("D")) == 85, "the source byte survives the round trip")
+    check(net:record("S").packet == nil and net:record("S").value == nil
+        and loaded:recompute(loaded:networkOf("D")) == nil, "the live packet is absent from saved records")
+    assert(loaded:setPacket("S", Packet.basic(85)))
+    check(Packet.basicValue(loaded:recompute(loaded:networkOf("D"))) == 85,
+        "the restored circuit carries the source's first live sample")
 
     local again = loaded:load(records)
     check(#again == 0, "loading the same records twice reports nothing")
@@ -214,11 +220,12 @@ do
     net:addEndpoint("D", 2, 2, 0, "sink")
     net:addCable("c1", 1, 0, 0); net:addCable("c2", 2, 0, 0); net:addCable("c3", 2, 1, 0)
     wire(net)
+    assert(net:setPacket("S", Packet.basic(0)))
     sim.clear()
 
-    net:setValue("S", 0)
+    net:setPacket("S", Packet.basic(0))
     check(sim.count() == 0, "an unchanged value marks nothing")
-    net:setValue("S", 255)
+    net:setPacket("S", Packet.basic(255))
     check(sim.marks[net:networkOf("S")] == 1 and sim.count() == 1, "a value change marks only its network")
 
     sim.clear()
@@ -230,7 +237,41 @@ do
     net:addCable("c2", 2, 0, 0)
     net:link("c1", "c2"); net:link("c2", "c3")
     check(sim.marks[net:networkOf("D")], "a repair marks the joined network")
-    check(sim.recompute(net:networkOf("D")) == 255, "the recompute step delivers the current byte")
+    check(Packet.basicValue(sim.recompute(net:networkOf("D"))) == 255, "the recompute step delivers the current byte")
+end
+
+-- ADR-309 packet ownership, validation and semantic change detection.
+do
+    local sim, net = stubSim(), layout()
+    net:attach(sim)
+    wire(net)
+    local id = net:networkOf("D")
+    local packet = { type = "signal.advanced", value = { kind = "weight", amount = 1150, unit = "kg" },
+        basicValue = 115 }
+    assert(net:setPacket("S", packet))
+    check(net:recompute(id).value.amount == 1150, "the wire delivers a complete advanced payload")
+    packet.value.amount, packet.basicValue = 0, 0
+    local read = net:recompute(id)
+    read.value.amount = 0
+    local current = net:recompute(id)
+    check(current.value.amount == 1150 and current.basicValue == 115,
+        "mutation of a published packet or recompute result cannot change the held packet")
+
+    sim.clear()
+    assert(net:setPacket("S", current))
+    check(sim.count() == 0, "equal packets in fresh tables do not dirty the network")
+    current.value.amount = 1151
+    assert(net:setPacket("S", current))
+    check(sim.marks[id] == 1 and net:recompute(id).value.amount == 1151,
+        "a payload change dirties the network even with the same fallback")
+    check(not net:setPacket("S", { type = "signal.basic", value = 256 })
+        and net:recompute(id).value.amount == 1151, "malformed basic packets leave the prior signal intact")
+    check(not net:setPacket("S", { type = "signal.advanced",
+        value = { kind = "weight", amount = math.huge, unit = "kg" } }),
+        "nonfinite weight payloads are rejected")
+    assert(net:setPacket("S", nil))
+    check(Packet.basicValue(net:recompute(id)) == nil and net:status(id) == Network.NO_SOURCE,
+        "clearing a packet makes the attached network unavailable")
 end
 
 -- End to end with the real simulation pass and local dispatch.
@@ -246,13 +287,14 @@ do
     net:attach(Sim)
     wire(net)
     local shown = {}
-    Dispatch.subscribe(function(networkId, value)
+    Dispatch.subscribe(function(networkId, packet)
+        local value = Packet.basicValue(packet)
         local sinks = net:sinksOf(networkId)
         for i = 1, #sinks do shown[sinks[i]] = value == nil and "off" or value end
     end)
     Sim.tick()
     check(shown.D == 0, "after wiring, the display shows valid zero")
-    net:setValue("S", 255)
+    net:setPacket("S", Packet.basic(255))
     Sim.tick()
     check(shown.D == 255, "a sensor change reaches the display in one pass")
     net:remove("c3")

@@ -33,7 +33,7 @@ $Out     = Join-Path $Dist 'ZedComm'
 $ModInfo = Join-Path $Source 'Contents\mods\ZedComm\42\mod.info'
 
 # File types a Project Zomboid mod ships. Anything else is a stray.
-$Allowed = '.lua', '.txt', '.info', '.png', '.ogg', '.wav', '.bank', '.x', '.fbx', '.xml'
+$Allowed = '.lua', '.txt', '.info', '.png', '.ogg', '.wav', '.bank', '.x', '.fbx', '.xml', '.pack', '.tiles', '.json'
 $problems = @()
 
 if (-not (Test-Path $ModInfo)) { throw "mod.info not found at $ModInfo" }

@@ -1,8 +1,8 @@
 ---
 project: zedcomm
 created_date: "Saturday, October 24th 2026, 10:47:46 pm"
-last_update: "Saturday, October 24th 2026, 10:47:46 pm"
-adr-status: accepted
+last_update: "Thursday, November 12th 2026, 2:18:49 pm"
+adr-status: superseded
 adr_domain: Architecture
 adr_number: 301
 aliases: []
@@ -13,7 +13,7 @@ deciders:
 decision_topic: "Use Parallel Straight Through Byte Signals"
 decision_date: 2026-10-24
 fileClass: adr
-related-adr: []
+related-adr:
 related-cards:
 tags:
   - zedcomm
@@ -21,6 +21,8 @@ tags:
 ---
 
 # ADR-301: Use Parallel Straight Through Byte Signals
+
+> Superseded by ADR-309.
 
 ## Context
 

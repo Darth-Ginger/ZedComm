@@ -57,8 +57,14 @@ Existing objects join ZedComm by in-place modification, modelled on vanilla lamp
 ### Negative
 
 - The game's own pickup code copies only vanilla light settings and copies the item before ZedComm's removal hook runs, so keeping the attribute through pickup needs ZedComm's own handling. This needs a spike before modification is built.
-- Each definition must decide how a connected object treats its own controls, such as a lamp's switch, while a cable is attached. Not yet decided.
+- Each fixture adapter decides how connected control affects its own controls. The first lamp retrofit gives the wire control while attached and restores the native switch on detach.
 - Matching on object classes and sprites ties definitions to game internals that can change between builds.
+
+## Relay retrofit follow-up
+
+The lamp pickup spike verified attribute retention through vanilla movable data on the tested lamp. For the playable retrofit, the installed receiver module supplies the port and interprets the signal. A shared fixture adapter applies the requested state to eligible lamps using a state check before any toggle. The installed module is the persistent record from which the networked label and visual attachment are derived. Gate logic stays in dedicated infrastructure modules.
+
+Keep the retrofit separate from the sensor-to-display MVP. While attached, the wire controls the lamp, including the fail-off state when the signal is unavailable. The native switch resumes normal control on detach. Game-level validation of the switch adapter and visual attachment remains open. See Relay retrofit architecture.
 
 ## Related
 

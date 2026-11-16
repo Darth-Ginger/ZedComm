@@ -2,16 +2,16 @@
 --
 -- Pure data, no game calls, so it runs the same in singleplayer, on a server
 -- and in the offline tests. The world objects and the server tile registry
--- feed it records; it works out which pieces form one network and what byte
+-- feed it records; it works out which pieces form one network and what packet
 -- each network carries.
 --
 -- Pieces:
 --   cable    - one cable piece on one square. Holds at most two links (its
 --              two ends), so a run is a chain and can bend.
 --   endpoint - a device on one square with named ports. Its role is "source"
---              (drives a byte, e.g. the pressure sensor) or "sink" (receives
+--              (publishes a packet, e.g. the pressure sensor) or "sink" (receives
 --              it, e.g. the display). Endpoint behaviour lives elsewhere
---              (ADR-302); the model only knows the role and the source value.
+--              (ADR-302); the model only knows the role and the current packet.
 --
 -- Links are explicit records. A cable links to a cable on an orthogonally
 -- adjacent square, or to a free endpoint port on its own or an adjacent
@@ -28,8 +28,9 @@
 --
 -- Kahlua (Lua 5.1): no goto, no integer division, no io/os.
 
-ZedComm = ZedComm or {}
+require "ZedComm/SignalModules"
 
+local Packet = ZedComm.SignalModules.Packet
 local Network = {}
 Network.__index = Network
 
@@ -37,16 +38,12 @@ Network.MAX_CABLE_LINKS = 2
 Network.DEFAULT_PORT = "signal"
 
 -- Status of a derived network.
-Network.OK = "ok"                     -- one source: carries its byte
+Network.OK = "ok"                     -- one live source packet
 Network.NO_SOURCE = "no-source"       -- nothing drives it: disconnected
 Network.MULTI_SOURCE = "multi-source" -- unsupported in the MVP: treated as disconnected
 
 local function portKey(endpointId, port)
     return endpointId .. "#" .. port
-end
-
-local function isByte(v)
-    return type(v) == "number" and v >= 0 and v <= 255 and math.floor(v) == v
 end
 
 function Network.new()
@@ -156,14 +153,16 @@ function Network:status(networkId)
     local net = self.nets[networkId]
     if not net or #net.sources == 0 then return Network.NO_SOURCE end
     if #net.sources > 1 then return Network.MULTI_SOURCE end
+    local source = self.pieces[net.sources[1]]
+    if source.definitionUnavailable or source.packet == nil then return Network.NO_SOURCE end
     return Network.OK
 end
 
--- The byte a network carries, or nil when it is disconnected (ADR-303:
--- valid zero is not disconnected). Used by the simulation pass.
+-- Return a snapshot of the current packet, or nil for unavailable input.
+-- A caller may inspect its copy without changing the held signal (ADR-309).
 function Network:recompute(networkId)
     if self:status(networkId) ~= Network.OK then return nil end
-    return self.pieces[self.nets[networkId].sources[1]].value
+    return Packet.copy(self.pieces[self.nets[networkId].sources[1]].packet)
 end
 
 -- Sink endpoints on a network, for delivery.
@@ -171,7 +170,12 @@ function Network:sinksOf(networkId)
     self:build()
     local net = self.nets[networkId]
     local out = {}
-    if net then for i = 1, #net.sinks do out[i] = net.sinks[i] end end
+    if net then
+        for i = 1, #net.sinks do
+            local id = net.sinks[i]
+            if not self.pieces[id].definitionUnavailable then out[#out + 1] = id end
+        end
+    end
     return out
 end
 
@@ -245,21 +249,62 @@ function Network:addCable(id, x, y, z)
 end
 
 -- role: "source" or "sink". ports: list of port names (default { "signal" }).
--- value: the source's starting byte (default 0).
-function Network:addEndpoint(id, x, y, z, role, ports, value)
+-- Kahlua modData can store string/number keys and plain serializable values.
+-- Reject unsupported state before changing a record. The copy also separates
+-- the caller, model and saved record so updates go through the registry.
+local function copyState(state, ancestors, depth)
+    if type(state) ~= "table" or getmetatable(state) ~= nil then
+        return nil, "state must be a plain table"
+    end
+    if ancestors[state] then return nil, "cyclic device state" end
+    if depth > 32 then return nil, "device state is too deeply nested" end
+    ancestors[state] = true
+    local copy = {}
+    for key, value in pairs(state) do
+        local keyType, valueType = type(key), type(value)
+        if keyType ~= "string" and (keyType ~= "number" or key - key ~= 0) then
+            return nil, "unsupported device state key"
+        end
+        if valueType == "table" then
+            local child, err = copyState(value, ancestors, depth + 1)
+            if not child then return nil, err end
+            copy[key] = child
+        elseif valueType == "string" or valueType == "boolean"
+            or (valueType == "number" and value - value == 0) then
+            copy[key] = value
+        else
+            return nil, "unsupported device state value"
+        end
+    end
+    ancestors[state] = nil
+    return copy
+end
+
+local function validatedState(definitionId, state)
+    if definitionId ~= nil and (type(definitionId) ~= "string" or definitionId == "") then
+        return nil, "bad definition id"
+    end
+    if state == nil then return nil end
+    if definitionId == nil then return nil, "device state requires a definition id" end
+    return copyState(state, {}, 1)
+end
+
+-- Persist device metadata without running callbacks. Sources start without a
+-- packet and publish their first live reading through the runtime.
+function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     if type(id) ~= "string" or string.find(id, "#", 1, true) then return false, "bad id" end
     if not checkPosition(x, y, z) then return false, "bad position" end
     if role ~= "source" and role ~= "sink" then return false, "bad role" end
-    if value == nil then value = 0 end
-    if not isByte(value) then return false, "bad value" end
     local existing = self.pieces[id]
     if existing then
         if existing.kind == "endpoint" and existing.role == role
-            and existing.x == x and existing.y == y and existing.z == z then
+            and existing.definitionId == definitionId and existing.x == x and existing.y == y and existing.z == z then
             return true
         end
         return false, "id in use"
     end
+    local stateCopy, stateError = validatedState(definitionId, state)
+    if stateError then return false, stateError end
     local portTable = {}
     ports = ports or { Network.DEFAULT_PORT }
     for i = 1, #ports do
@@ -268,7 +313,8 @@ function Network:addEndpoint(id, x, y, z, role, ports, value)
     end
     self.pieces[id] = {
         id = id, kind = "endpoint", x = x, y = y, z = z,
-        role = role, ports = portTable, value = value,
+        role = role, ports = portTable,
+        definitionId = definitionId, state = stateCopy,
     }
     local nodes = {}
     for port in pairs(portTable) do nodes[portKey(id, port)] = true end
@@ -366,18 +412,21 @@ function Network:remove(id)
     return true
 end
 
--- A source's byte changed (e.g. a sensor sample). Marks only on a real change.
-function Network:setValue(id, value)
+-- Publish a current packet, or clear it with nil. Mark only on a real change.
+function Network:setPacket(id, packet)
     local piece = self.pieces[id]
     if not piece or piece.kind ~= "endpoint" or piece.role ~= "source" then
         return false, "not a source"
     end
-    if not isByte(value) then return false, "bad value" end
-    if piece.value == value then return true end
-    piece.value = value
+    if piece.definitionUnavailable then return false, "device definition unavailable" end
+    local valid, reason = Packet.validate(packet)
+    if not valid then return false, reason end
+    if Packet.equal(piece.packet, packet) then return true end
+    piece.packet = Packet.copy(packet)
     if self.sim then
-        local netId = self:networkOf(id)
-        if netId then self.sim.markDirty(netId) end
+        for port in pairs(piece.ports) do
+            self.sim.markDirty(self:networkOf(id, port))
+        end
     end
     return true
 end
@@ -385,6 +434,16 @@ end
 ---------------------------------------------------------------------------
 -- Records: what the server registry saves, and rebuilds the model from
 ---------------------------------------------------------------------------
+
+function Network:setDeviceState(id, state)
+    local piece = self.pieces[id]
+    if not piece or not piece.definitionId then return false, "not a defined endpoint" end
+    if piece.definitionUnavailable then return false, "device definition unavailable" end
+    local stateCopy, err = validatedState(piece.definitionId, state)
+    if err then return false, err end
+    piece.state = stateCopy
+    return true
+end
 
 -- One plain record per piece, a copy the caller may keep. Each side of a
 -- link is stored with its piece, so a piece's record is complete on its own
@@ -397,7 +456,9 @@ function Network:record(id)
         r.links = {}
         for otherId, port in pairs(piece.links) do r.links[otherId] = port end
     else
-        r.role, r.value, r.ports = piece.role, piece.value, {}
+        r.role, r.ports = piece.role, {}
+        r.definitionId = piece.definitionId
+        if piece.state ~= nil then r.state = copyState(piece.state, {}, 1) end
         for port, cableId in pairs(piece.ports) do r.ports[port] = cableId end
     end
     return r
@@ -439,7 +500,7 @@ function Network:load(records)
             local ports = {}
             for port in pairs(r.ports or {}) do ports[#ports + 1] = port end
             table.sort(ports)
-            ok, err = self:addEndpoint(r.id, r.x, r.y, r.z, r.role, ports, r.value)
+            ok, err = self:addEndpoint(r.id, r.x, r.y, r.z, r.role, ports, r.definitionId, r.state)
         end
         if not ok then dropped[#dropped + 1] = r.id .. ": " .. err end
     end

@@ -1,0 +1,58 @@
+module ZedComm
+{
+    item PressurePlate
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 1.0,
+        Icon = ZedCommPressurePlate,
+    }
+
+    item OccupancyPlate
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 1.0,
+        Icon = ZedCommOccupancyPlate,
+    }
+
+    item WeightPlate
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 2.0,
+        Icon = ZedCommWeightPlate,
+    }
+
+    item SignalWire
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.1,
+        Icon = ZedCommSignalWire,
+    }
+
+    item NumericDisplay
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = ZedCommNumericDisplay,
+    }
+
+    item AdvancedAdapter
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.2,
+        Icon = ZedCommAdvancedAdapter,
+    }
+
+    item ThresholdModule
+    {
+        DisplayCategory = Electronics,
+        ItemType = base:normal,
+        Weight = 0.1,
+        Icon = ZedCommThresholdModule,
+    }
+}

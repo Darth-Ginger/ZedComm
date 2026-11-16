@@ -14,8 +14,9 @@
 --   OnChunkLoaded           - drops piece records whose world object is gone,
 --                             matching by id, not first object on the square
 --
--- World objects carry modData.zedcomm = { id, kind, role? } and nothing else;
--- links live only here. The model is rebuilt from these records when the
+-- World tags carry a piece id and kind, plus definitionId for defined endpoints.
+-- Optional seed state and legacy endpoint fields are accepted on registration.
+-- Durable device state and links live in the square records. The model is rebuilt from these records when the
 -- system starts, so connectivity is derived, not stored twice.
 --
 -- Multiplayer client sync is not done yet: the client hooks are no-ops until
@@ -27,17 +28,30 @@ require "Map/SGlobalObjectSystem"
 require "Map/SGlobalObject"
 require "ZedComm/Network"
 require "ZedComm/Simulation"
+require "ZedComm/NativeDevices"
+require "ZedComm/RunLabels"
 
 local Network = ZedComm.Network
+local Definitions = ZedComm.DeviceDefinitions
+local Relay = ZedComm.RelayLamp
 
 local function log(message) print("[ZedComm] registry: " .. message) end
 
 -- The ZedComm tag on a world object, or nil.
 local function tagOf(isoObject)
     if not isoObject or not isoObject.hasModData or not isoObject:hasModData() then return nil end
-    local tag = isoObject:getModData().zedcomm
-    if type(tag) ~= "table" or type(tag.id) ~= "string" then return nil end
-    return tag
+    local data = isoObject:getModData()
+    local tag = data.zedcomm
+    if type(tag) == "table" and type(tag.id) == "string" then return tag end
+    return Relay.restoreTag(isoObject, data)
+end
+
+local function syncRelayMarker(self, object, tag)
+    if tag.definitionId ~= Relay.ID then return end
+    local record = self.network:record(tag.id)
+    if record and record.state and type(record.state.module) == "table" then
+        Relay.writeInstallation(object:getModData(), tag.id, record.state)
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -74,7 +88,8 @@ end
 
 function SZedCommSystem:initSystem()
     SGlobalObjectSystem.initSystem(self)
-    self.system:setModDataKeys(nil)
+    self.system:setModDataKeys({ "runLabelData" })
+    self.runLabelData = self.runLabelData or {}
     self.system:setObjectModDataKeys({ "pieces" })
 end
 
@@ -107,8 +122,19 @@ function SZedCommSystem:rebuildNetwork()
     local network = Network.new()
     local dropped = network:load(records)
     for i = 1, #dropped do log("dropped on load: " .. dropped[i]) end
+    -- Keep missing devices and their links so reinstalling the definition can
+    -- recover the circuit. The runtime-only flag disables their signals.
+    for i = 1, #records do
+        local piece = network.pieces[records[i].id]
+        if piece and piece.definitionId and not Definitions.get(piece.definitionId) then
+            piece.definitionUnavailable = true
+            log("unavailable definition " .. piece.definitionId .. " for " .. piece.id .. "; record preserved")
+        end
+    end
     network:attach(ZedComm.Simulation)
     self.network = network
+    self.runLabels = ZedComm.RunLabels.new(network, self.runLabelData)
+    self.runLabels:refresh()
     -- Write back what the model accepted, so dropped links leave the save.
     for i = 1, #records do self:syncPiece(records[i].id, records[i].x, records[i].y, records[i].z) end
     log("loaded " .. #records .. " piece(s) in " .. network:networkCount() .. " network(s)")
@@ -153,7 +179,18 @@ function SZedCommSystem:addPiece(isoObject)
     if tag.kind == "cable" then
         ok, err = self.network:addCable(tag.id, x, y, z)
     elseif tag.kind == "endpoint" then
-        ok, err = self.network:addEndpoint(tag.id, x, y, z, tag.role, tag.ports, tag.value)
+        if tag.definitionId ~= nil then
+            local def = Definitions.get(tag.definitionId)
+            if def then
+                local role = def.role == "receiver" and "sink" or "source"
+                ok, err = self.network:addEndpoint(tag.id, x, y, z, role, def.ports,
+                    def.id, tag.state)
+            else
+                ok, err = false, "unavailable definition " .. tostring(tag.definitionId)
+            end
+        else
+            ok, err = self.network:addEndpoint(tag.id, x, y, z, tag.role, tag.ports, nil, tag.state)
+        end
     else
         ok, err = false, "unknown kind " .. tostring(tag.kind)
     end
@@ -170,29 +207,64 @@ function SZedCommSystem:removePiece(id)
     local piece = self.network.pieces[id]
     if not piece then return false, "unknown piece" end
     local partners = self.network:partners(id)
+    local priorRun = self.runLabels:beforeCut(id)
     local x, y, z = piece.x, piece.y, piece.z
     self.network:remove(id)
+    self.runLabels:afterCut(priorRun)
     self:syncPiece(id, x, y, z)
     syncAll(self, partners)
     return true
 end
 
 function SZedCommSystem:link(cableId, otherId, port)
+    local first = self.runLabels:get(cableId)
+    local second = self.runLabels:get(otherId)
     local ok, err = self.network:link(cableId, otherId, port)
-    if ok then syncAll(self, { cableId, otherId }) end
+    if ok then
+        self.runLabels:merge(first, second)
+        if not first and not second then self.runLabels:get(cableId) end
+        syncAll(self, { cableId, otherId })
+    end
     return ok, err
 end
 
 function SZedCommSystem:unlink(cableId, otherId)
+    local priorRun = self.runLabels:beforeCut(cableId)
     local ok, err = self.network:unlink(cableId, otherId)
-    if ok then syncAll(self, { cableId, otherId }) end
+    if ok then
+        self.runLabels:afterCut(priorRun)
+        syncAll(self, { cableId, otherId })
+    end
     return ok, err
 end
 
--- A source endpoint's byte changed. The value is saved with its record.
-function SZedCommSystem:setValue(id, value)
-    local ok, err = self.network:setValue(id, value)
-    if ok then syncAll(self, { id }) end
+function SZedCommSystem:getRunName(cableId)
+    return self.runLabels:display(cableId)
+end
+
+function SZedCommSystem:renameRun(cableId, name)
+    return self.runLabels:rename(cableId, name)
+end
+
+-- Replace a defined endpoint's durable state and sync its square record.
+function SZedCommSystem:setDeviceState(id, state)
+    local ok, err = self.network:setDeviceState(id, state)
+    if ok then
+        syncAll(self, { id })
+        local piece = self.network.pieces[id]
+        if piece.definitionId == Relay.ID then
+            local cell = getCell()
+            local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
+            if square then
+                local objects = square:getObjects()
+                for i = 0, objects:size() - 1 do
+                    local object = objects:get(i)
+                    local tag = tagOf(object)
+                    if tag and tag.id == id then syncRelayMarker(self, object, tag) end
+                end
+            end
+        end
+    end
     return ok, err
 end
 
@@ -205,8 +277,8 @@ end
 function SZedCommSystem:loadIsoObject(isoObject)
     local tag = tagOf(isoObject)
     if not tag or not isoObject:getSquare() then return end
-    if self.network.pieces[tag.id] then return end
-    self:addPiece(isoObject)
+    if not self.network.pieces[tag.id] then self:addPiece(isoObject) end
+    syncRelayMarker(self, isoObject, tag)
 end
 
 function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
@@ -227,8 +299,12 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
             local present = {}
             local objects = square:getObjects()
             for j = 0, objects:size() - 1 do
-                local tag = tagOf(objects:get(j))
-                if tag then present[tag.id] = true end
+                local object = objects:get(j)
+                local tag = tagOf(object)
+                if tag then
+                    present[tag.id] = true
+                    syncRelayMarker(self, object, tag)
+                end
             end
             local tile = globalObject:getModData()
             for id in pairs(tile.pieces or {}) do

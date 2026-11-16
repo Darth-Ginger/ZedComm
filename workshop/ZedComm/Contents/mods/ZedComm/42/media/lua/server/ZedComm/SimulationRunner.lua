@@ -10,13 +10,19 @@ require "ZedComm/Dispatch"
 
 if isClient() then return end
 
+require "ZedComm/DeviceRuntime"
+
 local Simulation = ZedComm.Simulation
 local Dispatch = ZedComm.Dispatch
 local adapter = isServer() and Dispatch.Server or Dispatch.Local
 Simulation.setAdapter(adapter)
+local Runtime = ZedComm.DeviceRuntime
+Dispatch.subscribe(Runtime.deliver)
 
 local announced = false
 local function onTick()
+    local registry = ZedComm.Registry
+    Runtime.prepare(registry and registry.instance)
     Simulation.tick()
     if not announced then
         announced = true

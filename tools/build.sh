@@ -38,7 +38,7 @@ done
 # File types a Project Zomboid mod ships. Anything else is a stray.
 # OS and file-sync droppings are skipped rather than reported.
 junk=(-name @eaDir -prune -o -name Thumbs.db -o -name desktop.ini -o -name .DS_Store -o -name .gitkeep)
-allowed=" lua txt info png ogg wav bank x fbx xml "
+allowed=" lua txt info png ogg wav bank x fbx xml pack tiles json "
 problems=()
 
 [ -f "$mod_info" ] || { echo "mod.info not found at $mod_info" >&2; exit 1; }

@@ -9,7 +9,7 @@
 next = nil
 
 local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
-package.path = LUA .. "shared/?.lua;" .. package.path
+package.path = LUA .. "shared/?.lua;" .. LUA .. "server/?.lua;" .. package.path
 
 local failures, checks = 0, 0
 local function check(cond, what)
@@ -25,6 +25,16 @@ local function boot(client, server)
     ZedComm = nil
     package.loaded["ZedComm/Simulation"] = nil
     package.loaded["ZedComm/Dispatch"] = nil
+    package.loaded["ZedComm/DeviceRuntime"] = nil
+    package.loaded["ZedComm/NativeDevices"] = nil
+    package.loaded["ZedComm/DeviceDefinitions"] = nil
+    package.loaded["ZedComm/SignalModules"] = nil
+    package.loaded["ZedComm/Devices/PressureSensor"] = nil
+    package.loaded["ZedComm/Devices/OccupancyPlate"] = nil
+    package.loaded["ZedComm/Devices/WeightPlate"] = nil
+    package.loaded["ZedComm/Devices/NumericDisplay"] = nil
+    package.loaded["ZedComm/Devices/DebugByteSource"] = nil
+    package.loaded["ZedComm/Devices/RelayLamp"] = nil
     local handlers = {}
     Events = { OnTick = { Add = function(fn) handlers[#handlers + 1] = fn end } }
     isClient = function() return client end
@@ -52,7 +62,7 @@ do
     local recomputed, delivered = {}, {}
     Sim.setRecompute(function(id)
         recomputed[id] = (recomputed[id] or 0) + 1
-        return 255
+        return { type = "signal.basic", value = 255 }
     end)
     Dispatch.subscribe(function(id, value) delivered[id] = value end)
 
@@ -63,14 +73,15 @@ do
     check(recomputed.a == nil, "marking never recomputes inside the event")
     fireTick(handlers)
     check(recomputed.a == 1 and recomputed.b == 1, "each marked network is recomputed once per pass")
-    check(delivered.a == 255 and delivered.b == 255, "values are delivered in the same pass")
+    check(delivered.a.type == "signal.basic" and delivered.a.value == 255 and delivered.b.value == 255,
+        "packets are delivered in the same pass")
     check(not Sim.hasPending(), "the pass clears the pending set")
 
     -- A mark made while the pass runs waits for the next tick.
     Sim.setRecompute(function(id)
         recomputed[id] = (recomputed[id] or 0) + 1
         if id == "c" then Sim.markDirty("c") end
-        return 0
+        return { type = "signal.basic", value = 0 }
     end)
     Sim.markDirty("c")
     fireTick(handlers)
@@ -85,7 +96,7 @@ do
     local Sim, Dispatch = ZedComm.Simulation, ZedComm.Dispatch
     check(#handlers == 1, "server registers one OnTick handler")
     check(Sim.getAdapter() == Dispatch.Server, "server uses the Server adapter stub")
-    Sim.setRecompute(function() return 1 end)
+    Sim.setRecompute(function() return { type = "signal.basic", value = 1 } end)
     Sim.markDirty("net")
     fireTick(handlers)
     check(Dispatch.Server.sent == 1, "the pass sends through the dispatch adapter stub")

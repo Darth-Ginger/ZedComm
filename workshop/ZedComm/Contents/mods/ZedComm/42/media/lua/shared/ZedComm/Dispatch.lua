@@ -1,5 +1,5 @@
 -- ZedComm dispatch adapters (ADR-302): where the simulation pass sends each
--- recomputed network's value. The pass itself is the same in every mode.
+-- recomputed network's packet. The pass itself is the same in every mode.
 --
 --   Local  - singleplayer: delivered inside the game process, this tick.
 --   Server - multiplayer server: stub. Sending state to clients is validated
@@ -9,13 +9,13 @@ ZedComm = ZedComm or {}
 
 local Dispatch = {}
 
--- Receivers subscribe here once endpoints exist: fn(networkId, value).
+-- Receivers subscribe here once endpoints exist: fn(networkId, packet).
 local listeners = {}
 
 function Dispatch.subscribe(fn) listeners[#listeners + 1] = fn end
 
-local function notify(networkId, value)
-    for i = 1, #listeners do listeners[i](networkId, value) end
+local function notify(networkId, packet)
+    for i = 1, #listeners do listeners[i](networkId, packet) end
 end
 
 Dispatch.Local = {
@@ -26,10 +26,10 @@ Dispatch.Local = {
 Dispatch.Server = {
     name = "server",
     sent = 0,
-    deliver = function(networkId, value)
+    deliver = function(networkId, packet)
         -- Stub: later work sends this to clients (sendServerCommand).
         Dispatch.Server.sent = Dispatch.Server.sent + 1
-        notify(networkId, value)
+        notify(networkId, packet)
     end,
 }
 

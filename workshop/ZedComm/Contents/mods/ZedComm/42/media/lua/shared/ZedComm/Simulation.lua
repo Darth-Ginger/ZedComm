@@ -13,8 +13,8 @@ ZedComm = ZedComm or {}
 local Simulation = {}
 
 local pending = {}      -- network id -> true, waiting for the next pass
-local recompute = nil   -- function(networkId) -> byte (0-255) or nil
-local adapter = nil     -- { name = string, deliver = function(networkId, value) }
+local recompute = nil   -- function(networkId) -> signal packet or nil
+local adapter = nil     -- { name = string, deliver = function(networkId, packet) }
 
 Simulation.passes = 0   -- passes run, for logs and tests
 Simulation.processed = 0 -- networks recomputed, for logs and tests
@@ -46,9 +46,9 @@ function Simulation.tick()
     pending = {}
     local count = 0
     for networkId in pairs(batch) do
-        local value = nil
-        if recompute then value = recompute(networkId) end
-        if adapter then adapter.deliver(networkId, value) end
+        local packet = nil
+        if recompute then packet = recompute(networkId) end
+        if adapter then adapter.deliver(networkId, packet) end
         count = count + 1
     end
     Simulation.processed = Simulation.processed + count
