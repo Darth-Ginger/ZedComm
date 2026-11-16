@@ -147,7 +147,8 @@ local function install()
             self.colorMod = class.normalColor
         else
             self.canCreate = actions.canPlace(self, selected.object, square)
-            self.objectSprite = props.sprite
+            local name = placement.previewSprite(square, selected.object)
+            self.objectSprite = (name and getSprite(name)) or props.sprite
             self.colorMod = self.canCreate and class.normalColor or class.invalidColor
         end
         self.currentMoveProps, self.origMoveProps = props, props

@@ -39,13 +39,14 @@ Select the free end of the intended run and left-click an occupied wire tile wit
 
 ## Pressure plate output
 
-Right-click a placed plate within reach and choose **ZedComm → Set pressure plate output**. The menu and dialog show the current setting. Enter a whole number from **1 to 255**. The basic plate sends that value while an actor, an overlapping vehicle, or qualifying floor-level furniture occupies the tile. Placed containers and solid moveable furniture qualify. Floor tiles, decorations, loose inventory items, wall fixtures, and tabletop objects leave the plate clear. The output returns to **0** when the last load leaves. Plates without a saved setting use **1**, including plates from older saves. The setting survives reload and pickup followed by replacement.
+Right-click a placed plate within reach and choose **ZedComm → Set pressure plate output**. The menu and dialog show the current setting. Enter a whole number from **1 to 255**. The basic plate sends that value when an actor, a corpse, an overlapping vehicle, a floor-level prop or container, or a loose inventory item occupies the tile. The output returns to **0** when the last load leaves. Plates without a saved setting use **1**, including plates from older saves. The setting survives reload and pickup followed by replacement.
 
 ### Concealed basic plate check
 
 1. Wire a basic pressure plate to a numeric display and set its occupied output to **155**. The clear plate reads **0**. Place a crate or bookshelf directly over it using the native moveables tool, then step away. Expect **155** with only the furniture on the plate.
 2. Save and reload with the furniture in place. Expect **155** before touching the furniture or wire. Move the furniture to the neighboring tile and expect **0**. Confirm the plate and wire remain intact and a nearby container or floor decoration stays clear.
 3. Repeat with a vehicle on a road tile. The configured byte should hold while its footprint overlaps, even with the center off the tile. Drive clear and expect **0**.
+4. Drop or place a loose item on the plate and expect **155** after stepping off. Pick up the item or move it to the neighboring tile and expect **0**.
 
 ## Occupancy plate
 

@@ -24,6 +24,7 @@ local function onTick()
     local registry = ZedComm.Registry
     Runtime.prepare(registry and registry.instance)
     Simulation.tick()
+    Runtime.finish()
     if not announced then
         announced = true
         print("[ZedComm] simulation pass running (" .. adapter.name .. ")")

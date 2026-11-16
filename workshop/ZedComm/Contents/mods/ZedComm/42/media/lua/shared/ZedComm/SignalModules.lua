@@ -3,6 +3,7 @@ ZedComm = ZedComm or {}
 local Modules = {
     ON_OFF = "ZedComm.OnOffReceiver",
     BYTE_READOUT = "ZedComm.ByteReadoutReceiver",
+    ADVANCED_READOUT = "ZedComm.AdvancedReadoutReceiver",
     BASIC_SENDER = "ZedComm.BasicSender",
     ADVANCED_SENDER = "ZedComm.AdvancedSender",
 }
@@ -109,7 +110,7 @@ end
 -- An adapter supplies apply(request) and optionally release(). A receiver
 -- instance belongs to one installation, with no durable state in this object.
 function Modules.newReceiver(moduleId, adapter)
-    if moduleId ~= Modules.ON_OFF and moduleId ~= Modules.BYTE_READOUT then
+    if moduleId ~= Modules.ON_OFF and moduleId ~= Modules.BYTE_READOUT and moduleId ~= Modules.ADVANCED_READOUT then
         return nil, "unknown receiver module"
     end
     if type(adapter) ~= "table" or type(adapter.apply) ~= "function"
@@ -121,7 +122,9 @@ function Modules.newReceiver(moduleId, adapter)
 end
 
 local function apply(self)
-    local ok, status, reason = pcall(self.adapter.apply, self.adapter, self.request)
+    local request = self.request
+    if self.moduleId == Modules.ADVANCED_READOUT then request = Packet.copy(request) end
+    local ok, status, reason = pcall(self.adapter.apply, self.adapter, request)
     if not ok then
         status, reason = "unavailable", "fixture application failed: " .. tostring(status)
     elseif status ~= "applied" and status ~= "unavailable" and status ~= "unsupported" then
@@ -132,6 +135,15 @@ local function apply(self)
 end
 
 function Receiver:receive(value, reconcile)
+    if self.moduleId == Modules.ADVANCED_READOUT then
+        local valid, reason = Packet.validate(value)
+        if not valid then return nil, reason end
+        local changed = not self.attached or not Packet.equal(value, self.request)
+        self.attached = true
+        if changed then self.request = Packet.copy(value) end
+        if changed or (reconcile and self.result ~= "unsupported") then return apply(self) end
+        return self.result, self.reason
+    end
     if value ~= nil and not isByte(value) then return nil, "expected a byte or unavailable input" end
     local request = value
     if self.moduleId == Modules.ON_OFF then request = value ~= nil and value ~= 0 end

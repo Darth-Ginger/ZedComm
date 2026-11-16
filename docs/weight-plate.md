@@ -16,12 +16,16 @@ The plate totals the load on its tile, then rounds to the nearest 10 kg step. A 
 | Standard crate, pickup weight 7.5 | 1 |
 | Standard crate with 20 units of stored weight | 3 |
 | Floor-standing shelf, pickup weight 20 | 2 |
+| One light dropped item with positive weight | 1 |
+| A dropped bag and contents totaling 40 units | 4 |
 | 80 kg on-foot player | 8 |
 | One zombie, estimated at 75 kg | 8 |
 | Both of the above, summed before rounding | 16 |
 | 1,200 kg vehicle | 120 |
 
-The runtime reads player body weight from the game's nutrition API. It uses 75 kg for each zombie and as the player fallback if nutrition data is unavailable. The first pass measures the vehicle reported by Build 42's square overlap lookup and uses its full reported mass while its footprint overlaps the plate. This models vehicle presence and relative load at the tile level. A driver or passenger contributes no separate on-foot weight. Qualifying floor-level furniture contributes its empty pickup weight plus the weight of items stored in its compartments. The runtime reads the tile's explicit PickUpWeight property and divides by 10, following the native Moveables conversion. It adds Build 42's contents weight for each compartment, which includes the contents of stored bags. For furniture without a pickup weight, the estimate uses the contents alone. Animals and loose floor items contribute zero.
+The runtime reads player body weight from the game's nutrition API and live animal weight from animal data. It uses 75 kg for each zombie and as the player fallback if nutrition data is unavailable. A stationary corpse contributes its reported mass and inventory, with the same 75 kg estimate for a human corpse whose mass is unavailable. The plate uses the full reported mass of a vehicle while its footprint overlaps the tile. A seated actor contributes no separate on-foot weight.
+
+Dropped and manually placed inventory items on the tile contribute their game-reported unequipped weight. That includes a dropped bag's own weight and contents. Floor-level moveable props and containers contribute their pickup weight, if defined, plus their compartments' contents. The game stores `PickUpWeight` in tenths. These readings share the plate's tile and level. Flooring, elevated fixtures, and the plate's own wiring are excluded.
 
 A future threshold receiver could trip at a byte such as 50 if the live vehicle and pedestrian readings bracket it. Confirm the readings with the numeric display in the target game before choosing the calibration for release.
 
@@ -34,7 +38,7 @@ The selected sender follows the plate through pickup and reload. Reconnect after
 ## Wiring and persistence
 
 1. Placement registers `ZedComm.WeightPlate` in the saved endpoint registry and exposes its `signal` port.
-2. The runtime combines the on-foot actor estimate with `square:getVehicleContainer():getMass()` when a vehicle overlaps, plus qualifying furniture pickup weight and stored contents. The selected sender encodes the combined load and applies the byte conversion.
+2. The runtime sums actors, corpses, overlapping vehicle mass, floor props, and world inventory items. The selected sender encodes the combined load and applies the byte conversion.
 3. The wire carries the packet. The existing display reads the basic byte or the advanced sender's fallback through Byte Readout.
 4. Reload restores the endpoint and links, then samples the current load. Pickup returns the weight plate and leaves the wire in place. Reconnect after replacement to resume the reading.
 
@@ -63,3 +67,7 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 2)
 ## Furniture smoke test
 
 Place a standard crate directly over a clear wired weight plate using native Moveables. Step away and expect **1**. Add about 20 units of items to the crate and expect **3** after stepping clear. Empty it and expect **1** again. Move it to the neighboring tile and expect **0**. A floor-standing shelf with a pickup weight of 20 should read **2**. Use the [basic plate check](player-placement.md#concealed-basic-plate-check) to verify a configured fixed output under furniture.
+
+## Loose items and other loads
+
+Drop one positive-weight item or use native item placement on the wired plate. Verify the weight display rises from **0**. Drop a loaded bag and inspect the Advanced Sender reading to see the combined mass. Pick up part of the load, then move all remaining items to the neighboring tile. The reading should fall with the removed mass and return to **0**. Repeat with a corpse or animal if the setup allows. A basic plate sends its configured byte for any of these loads. The occupancy plate remains a player and zombie count.

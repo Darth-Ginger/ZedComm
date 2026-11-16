@@ -6,6 +6,8 @@
 
 **Target** Project Zomboid Build 42 singleplayer, Lua 5.1, and the linked Workshop development build.
 
+Use the [combined Build 42 smoke test](../combined-smoke-test.md) for the staged build and console check-ins.
+
 **Design references** [Terminology and player workflows](../terminology-and-player-workflows.md) and [ADR-309](../adr/ADR-309-maintained-signal-packets__zedcomm.md).
 
 ## First playable circuit
@@ -68,10 +70,10 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 4)
 ```
 
 1. At a modifiable powered vanilla lamp choose **ZedComm → Install Advanced Adapter**. This fits the inventory item directly to an unconverted lamp. Wire the weight plate to the lamp.
-2. Open **ZedComm → Open Advanced Adapter**. Check the two fixed parts and the right-hand **Carried modules** count. Choose **Install Threshold** and click the center column's top cell. The count should decrease by one. The lamp stays off until the internal path is connected.
+2. Open **ZedComm → Open Advanced Adapter**. Check the two fixed parts and the right-hand **Carried modules** count. Drag a Threshold from that pane and drop it into the top two cells of the center column. The count should decrease by one. The wired lamp stays off until the internal path is connected.
 3. Click a module's output contact and the next part's input contact to connect the path from **Fixed IN → Threshold → Fixed OUT**. Selecting the same pair again cuts that link. **Auto-connect** restores the single Threshold path. Check that the input continues to show the plate byte during an internal cut and that the lamp goes off.
 4. Right-click the installed Threshold or use **ZedComm → Set threshold** at the lamp. Verify both edit the same saved setting. At threshold 50, the 80 kg player should leave the lamp off and the sheriff car should turn it on. Raise the threshold above the current byte to turn it off without changing the wire input.
-5. Select the Threshold and choose **Move**, then **Rotate**, then the bottom-left cell. Check that the rotated part fits the bottom row and the two links follow its contacts. Try a position that overlaps a fixed part and verify the previous layout stays intact. Right-click an empty cell to cancel a placement or link selection.
+5. Hold the Threshold by its body and press the game's **Rotate Building** key (R by default). Drag it into two adjacent cells of the bottom row and release when the preview turns green. The links should follow the rotated contacts and the lamp should keep its current state. Try dropping on a fixed part with a red preview, releasing outside the board, and right-clicking while held. Each should leave the module and links in place.
 6. Reload the save with the circuit connected. Verify the selected threshold, rotation, and links. Pick up and replace the lamp with vanilla moveable tools and reconnect its external cable. Then remove the Threshold in the editor and confirm it returns to inventory and clears the internal links.
 7. Run the pending [Phase C packet checks](maintained-signal-packets.md#phase-c---singleplayer-proof) in the same gameplay window.
 
@@ -79,17 +81,18 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 4)
 
 **Follow-up change, not yet verified in game.** The editor now opens from up to two tiles away when the path is open (`PlayerPlacement.canView`), but every edit still needs the player next to the lamp. Out of reach, the buttons are disabled and the editor says "Step next to the lamp to make changes." The server-side reach check is unchanged. A legend shows blue output, green input and red selected contacts, and a selected contact is now drawn true red (it was pink or orange). The registry suite covers this with 7 new checks (389 pass). It did not load in the 2026-11-16 session because a save and reload did not pick up the edit. Verify after a full game restart: in the debug console, `print(ZedComm.PlayerPlacement.canView ~= nil)` must print `true` before testing.
 
-**Next.** Verify the range and legend change, then review the Chunk 3 draft below together with the drag-and-R-rotate request, since the cabinet editor should reuse that interaction.
+**Placement follow-up.** Carried and installed modules use the same hold, drag, rotate and drop interaction. Preview and commit use the circuit validator, so a held part only changes inventory or saved layout when a valid drop commits. An installed module keeps its ID, settings and terminal links. The carried pane counts Threshold modules in the main inventory.
 
-The carried-module pane currently counts Threshold modules in the main inventory. Chunk 2 uses click-to-place and contact selection. The sprites are placeholders. The Workshop build and 628 offline Lua checks passed, including editor callback and inventory failure cases. Live PZ verification is open.
+**Next.** Verify the editor range, legend, and drag-and-rotate checks together with the Small Cabinet circuit below. Before that session, confirm the linked Windows source has this build and fully restart PZ.
 
 ## Chunk 3 - Small Cabinet and external ports
 
-**Draft for review after the 3×3 editor smoke test.** The port rules and acceptance cases below specify the cabinet build. The editor test will inform the layout and interaction details.
+**Implemented and verified offline.** The placeable Small Cabinet reuses the Advanced Adapter editor, the held-part preview, and the native Rotate Building key. Its fixed jacks occupy rows 1–2 of columns 1 and 6. The floor cabinet prototype supplies the world sprite. A craftable Network Switch provides the arm input. The Test Byte Source remains available for numeric diagnostics.
 
-- [ ] Add the 6×6 host, fixed ports, and rotatable input and output extensions. Reuse the circuit editor and extend the internal validator for modules with multiple terminals.
-- [ ] Extend the existing wire topology and delivery to route by port, then validate external and internal edits against the same feedback rule.
-- [ ] Add AND and prove the three-run circuit below with a debug byte source as the arm switch. Run the offline cases before the in-game walkthrough.
+- [x] Add the 6×6 host, fixed ports, and rotatable input and output extensions. Reuse the circuit editor and extend the internal validator for modules with multiple terminals.
+- [x] Extend the existing wire topology and delivery to route by port, then validate external and internal edits against the same feedback rule.
+- [x] Add AND and prove the three-run circuit below with a player-operated Network Switch in the offline harness.
+- [ ] Run the combined in-game placement and cabinet verification.
 
 ### Cabinet port rules
 
@@ -110,7 +113,7 @@ The carried-module pane currently counts Threshold modules in the main inventory
 
 ```text
 Weight plate → Run A → Fixed IN → Threshold ≥ 50 → AND input A
-Debug source → Run B → Input Extension ───────────→ AND input B
+Network switch → Run B → Input Extension ─────────→ AND input B
 AND output → Fixed OUT → Run C → Powered lamp
 ```
 
@@ -140,17 +143,172 @@ AND output → Fixed OUT → Run C → Powered lamp
 
 ### In-game acceptance
 
-1. Place a cabinet, a weight plate, a debug byte source, and a powered lamp with a Basic Adapter. Open the 6×6 editor. Check the fixed input and output footprints. Install an Input Extension on the top or bottom edge, then install Threshold and AND. Set Threshold to 50 and connect the internal path shown above.
-2. Wire and name the three runs so they can be inspected individually. With the arm source at 255, an 80 kg player should leave the lamp off at byte 8. A vehicle that yields 50 or more should turn it on. Keep the vehicle in place, set the arm to 0, and verify the lamp goes off while Run A retains its load byte.
-3. Set the arm back to 255. Disconnect its run at the cabinet and check for unavailable output and an OFF lamp. Reconnect it and verify the lamp turns on with the existing load. Move or rotate that wired extension to another legal edge and confirm its connections follow. Remove it and verify the wire stays in place with a free end, the module returns to inventory, and the lamp turns off.
-4. Reinstall and reconnect the extension. Save and reload. Verify module settings, port connections, and run names restore. Check that the lamp agrees with the currently present load and arm reading after sampling resumes.
+Use a Build 42 singleplayer debug save and a flat, clear area with a powered modifiable lamp nearby. Grant the cabinet parts in the Lua console.
+
+```lua
+getPlayer():getInventory():AddItem("ZedComm.SmallCabinet")
+getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
+getPlayer():getInventory():AddItem("ZedComm.NetworkSwitch")
+getPlayer():getInventory():AddItem("ZedComm.ThresholdModule")
+getPlayer():getInventory():AddItem("ZedComm.AndModule")
+getPlayer():getInventory():AddItem("ZedComm.InputExtension")
+getPlayer():getInventory():AddItem("ZedComm.OutputExtension")
+getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
+```
+
+1. Verify the Advanced Adapter placement follow-up in the 3×3 editor. Check two-tile viewing over an open path, adjacent-only editing, and the contact legend. Drag a wired Threshold into the bottom row with **R** and verify both links follow. Try an overlapping drop and a right-click cancellation.
+2. Place the cabinet and weight plate. Mount the Network Switch on a tile next to a wall using native **Place** or **ZedComm → Place network switch**. All four edges are eligible. At a corner, placement checks north, west, south, then east. The new switch starts OFF. Use **ZedComm → Install test relay** on the cabinet's target lamp. Open **ZedComm → Open Small Cabinet**. Check the fixed two-cell parts and drag Threshold to column 2, row 1, and AND to column 4, row 3. Rotate an Input Extension 90° and place its top-left at column 3, row 1 so the jack faces out at the top. If installed in this order, its jack is **IN 3**. Set Threshold to 50 and connect the four internal links from the acceptance circuit.
+3. Connect the weight plate to **IN**, the Network Switch to **IN 3**, and **OUT** to the relay lamp. Name the three runs. Use **ZedComm → Turn network switch on** and check the raised toggle sprite and `255` on **IN 3**. An 80 kg player should give `8` on the load jack, `0` on **OUT**, and an OFF lamp. A vehicle yielding at least 50 should turn it on. Keep the load steady and turn the switch OFF. The down sprite and `0` should return, and the lamp should go off while the load jack retains its reading.
+4. Set arm back to 255. Use **Disconnect cabinet jack (IN 3)**, check for `--` on **OUT** and an OFF lamp, then reconnect and check that the lamp resumes with the held load. Move the wired extension to another edge and check its links. Remove it and confirm the cable stays in place with a free end, the item returns, and the lamp turns off. Reinstall the extension and explicitly reconnect its internal contact and new external jack.
+5. Save and reload with the switch ON. Verify switch state and appearance, module settings, port connections, and run names restore. Confirm the lamp follows the currently present load and arm reading. Pick up the switch and remount it on a south wall and then an east wall. Use tiles with only the wall under test so the corner priority does not pick another edge. Check the preview and both toggle positions against the wall. Verify the latch follows the item, the old cable stays on the ground, and explicitly reconnecting restores the arm signal. Capture the game console before leaving the save.
+6. In normal crafting, search **Make ZedComm Network Switch** under Electrical. Verify one Electronics Scrap and one unit of Electric Wire produce the switch, with a screwdriver retained.
+7. With the plate above the Threshold, install an Output Extension on a free edge. Link Threshold OUT to the extension and run a separate wire from that jack to a numeric display. Turn the arm switch OFF. The display should hold `255` while the fixed OUT and lamp go OFF. Disconnect the extension's wire and verify fixed OUT still responds to the arm switch.
+
+Continue with the plate load, Adder and logic checks in Chunk 4 in the same game session. The Lua 5.1 suite passed 757 checks using the installed Build 42 Lua wrappers for placement, editor and registry coverage.
 
 **Review checkpoint** A cabinet reads two independent runs and drives a third. An armed threshold turns the lamp on. Losing either required input clears the output and turns the lamp off.
 
+### Built-in room lighting
+
+Build 42's native `IsoLightSwitch` supports explicit on/off. In the installed build, the room-light path updates its room's light state and the other switches assigned to the same room. A future receiver binding could use that path for a selected vanilla room switch and preserve native power checks. For building-wide coverage, a cabinet could fan out to one receiver per room on separate output runs. Verify room identification, interaction with other native switches in the same room, power loss and recovery, and reload on a one-room prototype first. See the [official IsoLightSwitch API](https://projectzomboid.com/modding/zombie/iso/objects/IsoLightSwitch.html).
+
 ## Chunk 4 - Combined load and normal gameplay
 
-- [ ] Add an Adder and define overflow before using it in a circuit. Proposed first rule is a byte sum capped at 255. With either input unavailable, the sum is unavailable. A connected clear plate supplies a valid 0.
-- [ ] Prove two weight plates → Adder → Threshold → AND with arm switch → lamp. At threshold 100, 60 or 55 alone gives OFF. Together they produce 115 and give ON while armed. These are summed sensor readings. A vehicle overlapping both tiles can contribute to both under the current plate model.
-- [ ] Add the real arm switch and recipes for Basic and Advanced Adapters and the selected modules. Exercise native endpoint crafting, vanilla lamp conversion and Basic-to-Advanced upgrade through normal gameplay. Scope ingredient counts and adapter recovery or reconnection during upgrade when the interaction is ready to test.
+- [x] Count world inventory items, animals, stationary corpses and floor-level props on the Basic and Weight Plates. A Basic plate sends its configured byte while occupied. The Weight Plate sums the detected mass before encoding.
+- [x] Add a two-input Adder with a byte sum capped at 255. With either input unavailable, the sum is unavailable. A connected clear plate supplies a valid 0.
+- [x] Prove two weight plates → Adder → Threshold → AND with arm switch → lamp in the offline game harness. At threshold 100, 60 or 55 alone gives OFF. Together they produce 115 and give ON while armed.
+- [x] Add OR and XOR for the cabinet and NOT for both the cabinet and the single-input Advanced Adapter. Gates use nonzero as true and preserve unavailable inputs.
+- [ ] Run the expanded live smoke checks below.
+- [x] Add recipes for Basic and Advanced Adapters, both cabinet variants and the Splitter. The Basic cabinet can be upgraded in place and returns its removed adapter.
+- [ ] Exercise the cabinet recipes, upgrade and splitter in-game. Additional module and endpoint recipes and normal vanilla lamp conversion are still open.
+
+### Expanded smoke test
+
+Grant any parts not already in the test inventory. Use the existing cabinet rig for the two-plate circuit, then a spare cabinet or a copy of the test board for comparing gates.
+
+```lua
+getPlayer():getInventory():AddItem("ZedComm.PressurePlate")
+getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
+getPlayer():getInventory():AddItem("ZedComm.InputExtension")
+getPlayer():getInventory():AddItem("ZedComm.AdderModule")
+getPlayer():getInventory():AddItem("ZedComm.OrModule")
+getPlayer():getInventory():AddItem("ZedComm.XorModule")
+getPlayer():getInventory():AddItem("ZedComm.NotModule")
+getPlayer():getInventory():AddItem("ZedComm.NumericDisplay")
+getPlayer():getInventory():AddItems("Base.LeadPipe", 14)
+```
+
+1. **Dropped or placed items.** Wire a Basic Plate to a display and configure it to `155`. Drop a pipe or use native **Place Item** on the plate, then step away. Check for `155`, remove the item, and check for `0`. Repeat on a Weight Plate. One pipe should show `1`, and ten pipes totaling 15 should show `2`. Place a loaded bag and check that the reading increases. Remove both the pipes and bag, then verify `0`. Try an animal or stationary corpse when convenient. The occupancy variant still reports players and zombies.
+2. **Combine two weight plates.** Keep the existing Threshold and AND-to-lamp path. Add an Input Extension at the bottom edge with its top-left at column 2, row 6, and an Adder at column 2, row 3. Wire the second Weight Plate to the new jack. Remove the Fixed IN to Threshold link, then connect the two weight inputs to Adder A and B and the Adder output to Threshold IN. Set Threshold to `2`. Turn the arm switch ON. Drop seven pipes on each plate so each reads `1` when loaded. Either pile alone should leave the lamp OFF. Both together should turn it ON. Turn the arm switch OFF and ON, then unplug and reconnect one plate. An unplugged input should clear the output, and reconnecting should restore it. If verifying the overflow boundary, two test byte sources at `200` should give `255` on a display wired to the Adder output. An overlapping vehicle can contribute its full reading to both plates when it covers both tiles.
+3. **Boolean modules.** Connect two runs to inputs A and B on OR or XOR and wire its output to a display. Use the Network Switch plus a Basic Plate as inputs, which gives you one latched input and one physical input. Try each row of the table. Keep both runs connected for the `0` cases. For NOT, use one input and expect `255` for `0`, `0` for any positive byte, and `--` when disconnected. A NOT module also fits on the 3×3 adapter and can be connected with **Auto-connect** when it is the sole module.
+4. **Persistence.** Reload with a complete circuit. Check that the module layout, Threshold value, jacks and wire runs restore. Verify output follows the currently detected load and arm state.
+
+| Input A | Input B | OR | XOR |
+| --- | --- | --- | --- |
+| 0 | 0 | 0 | 0 |
+| Positive | 0 | 255 | 255 |
+| 0 | Positive | 255 | 255 |
+| Positive | Positive | 255 | 0 |
+| Either input unavailable | | Unavailable | Unavailable |
 
 **Review checkpoint** Players can build, save, reload, and repair the combined-load circuit using normal gameplay actions.
+
+## Packet forwarding design
+
+Boolean gates and Threshold publish basic control bytes of `0` or `255`. Missing required inputs produce an unavailable signal. A cabinet has one signal per external run. Additional Input and Output Extensions give it independent jacks without combining unrelated signals onto a cable. Bitwise operations are deferred.
+
+### Cabinet tiers and splitter
+
+Both cabinet tiers use the same 6×6 board. The Basic cabinet is the entry-level build. It receives a byte directly or an advanced packet's sender-supplied byte fallback. An advanced packet without a fallback is unavailable to a Basic cabinet. The Advanced cabinet can receive the full packet and supports Full Reading arithmetic and per-jack Advanced output. New output jacks start in Basic mode, and an Advanced cabinet can have a mix of Basic and Advanced outputs. Cabinets placed in the earlier playtest keep their Advanced capability.
+
+Craft each adapter directly from scrap and wire. Cabinet recipes consume one sheet of metal and the corresponding adapter. All five recipes use a screwdriver and return it. The starting balance is:
+
+| Craft | Electrical | Parts consumed |
+| --- | --- | --- |
+| Basic Adapter | 1 | 1 Electronics Scrap, 1 Electric Wire |
+| Advanced Adapter | 3 | 3 Electronics Scrap, 2 Electric Wire |
+| Basic Small Cabinet | 1 | 1 Sheet Metal, 1 Basic Adapter |
+| Advanced Small Cabinet | 3 | 1 Sheet Metal, 1 Advanced Adapter |
+| Splitter Module | 1 | 1 Electronics Scrap, 2 Electric Wire |
+
+With an Advanced Adapter in your main inventory, choose **ZedComm → Upgrade cabinet with Advanced Adapter** on a Basic cabinet. The swap returns the Basic Adapter and preserves installed modules, internal links, and external runs. Use the cabinet editor to enable Advanced mode on any output that should send the full reading.
+
+The 1×2 Splitter mounts flush to a cabinet edge. Rotate it so **Out A** and **Out B** face into the board. It forwards its one input to both contacts, including a valid zero. Map each branch to its own external jack and run. Each output applies its own cabinet jack mode. For more branches, connect a splitter output to more internal output jacks through Output Extensions. Losing the input clears all branches. Disconnecting one output leaves the other branches live. Normal one-source-per-run and feedback rules apply to each branch.
+
+### Forwarding behavior
+
+- **Cache** has a **Data** input and an **Enable** input. It uses the latest maintained Data packet. While enabled, it forwards that packet and updates as Data changes. A closed gate or missing input leaves the output unavailable. Re-enabling forwards the current reading.
+- Keep full packets on internal connections and derive a byte when a Boolean module evaluates its input. A direct raw input-to-output connection publishes a Boolean control byte. An Adder produces a new numeric result and can publish it directly. Select **Always** on Cache to forward without an Enable connection.
+- A basic output sends the sender-supplied fallback or a basic packet as received. An advanced output can send the full packet. An Advanced Receiver hands the endpoint the full typed reading or the original basic byte. A typed arithmetic module can generate a new full-precision result from compatible input types and compute a fallback for that result.
+
+### Secret-door example
+
+Use three input runs. A and B each feed a load threshold. C is a hidden basic plate under a crate. Invert C so removing the crate produces an ON condition. Combine the two thresholds and the inverted crate condition with AND. A missing condition clears the door output. The example assumes a door receiver that leaves the door locked when its signal is unavailable. Weight thresholds respond to any qualifying load. A player-only requirement would need a player-specific source.
+
+Use a separate output run for each result. The door receives the Boolean unlock command. An advanced output can forward A's full weight through Cache, enabled by the unlock condition or set to Always for a continuous reading. Another output can send the crate-clear Boolean. Use one Output Extension per extra run.
+
+The Advanced Display is the first Advanced Receiver. Its face shows the byte fallback. **Read full signal** shows a raw byte or the full typed reading and unit. In an Advanced cabinet, select a fixed output or Output Extension and choose **Configure** to switch between Basic and Advanced transmission for that jack.
+
+## Arithmetic, timer and source modules
+
+### Full-reading arithmetic
+
+Keep Byte mode for existing circuits. It reads byte or fallback operands. Addition and multiplication cap at `255`, and subtraction floors at `0`. Two valid operands are required.
+
+Full Reading mode reads the typed packet. For the first payload, kilograms, Adder and Subtractor accept two compatible weight readings and emit a weight packet. Subtractor computes A minus B with a floor of zero for weight. Multiplier has a **Reading** input and a **Factor** input. A weight multiplied by a unitless factor stays in kilograms. A byte is usable as a scalar at that explicitly labeled Factor input. An input port expecting a weight requires a weight packet.
+
+Compute the fallback from the full result after validating that the result is finite. For example, `1,150 kg + 1,600 kg` publishes `2,750 kg` with fallback `255`. An advanced output and Advanced Receiver preserve the result in kilograms. A basic output sends the fallback. Select a math module and choose **Configure** to toggle Byte and Full Reading.
+
+### Timer and Wait
+
+Use a **Timer** with a configurable ON duration. A plate's transition from valid zero to a positive byte opens the window immediately. The timer outputs `255` for the configured duration even if the player steps off the plate. At expiry, it returns to `0` even if the plate is still occupied. Another valid zero-to-positive transition restarts the window. An unavailable input cancels the window and clears the signal.
+
+Timer and Wait measure real seconds while the simulation runs. Pause stops the countdown. Fast-forward keeps the same real-second duration. Active timing state resets on reload or a circuit edit. The Timer rearms after a valid zero. Use a lamp or display for the smoke test. A future door receiver can use the timed output as its open or unlock command.
+
+**Wait** delays publishing a positive input until it has held steady for the configured duration. It keeps the previous output while a positive reading is pending, with `0` as the initial output on a live input. A valid `0` publishes immediately and resets the countdown. An unavailable input cancels the wait and clears the output immediately. A two-second Wait opens a door after two seconds of steady pressure and closes it as soon as the player steps off. Add a ten-second Timer after Wait to open for ten seconds once the pressure qualifies.
+
+### Tunable sources
+
+A Source occupies one cell and publishes a configured integer from `1` through `255` while powered. The default is `255` for enable inputs. Loss of power clears its output. A source can also provide a numeric Factor to Multiplier.
+
+**Mains Source** checks the host object with the game's appliance grid and generator query. Recovery republishes the configured byte. **Battery Source** accepts a replaceable Base.Battery from the player's main inventory and retains its charge through battery removal and reinstallation. For this prototype the installed battery keeps its charge. Battery drain is a balance decision. The cabinet evaluates its other modules independently of any Source's supply.
+
+### Advanced packet and timing smoke check
+
+Use these parts after Chunks 3 and 4. Use the **Next** and **Previous** buttons in the carried pane to find the additional cabinet modules.
+
+```lua
+getPlayer():getInventory():AddItem("ZedComm.AdvancedDisplay")
+getPlayer():getInventory():AddItem("ZedComm.AdvancedSmallCabinet")
+getPlayer():getInventory():AddItem("ZedComm.CacheModule")
+getPlayer():getInventory():AddItem("ZedComm.SubtractorModule")
+getPlayer():getInventory():AddItem("ZedComm.MultiplierModule")
+getPlayer():getInventory():AddItem("ZedComm.TimerModule")
+getPlayer():getInventory():AddItem("ZedComm.WaitModule")
+getPlayer():getInventory():AddItem("ZedComm.MainsSourceModule")
+getPlayer():getInventory():AddItem("ZedComm.BatterySourceModule")
+getPlayer():getInventory():AddItem("Base.Battery")
+```
+
+1. **Advanced Receiver and Cache.** Set a Weight Plate to Advanced Sender via the Debug menu. Wire it directly to an Advanced Display and use **Read full signal** while a load is present. Move the reading through an Advanced cabinet with Fixed IN wired to Cache Data and Cache OUT wired to Fixed OUT. Set Cache to **Always**. Basic OUT shows only the fallback. Select Fixed OUT and configure it to Advanced. Read the display again and confirm the exact weight is back. Configure Cache to use Enable, wire an Input Extension to Enable, and run a switch to that jack. Check that OFF clears the reading and ON resumes the current load.
+2. **Math.** Reuse the two-plate rig after upgrading its cabinet, or build it in an Advanced cabinet. Select the Adder and configure it to Full Reading. Use Advanced Sender on both plates. Wire Adder OUT directly to an Output Extension, configure that jack to Advanced, and run it to the Advanced Display. Verify the exact sum. Repeat with Subtractor in A minus B order. For Multiplier, feed a weight to Reading and a tuned Source at `4` to Factor. An 80 kg reading should give 320 kg with fallback `32`. Set the output to Basic and confirm the display reports only that byte.
+3. **Wait and Timer.** Wire a plate through a 2-second Wait to a lamp or display. A quick step leaves the result OFF. Holding for two seconds turns it ON, and stepping off clears it immediately. Add a 10-second Timer after Wait. Once Wait qualifies, the output stays ON for the timer window after you step off. Check expiry with a quiet input and immediate signal loss on unplug. Try a reload with a timing window active and verify it has cleared.
+4. **Sources.** Place a one-cell Mains Source, configure `37`, and wire its output to a display. Check grid or generator power, loss, and recovery. Replace it with a Battery Source. With the source selected, use **Insert or remove battery** to install a charged battery. Verify the configured byte, then remove the cell and confirm the display clears and the battery returns to inventory.
+
+### Cabinet tiers and splitter smoke check
+
+1. In Electrical crafting, confirm the five recipes above use their listed adapter, skill and materials, and that each retains the screwdriver. Craft both cabinet variants or grant the parts below in a debug save.
+2. Place a Basic Small Cabinet. Try to drop a Splitter in the middle of the board and verify it stays in inventory. Rotate it to mount flush to an edge with both outputs facing inward, then install one Output Extension. Route Fixed IN → Splitter IN, Out A → Fixed OUT and Out B → the extension. Wire the two jacks to separate Advanced Displays. Connect an Advanced Weight Plate to Fixed IN. With the same load, both displays should report the same fallback byte. Clearing the plate should give a valid `0` on both.
+3. With the splitter still wired and the plate loaded, use **Upgrade cabinet with Advanced Adapter**. Verify the Basic Adapter returns to inventory, both runs and their names survive, and the circuit still works. Set only Fixed OUT to Advanced using **Configure**. **Read full signal** should show weight in kg on the first display and only the fallback byte on the second. Set the extension to Advanced and verify both report the full reading.
+4. Unplug one output and check the other still reads the load. Reconnect, then unplug Fixed IN and check both readings clear. Reconnect and reload. Confirm both runs follow the current load and that the cabinet keeps its Advanced tier and output settings.
+
+```lua
+getPlayer():getInventory():AddItem("ZedComm.SmallCabinet")
+getPlayer():getInventory():AddItem("ZedComm.AdvancedSmallCabinet")
+getPlayer():getInventory():AddItem("ZedComm.AdvancedAdapter")
+getPlayer():getInventory():AddItem("ZedComm.SplitterModule")
+getPlayer():getInventory():AddItem("ZedComm.OutputExtension")
+getPlayer():getInventory():AddItems("ZedComm.AdvancedDisplay", 2)
+```
+
+**Offline verification.** The Lua suite covers direct readout through the native receiver, Cache and output-mode reload, typed arithmetic, timer expiry, source power transitions, both cabinet tiers, swap inventory rollback, and independent splitter runs. Live Project Zomboid verification remains open.

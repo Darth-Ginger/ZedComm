@@ -8,10 +8,9 @@
 -- Pieces:
 --   cable    - one cable piece on one square. Holds at most two links (its
 --              two ends), so a run is a chain and can bend.
---   endpoint - a device on one square with named ports. Its role is "source"
---              (publishes a packet, e.g. the pressure sensor) or "sink" (receives
---              it, e.g. the display). Endpoint behaviour lives elsewhere
---              (ADR-302); the model only knows the role and the current packet.
+--   endpoint - a device on one square. Fixtures have a source or sink role.
+--              Cabinets have individual jack directions, output packets and
+--              directed dependencies between their jacks.
 --
 -- Links are explicit records. A cable links to a cable on an orthogonally
 -- adjacent square, or to a free endpoint port on its own or an adjacent
@@ -29,8 +28,10 @@
 -- Kahlua (Lua 5.1): no goto, no integer division, no io/os.
 
 require "ZedComm/SignalModules"
+require "ZedComm/InternalCircuit"
 
 local Packet = ZedComm.SignalModules.Packet
+local Circuit = ZedComm.InternalCircuit
 local Network = {}
 Network.__index = Network
 
@@ -44,6 +45,15 @@ Network.MULTI_SOURCE = "multi-source" -- unsupported in the MVP: treated as disc
 
 local function portKey(endpointId, port)
     return endpointId .. "#" .. port
+end
+
+local function direction(piece, port)
+    return piece.board and piece.board.directions[port] or piece.role
+end
+
+local function sourcePacket(piece, port)
+    if piece.board then return piece.packets[port] end
+    return piece.packet
 end
 
 function Network.new()
@@ -126,8 +136,10 @@ function Network:build()
                 if hash then
                     local endpointId = string.sub(nodes[j], 1, hash - 1)
                     local piece = self.pieces[endpointId]
-                    if piece.role == "source" then
+                    local port = string.sub(nodes[j], hash + 1)
+                    if direction(piece, port) == "source" then
                         net.sources[#net.sources + 1] = endpointId
+                        net.sourcePort = port
                     else
                         net.sinks[#net.sinks + 1] = endpointId
                     end
@@ -137,6 +149,50 @@ function Network:build()
         end
     end
     self.nodeNet, self.nets, self.built = nodeNet, nets, self.version
+end
+
+-- A link only merges two runs. Project that merge onto the internal
+-- dependencies before writing any links, packets, or dirty marks.
+function Network:hasFeedback(mergedInto, mergedFrom, replacement)
+    self:build()
+    local edges = {}
+    local function runOf(id, port)
+        local run = self.nodeNet[portKey(id, port)]
+        if run == mergedFrom then return mergedInto end
+        return run
+    end
+    for id, piece in pairs(self.pieces) do
+        local board = replacement and replacement.id == id and replacement.board or piece.board
+        if board then
+            for output, inputs in pairs(board.dependencies) do
+                local target = runOf(id, output)
+                if target then
+                    for input in pairs(inputs) do
+                        local source = runOf(id, input)
+                        if source then
+                            local group = edges[source] or {}
+                            group[target] = true
+                            edges[source] = group
+                        end
+                    end
+                end
+            end
+        end
+    end
+    local visited = {}
+    local function cycle(run)
+        if visited[run] ~= nil then return visited[run] end
+        visited[run] = true
+        for target in pairs(edges[run] or {}) do
+            if cycle(target) then return true end
+        end
+        visited[run] = false
+        return false
+    end
+    for run in pairs(edges) do
+        if cycle(run) then return true end
+    end
+    return false
 end
 
 -- The network a cable, or an endpoint's port, belongs to.
@@ -154,7 +210,7 @@ function Network:status(networkId)
     if not net or #net.sources == 0 then return Network.NO_SOURCE end
     if #net.sources > 1 then return Network.MULTI_SOURCE end
     local source = self.pieces[net.sources[1]]
-    if source.definitionUnavailable or source.packet == nil then return Network.NO_SOURCE end
+    if source.definitionUnavailable or sourcePacket(source, net.sourcePort) == nil then return Network.NO_SOURCE end
     return Network.OK
 end
 
@@ -162,7 +218,8 @@ end
 -- A caller may inspect its copy without changing the held signal (ADR-309).
 function Network:recompute(networkId)
     if self:status(networkId) ~= Network.OK then return nil end
-    return Packet.copy(self.pieces[self.nets[networkId].sources[1]].packet)
+    local net = self.nets[networkId]
+    return Packet.copy(sourcePacket(self.pieces[net.sources[1]], net.sourcePort))
 end
 
 -- Sink endpoints on a network, for delivery.
@@ -294,7 +351,9 @@ end
 function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     if type(id) ~= "string" or string.find(id, "#", 1, true) then return false, "bad id" end
     if not checkPosition(x, y, z) then return false, "bad position" end
-    if role ~= "source" and role ~= "sink" then return false, "bad role" end
+    if role ~= "source" and role ~= "sink" and (role ~= "cabinet" or definitionId ~= Circuit.CABINET_ID) then
+        return false, "bad role"
+    end
     local existing = self.pieces[id]
     if existing then
         if existing.kind == "endpoint" and existing.role == role
@@ -306,15 +365,24 @@ function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     local stateCopy, stateError = validatedState(definitionId, state)
     if stateError then return false, stateError end
     local portTable = {}
-    ports = ports or { Network.DEFAULT_PORT }
-    for i = 1, #ports do
-        if string.find(ports[i], "#", 1, true) then return false, "bad port" end
-        portTable[ports[i]] = false
+    local evaluate, board
+    if role == "cabinet" then
+        evaluate, stateError, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, true,
+            Circuit.cabinetAdapter(stateCopy))
+        if not evaluate then return false, stateError end
+        for port in pairs(board.directions) do portTable[port] = false end
+    else
+        ports = ports or { Network.DEFAULT_PORT }
+        for i = 1, #ports do
+            if string.find(ports[i], "#", 1, true) then return false, "bad port" end
+            portTable[ports[i]] = false
+        end
     end
     self.pieces[id] = {
         id = id, kind = "endpoint", x = x, y = y, z = z,
         role = role, ports = portTable,
         definitionId = definitionId, state = stateCopy,
+        board = board, evaluate = evaluate, packets = board and {} or nil,
     }
     local nodes = {}
     for port in pairs(portTable) do nodes[portKey(id, port)] = true end
@@ -348,20 +416,15 @@ function Network:link(cableId, otherId, port)
         if other.ports[port] == nil then return false, "no such port" end
         if other.ports[port] ~= false then return false, "port in use" end
         if distance > 1 then return false, "endpoint is not on or next to the cable" end
-        -- MVP: one source per network; refuse a link that would join two.
-        if other.role == "source" then
-            self:build()
-            local net = self.nets[self.nodeNet[cableId]]
-            if net and #net.sources > 0 then return false, "network already has a source" end
-        end
     end
-    if other.kind == "cable" then
-        self:build()
-        local a = self.nets[self.nodeNet[cableId]]
-        local b = self.nets[self.nodeNet[otherId]]
-        if a ~= b and a and b and #a.sources > 0 and #b.sources > 0 then
-            return false, "would join two sources"
+    self:build()
+    local a = self.nodeNet[cableId]
+    local b = self.nodeNet[port and portKey(otherId, port) or otherId]
+    if a ~= b then
+        if #self.nets[a].sources > 0 and #self.nets[b].sources > 0 then
+            return false, port and "network already has a source" or "would join two sources"
         end
+        if self:hasFeedback(a, b) then return false, "cabinet circuit feedback" end
     end
 
     local nodes = self:affectedNodes({ cableId, otherId })
@@ -413,19 +476,25 @@ function Network:remove(id)
 end
 
 -- Publish a current packet, or clear it with nil. Mark only on a real change.
-function Network:setPacket(id, packet)
+function Network:setPacket(id, packet, port)
     local piece = self.pieces[id]
-    if not piece or piece.kind ~= "endpoint" or piece.role ~= "source" then
+    if not piece or piece.kind ~= "endpoint" or (piece.board and piece.board.directions[port] ~= "source")
+        or (not piece.board and piece.role ~= "source") then
         return false, "not a source"
     end
     if piece.definitionUnavailable then return false, "device definition unavailable" end
     local valid, reason = Packet.validate(packet)
     if not valid then return false, reason end
-    if Packet.equal(piece.packet, packet) then return true end
-    piece.packet = Packet.copy(packet)
-    if self.sim then
-        for port in pairs(piece.ports) do
-            self.sim.markDirty(self:networkOf(id, port))
+    if Packet.equal(sourcePacket(piece, port), packet) then return true end
+    if piece.board then
+        piece.packets[port] = Packet.copy(packet)
+        if self.sim then self.sim.markDirty(self:networkOf(id, port)) end
+    else
+        piece.packet = Packet.copy(packet)
+        if self.sim then
+            for name in pairs(piece.ports) do
+                self.sim.markDirty(self:networkOf(id, name))
+            end
         end
     end
     return true
@@ -441,6 +510,30 @@ function Network:setDeviceState(id, state)
     if piece.definitionUnavailable then return false, "device definition unavailable" end
     local stateCopy, err = validatedState(piece.definitionId, state)
     if err then return false, err end
+    if piece.board then
+        local evaluate, reason, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, true,
+            Circuit.cabinetAdapter(stateCopy))
+        if not evaluate then return false, reason end
+        if self:hasFeedback(nil, nil, { id = id, board = board }) then return false, "cabinet circuit feedback" end
+        local affected, ports = self:affectedNodes({ id }), {}
+        for port, role in pairs(board.directions) do
+            if piece.board.directions[port] and piece.board.directions[port] ~= role then
+                return false, "cabinet port direction cannot change"
+            end
+            ports[port] = piece.ports[port] or false
+            affected[portKey(id, port)] = true
+        end
+        for port, cable in pairs(piece.ports) do
+            if ports[port] == nil then
+                if cable then self.pieces[cable].links[id] = nil end
+                piece.packets[port] = nil
+            end
+        end
+        piece.ports, piece.board, piece.evaluate = ports, board, evaluate
+        piece.state = stateCopy
+        self:changed(affected)
+        return true
+    end
     piece.state = stateCopy
     return true
 end

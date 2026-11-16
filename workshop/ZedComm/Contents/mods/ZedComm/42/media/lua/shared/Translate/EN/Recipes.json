@@ -1,0 +1,8 @@
+{
+    "ZedCommMakeBasicAdapter": "Make ZedComm Basic Adapter",
+    "ZedCommMakeAdvancedAdapter": "Make ZedComm Advanced Adapter",
+    "ZedCommMakeBasicSmallCabinet": "Make ZedComm Basic Small Cabinet",
+    "ZedCommMakeAdvancedSmallCabinet": "Make ZedComm Advanced Small Cabinet",
+    "ZedCommMakeSplitterModule": "Make ZedComm Splitter Module",
+    "ZedCommMakeNetworkSwitch": "Make ZedComm Network Switch"
+}

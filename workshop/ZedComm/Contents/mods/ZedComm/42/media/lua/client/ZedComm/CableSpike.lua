@@ -225,7 +225,10 @@ function Debug.optionsAt(registry, square)
         local piece = registry.network.pieces[tag.id]
         if piece then
             local label = #tagged > 1 and ("Inspect circuit (" .. tag.id .. ")") or "Inspect circuit"
-            add(label, Debug.inspectCircuit, object)
+            if not piece.board then add(label, Debug.inspectCircuit, object) end
+            if piece.definitionId == "ZedComm.DebugByteSource" then
+                add("Set test byte", Debug.setByte, object)
+            end
             if piece.definitionId == ZedComm.RelayLamp.ID then
                 local circuit = piece.state and piece.state.circuit
                 if thresholdModule(circuit) then
@@ -250,7 +253,6 @@ function Debug.optionsAt(registry, square)
             end
             if tag.spikeWire then
                 if tag.definitionId == "ZedComm.DebugByteSource" then
-                    add("Set test byte", Debug.setByte, object)
                     add("Toggle test source link", Debug.toggleDeviceLink, object)
                 elseif tag.definitionId == "ZedComm.NumericDisplay" then
                     add("Read test display", Debug.showDeviceDisplay, object)

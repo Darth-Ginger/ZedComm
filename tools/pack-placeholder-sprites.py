@@ -5,7 +5,7 @@ from math import hypot
 from pathlib import Path
 from struct import pack
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "art" / "placeholders"
@@ -13,6 +13,11 @@ CONCEPT_ART = ROOT / "art" / "first-release-concepts"
 OCCUPANCY_ART = CONCEPT_ART / "occupancy-plate.png"
 WEIGHT_ART = CONCEPT_ART / "weight-plate.png"
 DISPLAY_ART = CONCEPT_ART / "numeric-display-blank-face.png"
+FLOOR_CABINET = ROOT / "art" / "cabinet-prototypes" / "network-cabinet-floor-frame.png"
+CABINET_FRAME = 466
+SWITCH_FRAME = 467
+SWITCH_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
+SWITCH_ART = (CONCEPT_ART / "manual-network-switch.png", CONCEPT_ART / "manual-network-switch-on.png")
 OCCUPANCY_FIRST_FRAME = 419
 WEIGHT_FIRST_FRAME = 425
 DISPLAY_FIRST_FRAME = 431
@@ -280,6 +285,35 @@ def texture_page(name, atlas, metadata, count):
     return pack_string(name) + ints(count, 1) + metadata + ints(len(png)) + png
 
 
+def switch_page(textures):
+    art = []
+    for source in SWITCH_ART:
+        with Image.open(source) as original:
+            art.append(original.convert("RGBA"))
+    boxes = [frame.getchannel("A").point(lambda alpha: 255 if alpha >= 128 else 0).getbbox() for frame in art]
+    left, top = min(box[0] for box in boxes), min(box[1] for box in boxes)
+    right, bottom = max(box[2] for box in boxes), max(box[3] for box in boxes)
+    body = [frame.crop((left, top, right, bottom)) for frame in art]
+    width = 30
+    height = round(width * (bottom - top) / (right - left))
+    atlas = Image.new("RGBA", (256, 64))
+    metadata = bytearray()
+    for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
+        for state, frame in enumerate(body):
+            slot = facing * len(body) + state
+            frame = frame.resize((width, height), Image.Resampling.LANCZOS)
+            if mirror:
+                frame = ImageOps.mirror(frame)
+            atlas.alpha_composite(frame, (slot * width, 0))
+            metadata.extend(sprite_record(SWITCH_FRAME + slot, slot * width, 0, width, height,
+                                          center - width // 2, baseline - height))
+    icon = Image.new("RGBA", (64, 64))
+    body[0].thumbnail((52, 52), Image.Resampling.LANCZOS)
+    icon.alpha_composite(body[0], ((64 - body[0].width) // 2, (64 - body[0].height) // 2))
+    icon.save(textures / "Item_ZedCommNetworkSwitch.png")
+    return texture_page(SET + "_switch", atlas, metadata, len(SWITCH_MOUNTS) * len(body))
+
+
 def route_page(start):
     atlas = Image.new("RGBA", (1024, 2048))
     metadata = bytearray()
@@ -491,19 +525,33 @@ def main():
     display = display_art()
     legacy_displays, count = legacy_display_page(display_start, *display)
     display_faces = display_faces_page(*display)
+    cabinet = Image.open(FLOOR_CABINET).convert("RGBA")
+    left, top, right, bottom = cabinet.getbbox()
+    cropped_cabinet = cabinet.crop((left, top, right, bottom))
+    cabinet_metadata = sprite_record(CABINET_FRAME, 0, 0, right - left, bottom - top, left, top)
+    cabinet_page = texture_page(SET + "_cabinet", cropped_cabinet, cabinet_metadata, 1)
+    switch_frames = switch_page(textures)
+    write_icon(FLOOR_CABINET, textures / "Item_ZedCommSmallCabinet.png")
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
-    (packs / f"{SET}.pack").write_bytes(b"PZPK" + ints(1, 4) + original + routes + legacy_displays + display_faces)
+    (packs / f"{SET}.pack").write_bytes(
+        b"PZPK" + ints(1, 6) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+    )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
     tiles = b"tdef" + ints(1, 2) + f"{SET}\n{SET}.png\n".encode("ascii")
-    tiles += ints(7, 2, 1, count)
+    assert count == CABINET_FRAME
+    assert SWITCH_FRAME == CABINET_FRAME + 1
+    switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
+    tiles += ints(7, 2, 1, SWITCH_FRAME + switch_count)
     for index in range(count):
         if (module_start <= index < plate_start or compact_start <= index < lane_start
                 or index > DISPLAY_FIRST_FRAME):
             tiles += ints(0)
         else:
             tiles += ints(1) + b"FloorOverlay\n\n"
+    tiles += ints(0)  # Cabinet uses the ordinary object layer.
+    tiles += ints(0) * switch_count  # Switch faces draw at wall height.
     # Build 42 reserves 512 sprite IDs per tileset. Keep saved device IDs stable.
     tiles += f"{DISPLAY_SET}\n{DISPLAY_SET}.png\n".encode("ascii")
     tiles += ints(257, 1, 2, 257)

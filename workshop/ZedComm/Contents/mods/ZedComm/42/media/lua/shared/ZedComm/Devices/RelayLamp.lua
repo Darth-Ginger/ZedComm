@@ -45,8 +45,8 @@ end
 -- The wire stays byte-valued. Only the lamp's request uses the circuit result.
 function Relay.compileCircuit(state)
     if not state or state.circuit == nil then return nil end
-    local evaluate, reason = ZedComm.InternalCircuit.compile(state.circuit)
-    if evaluate then return evaluate end
+    local evaluate, reason, board = ZedComm.InternalCircuit.compile(state.circuit)
+    if evaluate then return evaluate, nil, board end
     return function() return nil end, reason
 end
 

@@ -8,6 +8,8 @@ local Placement = {}
 local Network = ZedComm.Network
 local definitions = ZedComm.DeviceDefinitions
 local Relay = ZedComm.RelayLamp
+local Circuit = ZedComm.InternalCircuit
+local Switch = ZedComm.NetworkSwitch
 local serial = 0
 local items = {
     { itemType = "ZedComm.PressurePlate", name = "pressure plate", sprite = "zedcomm_devices_01_20",
@@ -15,10 +17,20 @@ local items = {
     { itemType = "ZedComm.SignalWire", name = "wire", sprite = "zedcomm_devices_01_1", kind = "cable" },
     { itemType = "ZedComm.NumericDisplay", name = "numeric display", sprite = "zedcomm_devices_01_431",
         kind = "endpoint", definitionId = "ZedComm.NumericDisplay" },
+    { itemType = "ZedComm.AdvancedDisplay", name = "advanced display", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay" },
     { itemType = "ZedComm.OccupancyPlate", name = "occupancy plate", sprite = "zedcomm_devices_01_419",
         kind = "endpoint", definitionId = "ZedComm.OccupancyPlate" },
     { itemType = "ZedComm.WeightPlate", name = "weight plate", sprite = "zedcomm_devices_01_425",
         kind = "endpoint", definitionId = "ZedComm.WeightPlate" },
+    { itemType = Circuit.CABINET_ID, name = "basic small cabinet", sprite = "zedcomm_devices_01_466",
+        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "basic" },
+    { itemType = Circuit.ADVANCED_CABINET_ITEM, name = "advanced small cabinet", sprite = "zedcomm_devices_01_466",
+        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "advanced" },
+    { itemType = "ZedComm.DebugByteSource", name = "test byte source", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = "ZedComm.DebugByteSource" },
+    { itemType = Switch.ID, name = "network switch", sprite = Switch.OFF_NORTH,
+        kind = "endpoint", definitionId = Switch.ID },
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true }
 Placement.WIRE_TYPE = items[2].itemType
@@ -31,6 +43,15 @@ end
 
 function Placement.getSpec(itemType)
     return specFor(itemType)
+end
+
+function Placement.previewSprite(square, item)
+    local spec = specFor(item:getFullType())
+    if not spec then return nil end
+    if spec.definitionId ~= Switch.ID or not square then return spec.sprite end
+    local saved = item:getModData().zedcommPlacement
+    local state = type(saved) == "table" and saved.state
+    return Switch.sprite(Switch.mount(square), type(state) == "table" and state.on == true)
 end
 
 function Placement.getRegistry()
@@ -112,6 +133,10 @@ function Placement.piecesAt(registry, square)
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
+            if piece.board then
+                local advanced = Circuit.cabinetAdapter(piece.state) == "advanced"
+                spec = specFor(advanced and Circuit.ADVANCED_CABINET_ITEM or Circuit.CABINET_ID)
+            end
             out[#out + 1] = { id = piece.id, piece = piece, object = object, square = square, spec = spec }
         end
     end
@@ -184,6 +209,9 @@ local function tileAvailable(square, spec)
     if not square:TreatAsSolidFloor() or square:isSolid() or square:isSolidTrans() then
         return false, "Choose a clear floor tile."
     end
+    if spec.definitionId == Switch.ID and not Switch.mount(square) then
+        return false, "Choose a tile next to a wall for the switch."
+    end
     if spec.kind == "endpoint" then
         for _, object in ipairs(squareObjects(square)) do
             local tag = tagOf(object)
@@ -246,18 +274,26 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     if laying and not canExtend(anchor, anchorPort, square) then
         return false, "Select a free end on this tile or a neighboring tile."
     end
-    if not getSprite(spec.sprite) then return false, "The ZedComm sprite is missing." end
-    if spec.definitionId and not definitions.get(spec.definitionId) then
+    local sprite = Placement.previewSprite(square, item)
+    if not getSprite(sprite) then return false, "The ZedComm sprite is missing." end
+    if spec.definitionId and spec.definitionId ~= Circuit.CABINET_ID and not definitions.get(spec.definitionId) then
         return false, "The device definition is missing."
     end
     local retained = retainedState(item, spec)
     local id = chooseId(registry, square, retained)
     if not id then return false, "A device with this identity is already placed." end
 
-    local object = IsoObject.new(square, spec.sprite, item:getName())
+    local object = IsoObject.new(square, sprite, item:getName())
+    local state = retained and retained.state
+    if spec.adapter then
+        state = { adapter = spec.adapter, circuit = state and state.circuit or { modules = {}, links = {} } }
+    end
+    if spec.definitionId == Switch.ID then
+        state = { on = type(state) == "table" and state.on == true, mount = Switch.mount(square) }
+    end
     object:getModData().zedcomm = {
         id = id, kind = spec.kind, definitionId = spec.definitionId, placedItem = spec.itemType,
-        state = retained and retained.state,
+        state = state,
     }
     local entry = { id = id, object = object, square = square }
     local ok, err = pcall(function()
@@ -343,24 +379,61 @@ local function installRelay(registry, square, lamp, character, adapterItem)
     return true, id
 end
 
--- Apply an edit only to the exact live lamp and circuit the editor opened.
-function Placement.editLampCircuit(character, registry, target, expected, layout, install, remove)
+local function upgradeCabinet(registry, character, entry, adapter)
+    if entry.spec.adapter ~= "basic" then return false, "This cabinet already has an Advanced Adapter." end
+    local inventory = character:getInventory()
+    if not adapter or adapter:getFullType() ~= Circuit.ADVANCED_ADAPTER_ITEM
+        or adapter:getContainer() ~= inventory or not inventory:contains(adapter) then
+        return false, "Bring an Advanced Adapter in your main inventory."
+    end
+    local recovered = instanceItem(Circuit.BASIC_ADAPTER_ITEM)
+    if not recovered then return false, "Could not recover the Basic Adapter." end
+    inventory:Remove(adapter)
+    if inventory:contains(adapter) then return false, "Could not install the Advanced Adapter." end
+    if inventory:hasRoomFor(character, recovered) then inventory:AddItem(recovered) end
+    if not inventory:contains(recovered) then
+        inventory:AddItem(adapter)
+        return false, "There is no room for the recovered Basic Adapter."
+    end
+
+    local state = registry.network:record(entry.id).state
+    state.adapter = "advanced"
+    local called, ok, reason = pcall(registry.setDeviceState, registry, entry.id, state)
+    if not called and Circuit.cabinetAdapter(entry.piece.state) == "advanced" then
+        print("[ZedComm] Cabinet upgrade committed after sync error: " .. tostring(ok))
+        return true
+    end
+    if called and ok then return true end
+    inventory:Remove(recovered)
+    inventory:AddItem(adapter)
+    return false, called and reason or tostring(ok)
+end
+
+-- Apply an edit only to the exact host and circuit the editor opened.
+function Placement.editCircuit(character, registry, target, expected, layout, install, remove)
     local entry = Placement.getRegistry() == registry and Placement.resolve(registry, target.id)
     if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square) then
-        return false, "That lamp is no longer within reach."
+        return false, "That device is no longer within reach."
     end
     local state = entry.piece.state
-    if entry.piece.definitionId ~= Relay.ID or not state or type(expected) ~= "table" or state.circuit ~= expected then
-        return false, "The adapter changed. Reopen its circuit."
+    local cabinet = entry.piece.definitionId == Circuit.CABINET_ID
+    if (not cabinet and entry.piece.definitionId ~= Relay.ID) or not state
+        or type(expected) ~= "table" or state.circuit ~= expected then
+        return false, "The circuit changed. Reopen the editor."
     end
-    local valid, errorMessage = ZedComm.InternalCircuit.compile(layout)
+    local valid, errorMessage = Circuit.compile(layout, cabinet, cabinet and Circuit.cabinetAdapter(state) or nil)
     if not valid then return false, errorMessage end
-    local added, removed = 0, 0
-    for id in pairs(layout.modules) do
-        if not expected.modules[id] then added = added + 1 end
+    local added, removed, addedPart, removedPart = 0, 0
+    for id, part in pairs(layout.modules) do
+        local previous = expected.modules[id]
+        if not previous then
+            added, addedPart = added + 1, part
+        elseif previous.kind ~= part.kind then
+            return false, "An installed module cannot change type."
+        end
     end
-    for id in pairs(expected.modules) do
-        if not layout.modules[id] then removed = removed + 1 end
+    for id, part in pairs(expected.modules) do
+        if not layout.modules[id] then removed, removedPart = removed + 1, part end
     end
     if (install and remove) or added ~= (install and 1 or 0) or removed ~= (remove and 1 or 0) then
         return false, "The module inventory does not match this edit."
@@ -369,28 +442,45 @@ function Placement.editLampCircuit(character, registry, target, expected, layout
     local inventory = character:getInventory()
     local recovered
     if install then
-        if install:getFullType() ~= "ZedComm.ThresholdModule"
+        if install:getFullType() ~= Circuit.kinds[addedPart.kind].item
             or install:getContainer() ~= inventory or not inventory:contains(install) then
             return false, "The module is no longer in your main inventory."
+        end
+        if addedPart.kind == "batterySource" and addedPart.charge ~= install:getModData().zedcommCharge then
+            return false, "The battery source changed. Pick it up again."
         end
         inventory:Remove(install)
         if inventory:contains(install) then return false, "Could not install the module." end
     elseif remove then
-        recovered = instanceItem("ZedComm.ThresholdModule")
+        recovered = instanceItem(Circuit.kinds[removedPart.kind].item)
         if not recovered or not inventory:hasRoomFor(character, recovered) then
             return false, "There is no room for the module."
+        end
+        if removedPart.kind == "batterySource" then
+            recovered:getModData().zedcommCharge = removedPart.charge
+        end
+        if Circuit.kinds[removedPart.kind].source then
+            recovered:getModData().zedcommSourceLevel = removedPart.level
         end
         inventory:AddItem(recovered)
         if not inventory:contains(recovered) then return false, "Could not return the module." end
     end
 
-    local called, ok, reason = pcall(ZedComm.DeviceRuntime.setLampCircuit, registry, entry.id, layout)
+    local function save()
+        if not cabinet then return ZedComm.DeviceRuntime.setLampCircuit(registry, entry.id, layout) end
+        local copy = registry.network:record(entry.id).state
+        copy.circuit = layout
+        return registry:setDeviceState(entry.id, copy)
+    end
+    local called, ok, reason = pcall(save)
     if not called then
         -- Registry writes the circuit before syncing the world marker.
         -- Keep the inventory in step with an edit that already committed.
         if entry.piece.state.circuit ~= expected then
-            Relay.writeInstallation(entry.object:getModData(), entry.id, registry.network:record(entry.id).state)
-            print("[ZedComm] Adapter state committed after sync error: " .. tostring(ok))
+            if not cabinet then
+                Relay.writeInstallation(entry.object:getModData(), entry.id, registry.network:record(entry.id).state)
+            end
+            print("[ZedComm] Circuit state committed after sync error: " .. tostring(ok))
             return true
         end
         reason, ok = tostring(ok), false
@@ -400,6 +490,51 @@ function Placement.editLampCircuit(character, registry, target, expected, layout
         if recovered then inventory:Remove(recovered) end
     end
     return ok, reason
+end
+
+function Placement.changeCircuitBattery(character, registry, target, expected, id)
+    local entry = Placement.getRegistry() == registry and Placement.resolve(registry, target.id)
+    if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square)
+        or not entry.piece.state or entry.piece.state.circuit ~= expected then
+        return false, "The circuit changed or is out of reach."
+    end
+    local layout = registry.network:record(target.id).state.circuit
+    local part = layout.modules[id]
+    if not part or part.kind ~= "batterySource" then return false, "Select a Battery Source." end
+
+    local inventory = character:getInventory()
+    local battery, taken
+    if part.charge ~= nil then
+        battery = instanceItem("Base.Battery")
+        if not battery or not inventory:hasRoomFor(character, battery) then
+            return false, "There is no room for the battery."
+        end
+        battery:setUsedDelta(part.charge)
+        inventory:AddItem(battery)
+        if not inventory:contains(battery) then return false, "Could not return the battery." end
+        part.charge = nil
+    else
+        local items = inventory:getItems()
+        for i = 0, items:size() - 1 do
+            local candidate = items:get(i)
+            if candidate:getFullType() == "Base.Battery" and candidate:getCurrentUsesFloat() > 0 then
+                battery = candidate
+                break
+            end
+        end
+        if not battery then return false, "Bring a charged battery in your main inventory." end
+        part.charge = battery:getCurrentUsesFloat()
+        inventory:Remove(battery)
+        if inventory:contains(battery) then return false, "Could not install the battery." end
+        taken = true
+    end
+
+    local ok, reason = Placement.editCircuit(character, registry, target, expected, layout)
+    if not ok then
+        if taken then inventory:AddItem(battery) else inventory:Remove(battery) end
+        return false, reason
+    end
+    return true, taken and "Battery installed." or "Battery removed."
 end
 
 function Placement.perform(character, command)
@@ -426,6 +561,20 @@ function Placement.perform(character, command)
         local cable = target.piece.ports.signal
         if not cable then return false, "The relay lamp has no connected wire." end
         return registry:unlink(cable, target.id)
+    end
+    if command.kind == "disconnect-port" and target.piece.board then
+        local cable = target.piece.ports[command.port]
+        if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
+        return registry:unlink(cable, target.id)
+    end
+    if command.kind == "upgrade-cabinet" and target.piece.board then
+        return upgradeCabinet(registry, character, target, command.item)
+    end
+    if command.kind == "set-network-switch" and target.piece.definitionId == Switch.ID then
+        if type(command.on) ~= "boolean" then return false, "Choose an on or off state." end
+        local state = registry.network:record(target.id).state or { mount = Switch.mount(target.square) }
+        state.on = command.on
+        return registry:setDeviceState(target.id, state)
     end
     if command.kind == "pickup" then
         if target.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end

@@ -14,7 +14,7 @@
 | **Fixture binding** | Device-specific code that samples the world object or applies a request. This is the code behind the installed adapter. | Measures load on a plate or switches a powered lamp |
 | **Module** | A component installed inside an Advanced Adapter or network cabinet. It adds a connection or processes an input. | Input extension, AND, threshold, adder |
 | **Extension module** | Adds an external jack and an internal terminal. Its 2×1 footprint rotates in 90° steps and mounts with the jack against a host edge, facing out. | A second input feeds an AND module from the bottom edge |
-| **Logic module** | Evaluates one or more inputs and produces ON/OFF. | AND, OR, XOR, or a threshold |
+| **Logic module** | Evaluates one or more inputs and produces ON/OFF. | AND, OR, XOR, NOT, or a threshold |
 | **Arithmetic module** | Combines numeric signals and produces a numeric result. | Adder or subtracter |
 | **Port** | An external jack where the player connects a wire. A port is free while it has no cable attached. | The output jack on a pressure plate's adapter |
 | **Internal node** | A connection point in the host's circuit editor. A node represents a host input or output or a module terminal. | A threshold module's numeric input |
@@ -24,8 +24,11 @@
 | **Signal packet** | The latest value the network carries. A basic packet carries a 0–255 byte. A typed packet can carry a richer reading and a sender-supplied byte fallback. | Valid byte 0, or an estimated 1,150 kg with fallback 115 |
 | **Infrastructure** | Equipment that processes or distributes signals within the network. | A splitter forwards one input to separate output runs |
 | **Network cabinet** | A larger standalone host for internal circuits and modules. It exposes inputs and outputs to the external network. | A cabinet connects two incoming runs through an AND module to an outgoing run |
+| **Basic cabinet** | A 6×6 cabinet fitted with a Basic Adapter. Runs byte logic, accepts sender-supplied byte fallbacks and outputs bytes. | A basic Splitter circuit sends the same byte to two independent runs |
+| **Advanced cabinet** | A 6×6 cabinet fitted with an Advanced Adapter. Can process the full reading internally and transmit on each jack in Basic or Advanced mode. | A splitter sends the full reading to one run and the byte fallback to another |
+| **Splitter module** | An edge-mounted cabinet module that forwards one input to multiple inward-facing outputs. Each external branch uses its own output jack and run. | One Weight Plate feeds two displays |
 
-**Basic and Advanced are adapter hardware tiers.** The difference is capacity for local circuitry. Signal format is a separate choice. The Phase B prototype's Basic Sender and Advanced Sender labels refer to packet formats in that test. ADR-309 still describes the maintained packet transport. A gameplay rule for where typed payloads are useful remains open.
+**Basic and Advanced are adapter hardware tiers.** On a fixture, an Advanced Adapter adds a small local circuit. A cabinet has room for modules in either tier. An Advanced cabinet also supports full readings and a choice of transmission mode per output. The wire carries the packet published on its run. The Phase B prototype's Basic Sender and Advanced Sender labels refer to the sender's packet format. ADR-309 describes the maintained packet transport.
 
 ## Draft player workflows
 
@@ -36,6 +39,7 @@
 | **3. Convert a compatible vanilla device** | Fit an adapter directly to a supported fixture such as a lamp. Use Basic for ordinary control, or Advanced to put a small circuit on the device. | The existing fixture gains a ZedComm interface. Its fixture binding defines supported sensing and actions. |
 | **4. Upgrade an endpoint** | Replace its Basic Adapter with a separately crafted Advanced Adapter. Open the adapter to install and connect modules. | The same endpoint can run local logic. Recovery of the old adapter and whether the player reconnects the external cable remain open. |
 | **5. Build an internal circuit** | Open an Advanced Adapter or cabinet. Place modules in its layout and connect their terminals to host inputs and outputs. Add input or output extensions where needed. | A circuit that can process signals along a complete input-to-output path. |
+| **6. Craft or upgrade a cabinet** | Craft the enclosure with either adapter. To upgrade a placed Basic cabinet, bring an Advanced Adapter and select **Upgrade cabinet with Advanced Adapter**. | The upgraded cabinet keeps its board and runs. The Basic Adapter returns to inventory. |
 
 ## Internal circuit editor
 

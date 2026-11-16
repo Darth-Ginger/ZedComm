@@ -34,6 +34,7 @@ require "ZedComm/RunLabels"
 local Network = ZedComm.Network
 local Definitions = ZedComm.DeviceDefinitions
 local Relay = ZedComm.RelayLamp
+local Switch = ZedComm.NetworkSwitch
 
 local function log(message) print("[ZedComm] registry: " .. message) end
 
@@ -46,7 +47,12 @@ local function tagOf(isoObject)
     return Relay.restoreTag(isoObject, data)
 end
 
-local function syncRelayMarker(self, object, tag)
+local function syncFixture(self, object, tag)
+    if tag.definitionId == Switch.ID then
+        local piece = self.network.pieces[tag.id]
+        if piece and piece.definitionId == Switch.ID then Switch.updateSprite(object, piece.state) end
+        return
+    end
     if tag.definitionId ~= Relay.ID then return end
     local record = self.network:record(tag.id)
     if record and record.state and type(record.state.module) == "table" then
@@ -126,7 +132,7 @@ function SZedCommSystem:rebuildNetwork()
     -- recover the circuit. The runtime-only flag disables their signals.
     for i = 1, #records do
         local piece = network.pieces[records[i].id]
-        if piece and piece.definitionId and not Definitions.get(piece.definitionId) then
+        if piece and piece.definitionId and not piece.board and not Definitions.get(piece.definitionId) then
             piece.definitionUnavailable = true
             log("unavailable definition " .. piece.definitionId .. " for " .. piece.id .. "; record preserved")
         end
@@ -179,7 +185,9 @@ function SZedCommSystem:addPiece(isoObject)
     if tag.kind == "cable" then
         ok, err = self.network:addCable(tag.id, x, y, z)
     elseif tag.kind == "endpoint" then
-        if tag.definitionId ~= nil then
+        if tag.definitionId == ZedComm.InternalCircuit.CABINET_ID then
+            ok, err = self.network:addEndpoint(tag.id, x, y, z, "cabinet", nil, tag.definitionId, tag.state)
+        elseif tag.definitionId ~= nil then
             local def = Definitions.get(tag.definitionId)
             if def then
                 local role = def.role == "receiver" and "sink" or "source"
@@ -199,6 +207,7 @@ function SZedCommSystem:addPiece(isoObject)
         return false, err
     end
     self:syncPiece(tag.id, x, y, z)
+    if tag.definitionId == Switch.ID then syncFixture(self, isoObject, tag) end
     return true
 end
 
@@ -248,11 +257,18 @@ end
 
 -- Replace a defined endpoint's durable state and sync its square record.
 function SZedCommSystem:setDeviceState(id, state)
+    local piece = self.network.pieces[id]
+    local partners, cuts = {}, {}
+    if piece and piece.board then
+        partners = self.network:partners(id)
+        for _, cable in ipairs(partners) do cuts[#cuts + 1] = self.runLabels:beforeCut(cable) end
+    end
     local ok, err = self.network:setDeviceState(id, state)
     if ok then
+        for _, cut in ipairs(cuts) do self.runLabels:afterCut(cut) end
         syncAll(self, { id })
-        local piece = self.network.pieces[id]
-        if piece.definitionId == Relay.ID then
+        syncAll(self, partners)
+        if piece.definitionId == Relay.ID or piece.definitionId == Switch.ID then
             local cell = getCell()
             local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
             if square then
@@ -260,7 +276,7 @@ function SZedCommSystem:setDeviceState(id, state)
                 for i = 0, objects:size() - 1 do
                     local object = objects:get(i)
                     local tag = tagOf(object)
-                    if tag and tag.id == id then syncRelayMarker(self, object, tag) end
+                    if tag and tag.id == id then syncFixture(self, object, tag) end
                 end
             end
         end
@@ -278,7 +294,7 @@ function SZedCommSystem:loadIsoObject(isoObject)
     local tag = tagOf(isoObject)
     if not tag or not isoObject:getSquare() then return end
     if not self.network.pieces[tag.id] then self:addPiece(isoObject) end
-    syncRelayMarker(self, isoObject, tag)
+    syncFixture(self, isoObject, tag)
 end
 
 function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
@@ -303,7 +319,7 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
                 local tag = tagOf(object)
                 if tag then
                     present[tag.id] = true
-                    syncRelayMarker(self, object, tag)
+                    syncFixture(self, object, tag)
                 end
             end
             local tile = globalObject:getModData()

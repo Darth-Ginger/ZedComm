@@ -48,7 +48,8 @@ end
 
 local function refreshLoadedObject(object)
     local tag = object:hasModData() and object:getModData().zedcomm
-    if type(tag) ~= "table" or tag.kind ~= "endpoint" or tag.definitionId ~= definitionId then return end
+    if type(tag) ~= "table" or tag.kind ~= "endpoint"
+        or (tag.definitionId ~= definitionId and tag.definitionId ~= "ZedComm.AdvancedDisplay") then return end
     active[object] = nil
     removeLegacyGlyphs(object)
     local runtime = ZedComm and ZedComm.DeviceRuntime

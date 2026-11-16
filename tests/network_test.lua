@@ -306,5 +306,77 @@ do
     check(shown.D == 255, "reconnecting adopts the current value")
 end
 
+-- The wire graph counts driver jacks and validates directed cabinet dependencies.
+do
+    local id = ZedComm.InternalCircuit.CABINET_ID
+    local function state(connected)
+        return { circuit = { modules = {
+            spare = { kind = "outputExtension", column = 3, row = 6, rotation = 270 },
+        }, links = connected and {
+            { from = "input", output = "out", to = "output", input = "in" },
+        } or {} } }
+    end
+    local net, sim = Network.new(), stubSim()
+    net:attach(sim)
+    assert(net:addEndpoint("A", 0, 0, 0, "cabinet", nil, id, state(true)))
+    assert(net:addEndpoint("B", 2, 0, 0, "cabinet", nil, id, state(true)))
+    assert(net:addCable("forward", 1, 0, 0))
+    assert(net:link("forward", "A", "output"))
+    assert(net:link("forward", "B", "input"))
+    assert(net:addCable("return-a", 0, 1, 0))
+    assert(net:addCable("return-mid", 1, 1, 0))
+    assert(net:addCable("return-b", 2, 1, 0))
+    assert(net:link("return-a", "A", "input"))
+    assert(net:link("return-a", "return-mid"))
+    assert(net:link("return-b", "B", "output"))
+    sim.clear()
+    local ok, reason = net:link("return-mid", "return-b")
+    check(not ok and reason == "cabinet circuit feedback" and sim.count() == 0
+        and not net:record("return-mid").links["return-b"], "a wire join cannot close an unavailable two-cabinet loop")
+    assert(net:setDeviceState("A", state(false)))
+    assert(net:link("return-mid", "return-b"))
+    local before = net.pieces.A.state
+    ok, reason = net:setDeviceState("A", state(true))
+    check(not ok and reason == "cabinet circuit feedback" and net.pieces.A.state == before,
+        "an internal link cannot close the return loop either")
+
+    assert(net:addCable("spare-run", 0, -1, 0))
+    assert(net:link("spare-run", "A", "spare"))
+    assert(net:setPacket("A", Packet.basic(255), "output"))
+    assert(net:setPacket("A", Packet.basic(0), "spare"))
+    check(Packet.basicValue(net:recompute(net:networkOf("forward"))) == 255
+        and Packet.basicValue(net:recompute(net:networkOf("spare-run"))) == 0,
+        "two jacks on one cabinet independently drive separate runs")
+    check(not net:link("spare-run", "A", "output") and not net:setPacket("A", Packet.basic(1), "input"),
+        "occupied/current jacks cannot be joined again and input jacks cannot publish")
+    assert(net:addEndpoint("competing", 0, -2, 0, "source"))
+    check(not net:link("spare-run", "competing", "signal"), "an unavailable second source still conflicts")
+    local move = state(false)
+    move.circuit.modules.spare.column, move.circuit.modules.spare.row, move.circuit.modules.spare.rotation = 1, 4, 0
+    assert(net:setDeviceState("A", move))
+    check(net.pieces.A.ports.spare == "spare-run", "moving a jack preserves its cable")
+    local copy = Network.new()
+    check(#copy:load(net:records()) == 0 and copy.pieces.A.ports.spare == "spare-run"
+        and copy:recompute(copy:networkOf("spare-run")) == nil, "reload restores connections without replaying a packet")
+    move.circuit.modules.spare = nil
+    assert(net:setDeviceState("A", move))
+    check(net.pieces.A.ports.spare == nil and net:record("spare-run").links.A == nil
+        and net:recompute(net:networkOf("spare-run")) == nil, "removal frees the cable and clears its previous packet")
+end
+
+do
+    local net = Network.new()
+    local id = ZedComm.InternalCircuit.CABINET_ID
+    assert(net:addEndpoint("C", 0, 0, 0, "cabinet", nil, id, { circuit = { modules = {}, links = {
+        { from = "input", output = "out", to = "output", input = "in" },
+    } } }))
+    assert(net:addCable("a", 0, 0, 0))
+    assert(net:addCable("b", 0, 1, 0))
+    assert(net:link("a", "C", "output"))
+    assert(net:link("a", "b"))
+    local ok, reason = net:link("b", "C", "input")
+    check(not ok and reason == "cabinet circuit feedback", "a jack connection cannot feed its own upstream input")
+end
+
 print(string.format("%d checks, %d failed", checks, failures))
 if failures > 0 then os.exit(1) end

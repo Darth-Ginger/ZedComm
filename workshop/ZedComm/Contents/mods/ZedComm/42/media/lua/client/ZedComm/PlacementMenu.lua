@@ -116,6 +116,12 @@ function Action:complete()
         say(self.character, "Test relay installed. Select the lamp's free end to wire it.")
     elseif command.kind == "disconnect-relay" then
         say(self.character, "Relay wire disconnected. The native lamp switch works again.")
+    elseif command.kind == "disconnect-port" then
+        say(self.character, "Cabinet jack disconnected.")
+    elseif command.kind == "upgrade-cabinet" then
+        say(self.character, "Cabinet upgraded. Basic Adapter returned to inventory.")
+    elseif command.kind == "set-network-switch" then
+        say(self.character, command.on and "Switch on." or "Switch off.")
     elseif command.kind == "pickup" then
         if command.run and run.native then
             runs[self.character] = nil
@@ -173,6 +179,11 @@ local function orderedPieces(placement, registry, square)
     return pieces
 end
 
+local function portLabel(entry, port)
+    if entry.piece.board then return ZedComm.InternalCircuit.jackLabel(port, entry.piece.board.directions[port]) end
+    return port
+end
+
 local function openEnds(placement, registry, square)
     local ends, wireNumber = {}, 0
     for _, entry in ipairs(orderedPieces(placement, registry, square)) do
@@ -182,7 +193,7 @@ local function openEnds(placement, registry, square)
             label = label .. " " .. wireNumber .. " / " .. (registry:getRunName(entry.id) or "Loose wire")
         end
         for _, port in ipairs(placement.freePorts(entry)) do
-            local name = port and port ~= "signal" and label .. " (" .. port .. ")" or label
+            local name = port and port ~= "signal" and label .. " (" .. portLabel(entry, port) .. ")" or label
             ends[#ends + 1] = { entry = entry, port = port, label = name }
         end
     end
@@ -227,7 +238,15 @@ function Cursor:target(square)
 end
 
 function Cursor:isValid(square)
-    return self:target(square) ~= nil
+    local run = self:target(square)
+    if run and run.item and run.item:getFullType() == ZedComm.NetworkSwitch.ID then
+        local sprite = ZedComm.PlayerPlacement.previewSprite(square, run.item)
+        if sprite ~= self.previewSprite then
+            self:setSprite(sprite)
+            self.previewSprite = sprite
+        end
+    end
+    return run ~= nil
 end
 
 local function drawInvalidTile(x, y, z)
@@ -310,9 +329,11 @@ end
 local function readDisplay(player, object)
     local runtime = ZedComm.DeviceRuntime
     if not runtime then return end
-    local value, lit, attached = runtime.getDisplay(object)
+    local value, lit, attached, packet = runtime.getDisplay(object)
     if not attached then
         say(player, "Display unattached or awaiting update.")
+    elseif packet and packet.type == "signal.advanced" then
+        say(player, "Display: " .. tostring(packet.value.amount) .. " " .. packet.value.unit)
     elseif value == nil then
         say(player, "Display: no signal.")
     else
@@ -740,7 +761,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         local ports = placement.freePorts(entry)
         for _, port in ipairs(ports) do
             local label = name
-            if port and (#ports > 1 or port ~= "signal") then label = label .. " (" .. port .. ")" end
+            if port and (#ports > 1 or port ~= "signal") then label = label .. " (" .. portLabel(entry, port) .. ")" end
             addTo(group or options, group and "Select free end" or "Select " .. label .. " free end",
                 selectEnd, network, entry, port, label)
             if run and placement.canJoin(network, anchor, run.port, entry, port) then
@@ -752,12 +773,40 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
         if entry.piece.definitionId == "ZedComm.NumericDisplay" then
             add("Read numeric display", readDisplay, entry.object)
+        elseif entry.piece.definitionId == "ZedComm.AdvancedDisplay" then
+            add("Read full signal", readDisplay, entry.object)
         elseif entry.spec.itemType == "ZedComm.PressurePlate" and ZedComm.DeviceRuntime then
             local value = ZedComm.DeviceRuntime.getPressureOutput(entry.piece)
             add("Set pressure plate output (" .. value .. ")", configurePressurePlate, registry, entry)
+        elseif entry.piece.definitionId == ZedComm.NetworkSwitch.ID then
+            local on = not (entry.piece.state and entry.piece.state.on)
+            action(on and "Turn network switch on" or "Turn network switch off", {
+                kind = "set-network-switch", targetId = entry.id, object = entry.object, on = on,
+            })
+        end
+        if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(add, registry, entry) end
+        if entry.piece.board then
+            if entry.spec.adapter == "basic" then
+                local adapter = player:getInventory():getFirstType(ZedComm.InternalCircuit.ADVANCED_ADAPTER_ITEM)
+                if adapter then
+                    action("Upgrade cabinet with Advanced Adapter", {
+                        kind = "upgrade-cabinet", targetId = entry.id, object = entry.object, item = adapter,
+                    })
+                end
+            end
+            local wired = {}
+            for port, cable in pairs(entry.piece.ports) do
+                if cable then wired[#wired + 1] = port end
+            end
+            table.sort(wired)
+            for _, port in ipairs(wired) do
+                action("Disconnect cabinet jack (" .. portLabel(entry, port) .. ")", {
+                    kind = "disconnect-port", targetId = entry.id, object = entry.object,
+                    port = port, cableId = entry.piece.ports[port],
+                })
+            end
         end
         if entry.spec.nativePickup then
-            if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(add, registry, entry) end
             if entry.piece.ports.signal then
                 action("Disconnect relay wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object })
             end
