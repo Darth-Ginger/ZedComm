@@ -14,7 +14,7 @@ Placed displays and debug-rig displays use the same casing. A saved display with
 
 The packer uses `art/first-release-concepts/numeric-display-blank-face.png` and the `DISPLAY_*` art constants in `tools/pack-placeholder-sprites.py`. The casing is 70 px wide in a 128 × 256 logical tile cell. The face origin, right edge, bottom edge, and indicator center are coordinates in the resized casing. To replace the placeholder, supply a blank casing, adjust the face and indicator anchors, and regenerate the pack. The packer reuses one projected glyph set per slot for every value.
 
-The blank casing remains `zedcomm_devices_01_431`. Legacy attachment frames 432 to 465 remain in the pack for older saves. The separate `zedcomm_display_01` floor tileset contains signal loss at frame 0 and byte values 0 to 255 at frames 1 to 256.
+The blank casing remains `zedcomm_devices_01_431`. Attachment frames 432 to 465 from the first renderer remain in the pack but are no longer used; a display saved with them attached keeps them. The separate `zedcomm_display_01` floor tileset contains signal loss at frame 0 and byte values 0 to 255 at frames 1 to 256.
 
 ## Combined Build 42 smoke test
 

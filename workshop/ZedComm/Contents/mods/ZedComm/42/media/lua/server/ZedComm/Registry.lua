@@ -14,8 +14,8 @@
 --   OnChunkLoaded           - drops piece records whose world object is gone,
 --                             matching by id, not first object on the square
 --
--- World tags carry a piece id and kind, plus definitionId for defined endpoints.
--- Optional seed state and legacy endpoint fields are accepted on registration.
+-- World tags carry a piece id and kind. An endpoint's tag also names its
+-- definition and may carry seed state.
 -- Durable device state and links live in the square records. The model is rebuilt from these records when the
 -- system starts, so connectivity is derived, not stored twice.
 --
@@ -197,7 +197,7 @@ function SZedCommSystem:addPiece(isoObject)
                 ok, err = false, "unavailable definition " .. tostring(tag.definitionId)
             end
         else
-            ok, err = self.network:addEndpoint(tag.id, x, y, z, tag.role, tag.ports, nil, tag.state)
+            ok, err = false, "endpoint tag has no definitionId"
         end
     else
         ok, err = false, "unknown kind " .. tostring(tag.kind)

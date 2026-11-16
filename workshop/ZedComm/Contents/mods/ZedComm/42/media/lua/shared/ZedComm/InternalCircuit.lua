@@ -62,7 +62,7 @@ function Circuit.defaultRotation(kind)
     return kind == "outputExtension" and 180 or 0
 end
 
--- Untagged playtest cabinets already supported full packets.
+-- A cabinet with no saved adapter tier runs as Advanced.
 function Circuit.cabinetAdapter(state)
     if state and state.adapter ~= nil then return state.adapter end
     return "advanced"

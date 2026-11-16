@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Saves made with development builds before 0.0.1 are not migrated. A display keeps any digit sprites attached by the first renderer, an endpoint whose tag names no definition is refused with a log line, and debug test rigs placed earlier lose their link toggle (the tag field is now `rigWire`).
 - Cabinet jacks can be given a label. The Network Switch mounts on a chosen wall, shows a lead toward its wire and toggles on a click. Output Extensions face right by default.
 - Small Cabinet: a placed 6×6 circuit board with its own input and output jacks, in Basic and Advanced tiers, with an in-place upgrade that returns the Basic Adapter. A cabinet circuit that would feed back into itself through the external wiring is refused.
 - Circuit modules: AND, OR, XOR, NOT, Adder, Subtractor, Multiplier, Cache, Splitter, Timer, Wait, Mains Source, Battery Source, and Input and Output Extensions. Arithmetic modules can work on the full reading in an Advanced cabinet.
