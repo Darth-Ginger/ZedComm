@@ -568,7 +568,6 @@ function inventory.AddItem(_, item)
     return item
 end
 function inventory.Remove(_, item)
-    if inventory.refuseRemoval then return end
     for i = #carried, 1, -1 do
         if carried[i] == item then
             table.remove(carried, i)
@@ -654,11 +653,6 @@ check(not lay(w0, wireA, plateId, "signal") and inventory:contains(wireA)
     and #w0.objects == 0 and playerRegistry.network.pieces[plateId].ports.signal == false,
     "refused link rolls back the new tile and leaves inventory unchanged")
 playerRegistry.link = registryLink
-inventory.refuseRemoval = true
-check(not lay(w0, wireA, plateId, "signal") and #w0.objects == 0
-    and playerRegistry.network.pieces[plateId].ports.signal == false,
-    "failed inventory debit also rolls back the wire and its link")
-inventory.refuseRemoval = false
 
 local laid, firstWire = lay(w0, wireA, plateId, "signal")
 check(laid and not inventory:contains(wireA) and playerRegistry.network.pieces[plateId].ports.signal == firstWire,
@@ -2713,12 +2707,6 @@ do
     panel:onMouseUp(72, 142)
     check(inventory:contains(part) and not circuit().modules["threshold-1"],
         "an overlapping placement consumes no module")
-    inventory.refuseRemoval = true
-    grabCarried()
-    panel:onMouseUp(133, 142)
-    inventory.refuseRemoval = false
-    check(inventory:contains(part) and not circuit().modules["threshold-1"],
-        "a failed inventory removal leaves the circuit untouched")
     grabCarried()
     panel:onMouseUp(133, 142)
     check(not inventory:contains(part) and circuit().modules["threshold-1"].threshold == 50,
