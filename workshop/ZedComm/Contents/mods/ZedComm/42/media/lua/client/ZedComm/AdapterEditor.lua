@@ -13,10 +13,14 @@ local textureFolder = "media/textures/"
 local textures = {}
 local panels = {}
 
-local function selectedLamp(player, registry, target)
+local REACH_MESSAGE = "Step next to the lamp to make changes."
+
+-- `view` allows the two-tile looking range; anything that changes the board needs reach.
+local function selectedLamp(player, registry, target, view)
     local placement = ZedComm.PlayerPlacement
     local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
-    if entry and entry.object == target.object and placement.canReach(player, entry.square) then return entry end
+    if not entry or entry.object ~= target.object then return nil end
+    if view and placement.canView(player, entry.square) or placement.canReach(player, entry.square) then return entry end
 end
 
 local function readLayout(registry, id)
@@ -94,9 +98,10 @@ local function terminalPosition(part, name)
 end
 
 function Editor:refresh()
-    local entry = selectedLamp(self.player, self.registry, self.target)
+    local entry = selectedLamp(self.player, self.registry, self.target, true)
     local circuit = entry and entry.piece.state and entry.piece.state.circuit
     if not circuit then return false end
+    self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square) and true or false
     if circuit ~= self.expected then
         local layout = readLayout(self.registry, self.target.id)
         local evaluate = Circuit.compile(layout)
@@ -123,6 +128,15 @@ function Editor:refresh()
     return true
 end
 
+-- Read-only from two tiles away: edits ask the player to step closer.
+function Editor:inReach()
+    if not self:refresh() then return false end
+    if self.reachable then return true end
+    self.placing, self.movingPart, self.terminal, self.pendingRotation = nil, false, nil, nil
+    self.message = REACH_MESSAGE
+    return false
+end
+
 function Editor:commit(layout, install, remove)
     local ok, reason = ZedComm.PlayerPlacement.editLampCircuit(self.player, self.registry, self.target,
         self.expected, layout, install, remove)
@@ -132,19 +146,19 @@ function Editor:commit(layout, install, remove)
 end
 
 function Editor:beginPlacement()
-    if not self:refresh() or not self.moduleItem then return end
+    if not self:inReach() or not self.moduleItem then return end
     self.placing, self.movingPart, self.terminal, self.message = self.moduleItem, false, nil, "Choose an empty cell."
     self.pendingRotation = 0
 end
 
 function Editor:beginMove()
-    if not self:refresh() or not self.selected then return end
+    if not self:inReach() or not self.selected then return end
     self.movingPart, self.placing, self.terminal, self.message = true, nil, nil, "Choose the module's new top-left cell."
     self.pendingRotation = self.layout.modules[self.selected].rotation
 end
 
 function Editor:rotatePart()
-    if not self:refresh() then return end
+    if not self:inReach() then return end
     if self.pendingRotation then
         self.pendingRotation = (self.pendingRotation + 90) % 360
         self.message = "Rotation " .. self.pendingRotation .. " degrees. Choose a cell."
@@ -159,7 +173,7 @@ function Editor:rotatePart()
 end
 
 function Editor:removePart()
-    if not self:refresh() or not self.selected then return end
+    if not self:inReach() or not self.selected then return end
     local layout = readLayout(self.registry, self.target.id)
     local id = self.selected
     layout.modules[id] = nil
@@ -171,11 +185,11 @@ function Editor:removePart()
 end
 
 function Editor:configure()
-    if self:refresh() and self.selected then Editor.setThreshold(self.player, self.registry, self.target, self.selected) end
+    if self:inReach() and self.selected then Editor.setThreshold(self.player, self.registry, self.target, self.selected) end
 end
 
 function Editor:autoConnect()
-    if not self:refresh() then return end
+    if not self:inReach() then return end
     local layout = readLayout(self.registry, self.target.id)
     local ids = thresholdIds(layout)
     if #ids ~= 1 then return end
@@ -204,6 +218,7 @@ function Editor:placeAt(column, row)
 end
 
 function Editor:linkTerminal(id, name)
+    if not self:inReach() then return end
     local first = self.terminal
     if not first or first.name == name then
         self.terminal = { id = id, name = name }
@@ -231,7 +246,7 @@ function Editor:onMouseUp(x, y)
     end
     self.moving = false
     ISMouseDrag.dragView = nil
-    if self.placing or self.movingPart then
+    if (self.placing or self.movingPart) and self:inReach() then
         self:placeAt(math.floor((x - gridX) / cell) + 1, math.floor((y - gridY) / cell) + 1)
         return true
     end
@@ -280,6 +295,14 @@ function Editor:onRightMouseUp(x, y)
     return true
 end
 
+-- Blue = output contact, green = input contact, red = the contact picked for a link.
+local function contactColor(name, active)
+    if active then return 0.95, 0.25, 0.25 end
+    if name == "out" then return 0.52, 0.71, 0.93 end
+    return 0.52, 0.71, 0.35
+end
+local LEGEND = { { "out", "Output contact" }, { "in", "Input contact" }, { "selected", "Selected contact" } }
+
 local function drawPart(panel, kind, rotation, x, y, width, height)
     local name = "ZedCommCircuit_" .. kind .. "_" .. rotation
     local texture = textures[name]
@@ -324,7 +347,8 @@ function Editor:render()
             if not (id == "input" and name == "in") and not (id == "output" and name == "out") then
                 local x, y = terminalPosition(part, name)
                 local active = self.terminal and self.terminal.id == id and self.terminal.name == name
-                self:drawRect(x - 6, y - 6, 12, 12, 1, active and 1 or 0.52, 0.71, name == "out" and 0.93 or 0.35)
+                local r, g, b = contactColor(name, active)
+                self:drawRect(x - 6, y - 6, 12, 12, 1, r, g, b)
             end
         end
     end
@@ -332,11 +356,20 @@ function Editor:render()
     self:drawText("Carried modules", 272, 44, 1, 1, 1, 1, UIFont.Small)
     self:drawText("Threshold  x" .. self.carried, 312, 82, 0.91, 0.93, 0.86, 1, UIFont.Small)
     drawPart(self, "threshold", 0, 274, 69, 27, 54)
-    self:drawText(self.message or "Select two contacts to link or unlink.", 16, 314, 0.90, 0.90, 0.80, 1, UIFont.Small)
-    self.installButton:setEnable(self.carried > 0)
-    for _, button in ipairs(self.partButtons) do button:setEnable(self.selected ~= nil) end
-    self.rotateButton:setEnable(self.selected ~= nil or self.placing ~= nil)
-    self.autoButton:setEnable(#thresholdIds(self.layout) == 1)
+    -- Legend for the contact squares until the parts get clearer art.
+    for i, row in ipairs(LEGEND) do
+        local y = 266 + (i - 1) * 15
+        local r, g, b = contactColor(row[1], row[1] == "selected")
+        self:drawRect(276, y + 2, 10, 10, 1, r, g, b)
+        self:drawText(row[2], 292, y, 0.85, 0.90, 0.85, 1, UIFont.Small)
+    end
+    local hint = self.reachable and "Select two contacts to link or unlink." or REACH_MESSAGE
+    self:drawText(self.message or hint, 16, 314, 0.90, 0.90, 0.80, 1, UIFont.Small)
+    local reach = self.reachable
+    self.installButton:setEnable(reach and self.carried > 0)
+    for _, button in ipairs(self.partButtons) do button:setEnable(reach and self.selected ~= nil) end
+    self.rotateButton:setEnable(reach and (self.selected ~= nil or self.placing ~= nil))
+    self.autoButton:setEnable(reach and #thresholdIds(self.layout) == 1)
 end
 
 function Editor:createChildren()
@@ -364,7 +397,7 @@ function Editor:close()
 end
 
 function Editor.open(player, registry, target)
-    local entry = selectedLamp(player, registry, target)
+    local entry = selectedLamp(player, registry, target, true)
     if not entry or not entry.piece.state or not Circuit.compile(entry.piece.state.circuit) then
         player:Say("Choose a nearby lamp with an Advanced Adapter.")
         return

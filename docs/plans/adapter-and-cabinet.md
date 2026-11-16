@@ -52,7 +52,7 @@ The Lua suite covers incomplete internal links, rotation fit, invalid circuits, 
 - [x] Let the player select two compatible terminals to make a link and select a link to remove it. Draw the route from the terminal positions. Offer automatic connection when a single module gives one clear input-to-output path. Show current input and output with a distinct unavailable state.
 - [x] Edit the same saved threshold from the module visual or **ZedComm → Set threshold** on the lamp. When a host has several thresholds later, the world action must identify the module to edit.
 - [x] Run the Lua suite and Workshop build.
-- [ ] Run the in-game checklist below and the pending Phase C packet checks in the same gameplay window.
+- [x] Run the in-game checklist below and the pending Phase C packet checks in the same gameplay window. Passed 2026-11-16; see the live results below.
 
 **Review checkpoint** A player can assemble and troubleshoot the lamp circuit without console configuration after receiving the debug items.
 
@@ -74,6 +74,12 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 4)
 5. Select the Threshold and choose **Move**, then **Rotate**, then the bottom-left cell. Check that the rotated part fits the bottom row and the two links follow its contacts. Try a position that overlaps a fixed part and verify the previous layout stays intact. Right-click an empty cell to cancel a placement or link selection.
 6. Reload the save with the circuit connected. Verify the selected threshold, rotation, and links. Pick up and replace the lamp with vanilla moveable tools and reconnect its external cable. Then remove the Threshold in the editor and confirm it returns to inventory and clears the internal links.
 7. Run the pending [Phase C packet checks](maintained-signal-packets.md#phase-c---singleplayer-proof) in the same gameplay window.
+
+**Live results, 2026-11-16.** Steps 1, 3 and 6 passed, including reload and an unplanned lamp relocation. In step 2 the lamp was already on because no plate was wired yet, which matches the native switch staying in control until a cable attaches. Step 4 passed on the editor side: both edit paths changed the same setting and the input read 8 for the player. The car check was skipped because the rig was indoors. Step 5 rotation could not be exercised on the 3×3 board, so it moves to the drag-and-R-rotate card (on281l2). Loose floor items on the weight plate read 0 by design; counting them is card 97c4izb. Phase C passed in the same save (see [maintained-signal-packets.md](maintained-signal-packets.md#phase-c---singleplayer-proof)). Console capture: `the shared test-log folderchunk2-phase-c-20261116-console.txt`.
+
+**Follow-up change, not yet verified in game.** The editor now opens from up to two tiles away when the path is open (`PlayerPlacement.canView`), but every edit still needs the player next to the lamp. Out of reach, the buttons are disabled and the editor says "Step next to the lamp to make changes." The server-side reach check is unchanged. A legend shows blue output, green input and red selected contacts, and a selected contact is now drawn true red (it was pink or orange). The registry suite covers this with 7 new checks (389 pass). It did not load in the 2026-11-16 session because a save and reload did not pick up the edit. Verify after a full game restart: in the debug console, `print(ZedComm.PlayerPlacement.canView ~= nil)` must print `true` before testing.
+
+**Next.** Verify the range and legend change, then review the Chunk 3 draft below together with the drag-and-R-rotate request, since the cabinet editor should reuse that interaction.
 
 The carried-module pane currently counts Threshold modules in the main inventory. Chunk 2 uses click-to-place and contact selection. The sprites are placeholders. The Workshop build and 628 offline Lua checks passed, including editor callback and inventory failure cases. Live PZ verification is open.
 

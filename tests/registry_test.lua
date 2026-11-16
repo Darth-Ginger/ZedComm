@@ -2669,6 +2669,29 @@ do
     check(not circuit().modules["threshold-1"] and #circuit().links == 0 and not lamp.active
         and inventory:getFirstType("ZedComm.ThresholdModule"), "removal returns a module and releases its links")
     panel:close()
+
+    -- Two tiles away the editor opens and reads, but every change asks the player to step closer.
+    local openEditor = assert(optionsAt(lampTile)["Open Advanced Adapter"])
+    player.tile = plateTile
+    openEditor()
+    check(panel and panel:refresh() and not panel.reachable, "the editor opens read-only from two tiles away")
+    panel:render()
+    panel.installButton.click()
+    check(not panel.placing and panel.message == "Step next to the lamp to make changes.",
+        "starting a placement from two tiles away asks the player to step closer")
+    panel:onMouseUp(111, 82)
+    check(not circuit().modules["threshold-1"], "a click from two tiles away changes nothing")
+    panel:linkTerminal("input", "out")
+    check(panel.terminal == nil, "contact selection needs reach")
+    wireTile.blocked = lampTile
+    check(not panel:refresh(), "a blocked path closes the looking range")
+    wireTile.blocked = nil
+    local farTile = floorTile(158, 125)
+    player.tile = farTile
+    check(not panel:refresh(), "three tiles away is out of range")
+    player.tile = lampTile
+    check(panel:refresh() and panel.reachable, "stepping back next to the lamp restores editing")
+    panel:close()
     getTexture, UIFont, ISMouseDrag = originalTexture, originalFont, originalDrag
     getDebug, getCore = previousDebug, previousCore
 end

@@ -63,6 +63,23 @@ function Placement.canReach(character, square)
     return loadedSquare(square) and from and distance(from, square) <= 1 and clearBetween(from, square)
 end
 
+-- Looking range for read-only UI such as the adapter editor: up to two tiles on the same
+-- level, through an open path. Changes still need canReach.
+function Placement.canView(character, square)
+    local from = character:getCurrentSquare()
+    if not loadedSquare(square) or not from then return false end
+    local steps = distance(from, square)
+    if steps <= 1 then return clearBetween(from, square) end
+    if steps ~= 2 then return false end
+    local cell = getCell()
+    for _, step in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        local middle = cell:getGridSquare(from:getX() + step[1], from:getY() + step[2], from:getZ())
+        if middle and distance(middle, square) == 1 and clearBetween(from, middle)
+            and clearBetween(middle, square) then return true end
+    end
+    return false
+end
+
 local function squareObjects(square)
     local out = {}
     local objects = square:getObjects()
