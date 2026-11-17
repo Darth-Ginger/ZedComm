@@ -134,26 +134,26 @@ local packet = ZedComm.SignalModules.Packet
 evaluatorBoard.modules.module.kind = "cache"
 evaluatorBoard.links[1].input = "data"
 evaluatorBoard.links[2].input = "enable"
-local cache = assert(Circuit.compilePackets(evaluatorBoard, true))
+local cache = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 local weight = packet.weight(1150.25, 115)
 check(cache({ input = weight, second = packet.basic(255) }).output.value == 115,
     "Cache forwards the sender fallback at a basic jack")
 evaluatorBoard.outputModes = { output = "advanced" }
-cache = assert(Circuit.compilePackets(evaluatorBoard, true))
+cache = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 check(packet.equal(cache({ input = weight, second = packet.basic(1) }).output, weight),
     "Cache preserves the full weight at an advanced jack")
 check(cache({ input = weight, second = packet.basic(0) }).output == nil
     and cache({ input = weight }).output == nil, "Cache clears when enable is off or missing")
 check(cache({ second = packet.basic(255) }).output == nil, "enabled Cache clears if its data is missing")
 evaluatorBoard.modules.module.always = true
-cache = assert(Circuit.compilePackets(evaluatorBoard, true))
+cache = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 local noFallback = packet.weight(200)
 check(packet.equal(cache({ input = noFallback }).output, noFallback), "Always mode forwards weight without a fallback")
 check(cache({ input = packet.basic(9) }).output.value == 9, "advanced output preserves a received basic byte")
 local direct = { modules = {}, outputModes = { output = "advanced" }, links = {
     { from = "input", output = "out", to = "output", input = "in" },
 } }
-check(assert(Circuit.compilePackets(direct, true))({ input = weight }).output.value == 255,
+check(assert(Circuit.compilePackets(direct, true, "advanced"))({ input = weight }).output.value == 255,
     "a direct jack connection publishes control rather than forwarding data")
 
 local split = { modules = {
@@ -195,28 +195,28 @@ check(not Circuit.compilePackets(split, true, "advanced"), "a splitter output ca
 evaluatorBoard.links[1].input, evaluatorBoard.links[2].input = "a", "b"
 evaluatorBoard.modules.module = { kind = "adder", column = 3, row = 3, rotation = 0, fullReading = true }
 check(not Circuit.compilePackets(evaluatorBoard, true, "basic"), "a Basic cabinet rejects Full Reading")
-local read = assert(Circuit.compilePackets(evaluatorBoard, true))
+local read = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 local sum = read({ input = packet.weight(1150.25, 115), second = packet.weight(1600, 160) }).output
 check(sum.value.amount == 2750.25 and sum.basicValue == 255, "full adder sums the original weights before deriving fallback")
 check(read({ input = weight, second = packet.basic(5) }).output == nil, "typed weight math rejects an untyped byte")
 check(read({ input = packet.weight(1e308), second = packet.weight(1e308) }).output == nil,
     "typed arithmetic drops a non-finite result")
 evaluatorBoard.modules.module.kind = "subtractor"
-read = assert(Circuit.compilePackets(evaluatorBoard, true))
+read = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 check(read({ input = packet.weight(320), second = packet.weight(80) }).output.value.amount == 240
     and read({ input = packet.weight(80), second = packet.weight(320) }).output.value.amount == 0,
     "full subtractor observes operand order and floors weight at zero")
 evaluatorBoard.modules.module.kind = "multiplier"
-read = assert(Circuit.compilePackets(evaluatorBoard, true))
+read = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 local multiplied = read({ input = packet.weight(80), second = packet.basic(4) }).output
 check(multiplied.value.amount == 320 and multiplied.basicValue == 32, "a basic scalar can multiply a full weight")
 check(read({ input = packet.weight(80), second = packet.weight(4) }).output == nil,
     "the Factor port requires a scalar")
 evaluatorBoard.modules.module.fullReading = false
-local byteMath = assert(Circuit.compile(evaluatorBoard, true))
+local byteMath = assert(Circuit.compile(evaluatorBoard, true, "advanced"))
 check(byteMath({ input = 120, second = 4 }).output == 255, "byte multiplication saturates")
 evaluatorBoard.modules.module.kind = "subtractor"
-byteMath = assert(Circuit.compile(evaluatorBoard, true))
+byteMath = assert(Circuit.compile(evaluatorBoard, true, "advanced"))
 check(byteMath({ input = 25, second = 8 }).output == 17 and byteMath({ input = 0, second = 20 }).output == 0
     and byteMath({ input = 25 }).output == nil, "byte subtraction keeps true zero separate from missing")
 

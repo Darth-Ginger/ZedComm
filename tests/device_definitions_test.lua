@@ -15,7 +15,7 @@ end
 local function receiver(id)
     return { id = id or "Example.Lamp", role = "receiver", ports = { "input" },
         match = function(o) return o.kind == "lamp" end,
-        receive = function(o, value) o.received = value end }
+        receiverModule = "Example.Module", bindFixture = function() return {} end }
 end
 local d = fresh()
 local original = source()
@@ -72,7 +72,7 @@ invalid(function(v) v.role = "sink" end, "internal sink role rejected at public 
 invalid(function(v) v.role = "infrastructure" end, "infrastructure outside endpoint contract")
 invalid(function(v) v.match = true end, "invalid predicate rejected")
 invalid(function(v) v.sample = nil end, "source must sample")
-invalid(function(v) v.receive = function() end end, "source cannot receive")
+invalid(function(v) v.receiverModule = "Example.Module" end, "source cannot receive")
 invalid(function(v) v.extra = true end, "unknown fields rejected")
 invalid(function(v) v.ports = nil end, "missing ports rejected")
 invalid(function(v) v.ports = {} end, "empty ports rejected")
@@ -81,8 +81,8 @@ invalid(function(v) v.ports = { [1] = "one", [3] = "three" } end, "sparse ports 
 invalid(function(v) v.ports = { named = "signal" } end, "map ports rejected")
 invalid(function(v) v.ports = { "bad#port" } end, "unsafe port rejected")
 invalid(function(v) v.ports = { false } end, "non-string port rejected")
-local badReceiver = receiver(); badReceiver.receive = nil
-check(not fresh().register(badReceiver), "receiver must receive")
+local badReceiver = receiver(); badReceiver.bindFixture = nil
+check(not fresh().register(badReceiver), "receiver must bind a fixture")
 badReceiver = receiver(); badReceiver.sample = function() end
 check(not fresh().register(badReceiver), "receiver cannot sample")
 

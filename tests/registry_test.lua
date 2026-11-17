@@ -1,13 +1,16 @@
--- Tests for the server registry (server/ZedComm/Registry.lua), run outside
--- the game with a Lua 5.1 interpreter.
+-- Tests for the server registry, device runtime, placement, menus and editor,
+-- run outside the game with a Lua 5.1 interpreter.
 --
--- The registry derives from the game's own Lua wrapper classes, so the test
--- loads them from a local copy of the game's media/lua (never committed to
--- this repo) and stubs only the Java side beneath them: the global object
--- system, squares, world objects and Events. Without that copy it skips.
+-- The registry derives from the game's own Lua wrapper classes. With PZ_LUA
+-- pointing at a copy of the game's media/lua (never committed to this repo)
+-- the test loads them from there and also runs the cursor checks, which need
+-- the game's building and moveable cursors. Without it, the two wrapper
+-- classes come from the stand-ins in tests/support/pz and the cursor checks
+-- are skipped. Only the Java side is stubbed here: the global object system,
+-- squares, world objects and Events.
 --
 -- Usage: lua5.1 tests/registry_test.lua   (from the repo root)
---   PZ_LUA=/path/to/ProjectZomboid/media/lua   (required)
+--   PZ_LUA=/path/to/ProjectZomboid/media/lua
 
 -- Regression: the game failed when the standard Lua next global was nil.
 next = nil
@@ -16,11 +19,8 @@ local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
 local PZ = os.getenv("PZ_LUA") or "/path/to/ProjectZomboid/media/lua"
 
 local probe = io.open(PZ .. "/server/Map/SGlobalObjectSystem.lua", "r")
-if not probe then
-    print("registry tests skipped: no game Lua at " .. PZ .. " (set PZ_LUA)")
-    return
-end
-probe:close()
+local GAME = probe ~= nil
+if probe then probe:close() else PZ = "tests/support/pz" end
 
 package.path = LUA .. "shared/?.lua;" .. LUA .. "server/?.lua;" .. LUA .. "client/?.lua;"
     .. PZ .. "/shared/?.lua;" .. PZ .. "/server/?.lua;" .. package.path
@@ -398,7 +398,8 @@ check(definitions.register({
 }), "restored sender definition registers")
 check(definitions.register({
     id = "Example.Display", role = "receiver", ports = { "signal" },
-    match = function() return false end, receive = function() end,
+    match = function() return false end, receiverModule = ZedComm.SignalModules.ON_OFF,
+    bindFixture = function() return { apply = function() return "applied" end } end,
 }), "restored receiver definition registers")
 local recovered, recoveredJava = start(missingSave)
 local recoveredId = recovered.network:networkOf("sensor")
@@ -795,6 +796,7 @@ assert(opts["Pause wire run"])()
 check(not queued:isValid() and not queued:complete() and inventory:contains(spare)
     and #nextTile.objects == 0, "pausing the run cancels a queued wire placement")
 
+if GAME then
 -- The game loads the server building scripts after the client menu.
 require "BuildingObjects/ISBuildingObject"
 dofile(PZ .. "/client/TimedActions/WalkToTimedAction.lua")
@@ -1361,6 +1363,8 @@ do
     renderIsoRect = originalRenderRect
 end
 
+end -- GAME
+
 -- Update wires and plate terminals using the real topology and square-load callbacks.
 dofile(LUA .. "client/ZedComm/WireVisuals.lua")
 local function spriteOf(id)
@@ -1538,17 +1542,6 @@ loaded[key(60, 60, 0)] = true
 fire("OnTick")
 check(runtime.inspect("debug-display").receivers[1].value == 170,
     "source reload restores the current byte without a sender change")
-
-local calls = {}
-local receiver = {
-    receive = function(_, value) calls[#calls + 1] = value == nil and "default-off" or value end,
-}
-definitions.deliver(receiver, {}, nil, {})
-receiver.onUnavailable = function() calls[#calls + 1] = "custom-unavailable" end
-definitions.deliver(receiver, {}, nil, {})
-definitions.deliver(receiver, {}, 0, {})
-check(calls[1] == "default-off" and calls[2] == "custom-unavailable" and calls[3] == 0,
-    "fallback override runs only on unavailable input, never for valid zero")
 
 -- Two player-built circuits share a square and stay independently selectable.
 do
@@ -1800,23 +1793,6 @@ do
         "reloading the fixture attaches a fresh module and reads the held byte")
 
     assert(playerRegistry:unlink("module-test-wire", "modular-fixture"))
-    local legacy = {}
-    assert(definitions.register({
-        id = "Example.LegacyFixture", role = "receiver", ports = { "signal" },
-        match = function() return false end,
-        receive = function(_, byte) legacy[#legacy + 1] = byte end,
-        onUnavailable = function() legacy[#legacy + 1] = "fallback" end,
-    }))
-    local legacyObject = worldObject(otherSquare, {
-        id = "legacy-fixture", kind = "endpoint", definitionId = "Example.LegacyFixture",
-    })
-    fire("OnObjectAdded", legacyObject)
-    assert(playerRegistry:link("module-test-wire", "legacy-fixture"))
-    assert(runtime.setTestByte(playerRegistry, "module-test-source", "0"))
-    fire("OnTick")
-    assert(playerRegistry:unlink("module-test-wire", "module-test-source"))
-    fire("OnTick")
-    check(legacy[1] == 0 and legacy[2] == "fallback", "legacy receiver and fallback hooks still receive valid zero and loss")
 end
 
 -- A relay uses native lamp power/switch behavior and vanilla moveable data.
@@ -3504,5 +3480,6 @@ do
 end
 
 print = realPrint
-print(string.format("%d checks, %d failed", checks, failures))
+print(string.format("%d checks, %d failed%s", checks, failures,
+    GAME and "" or " (cursor checks skipped: set PZ_LUA to the game's media/lua)"))
 if failures > 0 then os.exit(1) end

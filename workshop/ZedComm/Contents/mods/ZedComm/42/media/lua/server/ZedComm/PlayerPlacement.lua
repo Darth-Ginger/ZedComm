@@ -140,7 +140,7 @@ function Placement.piecesAt(registry, square)
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
             if piece.board then
-                local advanced = Circuit.cabinetAdapter(piece.state) == "advanced"
+                local advanced = piece.state.adapter == "advanced"
                 spec = specFor(advanced and Circuit.ADVANCED_CABINET_ITEM or Circuit.CABINET_ID)
             end
             out[#out + 1] = { id = piece.id, piece = piece, object = object, square = square, spec = spec }
@@ -425,7 +425,7 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
         or type(expected) ~= "table" or state.circuit ~= expected then
         return false, "The circuit changed. Reopen the editor."
     end
-    local valid, errorMessage = Circuit.compile(layout, cabinet, cabinet and Circuit.cabinetAdapter(state) or nil)
+    local valid, errorMessage = Circuit.compile(layout, cabinet, cabinet and state.adapter or nil)
     if not valid then return false, errorMessage end
     local added, removed, addedPart, removedPart = 0, 0
     for id, part in pairs(layout.modules) do

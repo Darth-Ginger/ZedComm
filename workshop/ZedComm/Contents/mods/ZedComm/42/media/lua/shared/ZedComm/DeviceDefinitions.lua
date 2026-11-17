@@ -3,18 +3,18 @@
 -- match(object, context) -> definition copy or nil, optional error reason.
 -- match predicates must be pure and return a boolean. Multiple matches fail.
 -- Sources sample a byte, or a raw reading for their declared readingKind.
--- Basic receivers consume a byte after packet projection.
+-- Receivers name a receiver module and bind it to their fixture.
 -- Callbacks stay in code, never in saved records. Runtime invocation is separate.
 
 ZedComm = ZedComm or {}
 local Definitions = {}
 local entries, ids = {}, {}
 local fields = { id = true, role = true, ports = true, match = true,
-    sample = true, readingKind = true, receive = true, onUnavailable = true, receiverModule = true, bindFixture = true }
+    sample = true, readingKind = true, receiverModule = true, bindFixture = true }
 
 local function copy(def)
     local out = { id = def.id, role = def.role, match = def.match,
-        sample = def.sample, readingKind = def.readingKind, receive = def.receive, onUnavailable = def.onUnavailable,
+        sample = def.sample, readingKind = def.readingKind,
         receiverModule = def.receiverModule, bindFixture = def.bindFixture, ports = {} }
     for i = 1, #def.ports do out.ports[i] = def.ports[i] end
     return out
@@ -36,26 +36,14 @@ function Definitions.register(def)
     if def.role == "source" then
         if type(def.sample) ~= "function" then return false, "source requires sample" end
         if def.readingKind ~= nil and def.readingKind ~= "weight" then return false, "unsupported source reading kind" end
-        if def.receive ~= nil or def.onUnavailable ~= nil
-            or def.receiverModule ~= nil or def.bindFixture ~= nil then
+        if def.receiverModule ~= nil or def.bindFixture ~= nil then
             return false, "source cannot define receiver behavior"
         end
     else
         if def.sample ~= nil or def.readingKind ~= nil then return false, "receiver cannot define source sampling" end
-        if def.receiverModule ~= nil then
-            if type(def.receiverModule) ~= "string" or def.receiverModule == ""
-                or type(def.bindFixture) ~= "function" then
-                return false, "modular receiver requires a module ID and fixture binding"
-            end
-            if def.receive ~= nil or def.onUnavailable ~= nil then
-                return false, "modular receiver uses its fixture binding for delivery"
-            end
-        else
-            if def.bindFixture ~= nil then return false, "fixture binding requires a receiver module" end
-            if type(def.receive) ~= "function" then return false, "receiver requires receive" end
-            if def.onUnavailable ~= nil and type(def.onUnavailable) ~= "function" then
-                return false, "onUnavailable must be a function"
-            end
+        if type(def.receiverModule) ~= "string" or def.receiverModule == ""
+            or type(def.bindFixture) ~= "function" then
+            return false, "receiver requires a module ID and fixture binding"
         end
     end
     if type(def.ports) ~= "table" then return false, "ports must be a nonempty list" end
@@ -103,15 +91,6 @@ function Definitions.match(object, context)
     if #matches > 1 then return nil, "ambiguous match: " .. table.concat(matches, ", ") end
     if #matches == 1 then return Definitions.get(matches[1]) end
     return nil
-end
-
--- An attached receiver gets nil for the default OFF state. Definitions can
--- override only the unavailable case without changing valid byte delivery.
-function Definitions.deliver(def, object, value, context)
-    if value == nil and def.onUnavailable then
-        return def.onUnavailable(object, context)
-    end
-    return def.receive(object, value, context)
 end
 
 ZedComm.DeviceDefinitions = Definitions

@@ -13,6 +13,7 @@ tools/link-dev.ps1|sh  links the game's Workshop folder to workshop/ZedComm
 tools/build.ps1|sh     checks and copies workshop/ZedComm into dist/
 tools/selftest.sh      exercises the bash tools against a scratch Workshop folder
 tools/make-preview.py  redraws workshop/ZedComm/preview.png
+tools/make-recipes.py  writes the recipes, their names and docs/recipes.md from one table
 workshop/ZedComm/      the Workshop item: the only folder the game and the uploader see
   workshop.txt  preview.png
   Contents/mods/ZedComm/
@@ -41,7 +42,7 @@ That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `wo
 
 
 - The server has no Lua 5.1. Run the suite in a container: `docker run --rm -v <repo>:/src:ro -v <pz-reference>:<pz-reference>:ro -w /src alpine:3.20 sh -c "apk add -q lua5.1 bash && ZEDCOMM_REQUIRE_LUA=1 bash tests/run.sh"`.
-- `tests/registry_test.lua` (the editor, placement and menu checks) needs the game's Lua and is skipped in CI. Against the server's 42.21 reference copy it also needs a `Core` stub: `lua5.1 -e 'Core={getTileScale=function() return 1 end}' tests/registry_test.lua`, with `PZ_LUA` pointing at a newer copy when one exists.
+- `tests/registry_test.lua` (the registry, runtime, placement, menu and editor checks) runs in CI against small stand-ins for two game classes in `tests/support/pz`, and skips its cursor checks there. Those need the game's Lua: set `PZ_LUA` to a copy of the game's `media/lua` and run the suite before an in-game check. Against the server's 42.21 reference copy it also needs a `Core` stub: `lua5.1 -e 'Core={getTileScale=function() return 1 end}' tests/registry_test.lua`, with `PZ_LUA` pointing at a newer copy when one exists.
 
 ## Building a release
 

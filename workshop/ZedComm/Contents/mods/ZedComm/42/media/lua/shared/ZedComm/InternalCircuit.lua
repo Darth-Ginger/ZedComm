@@ -62,12 +62,6 @@ function Circuit.defaultRotation(kind)
     return kind == "outputExtension" and 180 or 0
 end
 
--- A cabinet with no saved adapter tier runs as Advanced.
-function Circuit.cabinetAdapter(state)
-    if state and state.adapter ~= nil then return state.adapter end
-    return "advanced"
-end
-
 function Circuit.footprint(rotation, kind)
     if kinds[kind] and kinds[kind].source then return 1, 1 end
     if rotation == 90 or rotation == 270 then return 2, 1 end
@@ -285,7 +279,8 @@ function Circuit.compilePackets(layout, cabinet, adapter)
     if adapter ~= nil and adapter ~= "basic" and adapter ~= "advanced" then
         return nil, "invalid cabinet adapter"
     end
-    local basicCabinet = cabinet and adapter == "basic"
+    -- A cabinet is Basic unless it carries an Advanced Adapter.
+    local basicCabinet = cabinet and adapter ~= "advanced"
     if basicCabinet then
         for _, part in pairs(parts) do
             if part.fullReading then return nil, "Full Reading requires an Advanced Cabinet" end

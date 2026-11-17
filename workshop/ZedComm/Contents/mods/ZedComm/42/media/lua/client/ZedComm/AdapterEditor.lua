@@ -152,7 +152,7 @@ function Editor:refresh()
     if not self.reachable then self:endDrag() end
     if circuit ~= self.expected then
         local layout = readLayout(self.registry, self.target.id)
-        self.adapter = self.cabinet and Circuit.cabinetAdapter(entry.piece.state) or nil
+        self.adapter = self.cabinet and entry.piece.state.adapter or nil
         local evaluate = Circuit.compile(layout, self.cabinet, self.adapter)
         if not evaluate then return false end
         self.expected, self.layout, self.evaluate = circuit, layout, evaluate
@@ -656,7 +656,7 @@ end
 function Editor.open(player, registry, target)
     local entry = selectedHost(player, registry, target, true)
     local cabinet = entry and entry.piece.definitionId == Circuit.CABINET_ID
-    local adapter = cabinet and Circuit.cabinetAdapter(entry.piece.state) or nil
+    local adapter = cabinet and entry.piece.state.adapter or nil
     if not entry or not entry.piece.state or not Circuit.compile(entry.piece.state.circuit, cabinet, adapter) then
         player:Say("Choose a nearby Small Cabinet or lamp with an Advanced Adapter.")
         return
