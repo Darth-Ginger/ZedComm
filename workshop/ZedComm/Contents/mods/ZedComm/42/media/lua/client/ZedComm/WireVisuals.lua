@@ -46,11 +46,6 @@ local function spritesFor(network)
 end
 
 local function updateSwitchLead(square, lead, name)
-    local floor = square:getFloor()
-    -- Older saves can still have a lead sprite attached to the floor.
-    if floor and ModuleVisuals.setAttachment(floor, nil, Switch.isFloorLead) then
-        floor:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD)
-    end
     if lead then
         if name then
             setWorldSprite(lead, name)
@@ -79,7 +74,7 @@ local function refreshSquare(square, network)
             local piece = network.pieces[tag.id]
             if piece and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
                 local plate = plateSprites[piece.definitionId]
-                if piece.kind == "cable" and (tag.placedItem == "ZedComm.SignalWire" or tag.useRouteSprite) then
+                if piece.kind == "cable" and tag.placedItem == "ZedComm.SignalWire" then
                     setWorldSprite(object, sprites[tag.id])
                     -- Build 42 draws floor overlays in square object order.
                     if endpoint then

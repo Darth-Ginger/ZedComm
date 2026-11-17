@@ -181,7 +181,7 @@ Build 42's native `IsoLightSwitch` supports explicit on/off. In the installed bu
 - [x] Add OR and XOR for the cabinet and NOT for both the cabinet and the single-input Advanced Adapter. Gates use nonzero as true and preserve unavailable inputs.
 - [ ] Run the expanded live smoke checks below.
 - [x] Add recipes for Basic and Advanced Adapters, both cabinet variants and the Splitter. The Basic cabinet can be upgraded in place and returns its removed adapter.
-- [ ] Exercise the cabinet recipes, upgrade and splitter in-game. Additional module and endpoint recipes and normal vanilla lamp conversion are still open.
+- [ ] Complete the non-debug crafting test. Darth-Ginger accepted the starting recipe balance, as recorded in the 2026-11-16 session handoff. All non-debug parts have recipes in [the generated table](../recipes.md). The cabinet upgrade and Splitter passed the combined smoke test. Normal vanilla lamp conversion remains open.
 
 ### Expanded smoke test
 

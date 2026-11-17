@@ -46,7 +46,8 @@ That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `wo
 
 
 - The server has no Lua 5.1. Run the suite in a container: `docker run --rm -v <repo>:/src:ro -v <pz-reference>:<pz-reference>:ro -w /src alpine:3.20 sh -c "apk add -q lua5.1 bash && ZEDCOMM_REQUIRE_LUA=1 bash tests/run.sh"`.
-- `tests/registry_test.lua` (the registry, runtime, placement, menu and editor checks) runs in CI against small stand-ins for two game classes in `tests/support/pz`, and skips its cursor checks there. Those need the game's Lua: set `PZ_LUA` to a copy of the game's `media/lua` and run the suite before an in-game check. Against the server's 42.21 reference copy it also needs a `Core` stub: `lua5.1 -e 'Core={getTileScale=function() return 1 end}' tests/registry_test.lua`, with `PZ_LUA` pointing at a newer copy when one exists.
+- Integration suites share fixtures in `tests/support/` and run independently. Without `PZ_LUA`, they use the two global-object stand-ins in `tests/support/pz`. The runner names `native_placement_test.lua` and `placement_cursor_test.lua` as skipped because they need the game's cursor classes. This mode runs 804 checks across 24 suites.
+- Set `PZ_LUA` to the installed game's `media/lua` before a full run. All 865 checks across 26 suites pass with Build 42.22.2 wrappers. For example, from Git Bash run `PZ_LUA='<ProjectZomboid>/media/lua' tests/run.sh`. Run one suite directly with `lua5.1 tests/cabinet_editor_test.lua`.
 
 ## Building a release
 

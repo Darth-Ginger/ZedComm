@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Registry integration checks are split into independent persistence, runtime, placement, rendering, lamp, plate, debug-menu and editor suites with shared fixtures. The Lua runner reports total checks and names suites skipped without installed game Lua.
+
+- Debug-rig wires use the standard Signal Wire item tag and rendering path. Removed the route-sprite flag and cleanup for retired switch-floor attachments. Older development rigs and floor attachments are not migrated.
+
 - Editor refresh reuses one circuit snapshot for its layout and geometry. Fixture menus share name formatting, and circuit contact coordinates are reused.
 
 - ZedComm items have a dedicated inventory category and recipes appear under ZedComm in Crafting. Native Place groups candidates by registered source, receiver, cabinet, and wire tags. These tags require Build 42.13 or later.

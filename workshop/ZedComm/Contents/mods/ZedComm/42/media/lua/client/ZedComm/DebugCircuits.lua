@@ -60,7 +60,7 @@ function Debug.placeByteRig(player, square)
     local tags = {
         { id = prefix .. "-sensor", kind = "endpoint", rigWire = wireId,
             definitionId = "ZedComm.DebugByteSource" },
-        { id = wireId, kind = "cable", useRouteSprite = true },
+        { id = wireId, kind = "cable", placedItem = "ZedComm.SignalWire" },
         { id = prefix .. "-display", kind = "endpoint", definitionId = "ZedComm.NumericDisplay", rigWire = wireId },
     }
     local names = { "ZedCommTestByteSource", "ZedCommTestCable", "ZedCommTestDisplay" }
