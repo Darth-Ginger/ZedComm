@@ -367,6 +367,20 @@ end
 
 local cabinets, cabinetInputs, pendingCabinets = {}, {}, {}
 
+function Runtime.getTimingRemaining(id, moduleId)
+    local host = cabinets[id] or receivers[id]
+    if not host or not host.logic then return nil end
+    local piece = network and network.pieces[id]
+    if not piece or host.piece ~= piece then return nil end
+    if piece.board then
+        if host.board ~= piece.board then return nil end
+    elseif host.circuit ~= (piece.state and piece.state.circuit) then
+        return nil
+    end
+    local timer = host.logic.timers[moduleId]
+    if timer and timer.due and timer.due > circuitTime then return timer.due - circuitTime end
+end
+
 local function updateCircuitClock(logic, board, object)
     local mains = board.hasMains and ItemContainer.isObjectPowered(object, true) or false
     local changed = logic.mains ~= mains

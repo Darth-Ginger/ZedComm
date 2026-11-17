@@ -511,6 +511,10 @@ function Network:setDeviceState(id, state)
     if piece.definitionUnavailable then return false, "device definition unavailable" end
     local stateCopy, err = validatedState(piece.definitionId, state)
     if err then return false, err end
+    if piece.state and piece.state.fixtureName then
+        stateCopy = stateCopy or {}
+        stateCopy.fixtureName = piece.state.fixtureName
+    end
     if piece.board then
         local evaluate, reason, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, true,
             stateCopy and stateCopy.adapter)
@@ -540,16 +544,34 @@ function Network:setDeviceState(id, state)
     return true
 end
 
--- A label edit changes the saved record without rebuilding the board or restarting timers.
+local function cleanLabel(name)
+    if type(name) ~= "string" or name:find("[%c]") then return nil, "Use a single-line label." end
+    name = name:match("^%s*(.-)%s*$")
+    if #name > 64 then return nil, "Use a shorter label." end
+    return name
+end
+
+-- Labels change the saved record without rebuilding the board or restarting timers.
+function Network:renameFixture(id, name)
+    local piece = self.pieces[id]
+    if not piece or piece.kind ~= "endpoint" or not piece.definitionId or piece.definitionUnavailable then
+        return false, "That fixture is no longer available."
+    end
+    local label, reason = cleanLabel(name)
+    if not label then return false, reason end
+    piece.state = piece.state or {}
+    piece.state.fixtureName = label ~= "" and label or nil
+    return true, piece.state.fixtureName
+end
+
 function Network:renameCabinetPort(id, port, name)
     local piece = self.pieces[id]
     if not piece or not piece.board or not piece.board.directions[port] then return false, "That cabinet jack is gone." end
-    if type(name) ~= "string" or name:find("[%c]") then return false, "Use a single-line jack label." end
-    name = name:match("^%s*(.-)%s*$")
-    if #name > 64 then return false, "Use a shorter jack label." end
+    local label, reason = cleanLabel(name)
+    if not label then return false, reason end
     local labels = piece.state.portLabels or {}
     piece.state.portLabels = labels
-    labels[port] = name ~= "" and name or nil
+    labels[port] = label ~= "" and label or nil
     return true, Circuit.jackLabel(port, piece.board.directions[port], labels[port])
 end
 

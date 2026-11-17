@@ -47,7 +47,7 @@ Phase A verified the packet transport offline.
 
 The weight plate declares a weight reading and samples its full estimated load once. Basic Sender publishes the same scaled byte as before. Advanced Sender publishes the typed weight in kg and the equivalent byte fallback. For 1,150 kg, the advanced packet contains `value = { kind = "weight", amount = 1150, unit = "kg" }` and `basicValue = 115`.
 
-On the plate, use **ZedComm → Debug → Weight plate sender** to select **Basic Sender** or **Advanced Sender**. The menu shows the current selection. Advanced is stored as `state.senderModule = { id = "ZedComm.AdvancedSender" }`. Selecting Basic clears the override. The module choice follows the plate through pickup and reload. An unsupported saved sender is retained and produces no signal until corrected.
+On the plate, use **ZedComm → Plate → Weight plate sender** to select **Basic Sender** or **Advanced Sender**. The menu shows the current selection. Advanced is stored as `state.senderModule = { id = "ZedComm.AdvancedSender" }`. Selecting Basic clears the override. The module choice follows the plate through pickup and reload. An unsupported saved sender is retained and produces no signal until corrected.
 
 **Inspect circuit** shows the source packet type, advanced load and units, fallback, and the display reading. A change from 1,150 to 1,151 kg updates the advanced payload and the inspector while the basic display stays at 115.
 

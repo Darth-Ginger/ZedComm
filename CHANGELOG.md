@@ -2,10 +2,20 @@
 
 ## Unreleased
 
+- Editor refresh reuses one circuit snapshot for its layout and geometry. Fixture menus share name formatting, and circuit contact coordinates are reused.
+
 - ZedComm items have a dedicated inventory category and recipes appear under ZedComm in Crafting. Native Place groups candidates by registered source, receiver, cabinet, and wire tags. These tags require Build 42.13 or later.
 - Wires draw beneath same-tile devices that use the game's floor overlay layer.
 - Network Switches use native drag-to-rotate placement at corners. The grounded section of a connected switch lead draws on the finished floor.
 - Right-click a jack in the cabinet editor to rename it. Right-click an installed module in either editor to remove it or open its settings.
+- Double-click a placed cabinet to open its editor. Advanced cabinet jacks show weight while they carry an Advanced weight packet.
+- Right-click a drawn link in either circuit editor to remove it.
+- Placed fixtures have device-specific rename actions. Names appear in wiring choices and editor titles.
+- The carried-module pane groups parts by function, drag previews show contacts, and terminal hints appear below the board. Cache inputs sit below its mode label.
+- Splitters default to right-facing output jacks. Configure opens their independent jack modes on an Advanced cabinet.
+- Grounded switch leads use the cable's tile origin and extend to the wall base.
+- Wait and Timer show their active countdown below the configured duration in the editor.
+- Placed fixtures have their own named submenus under ZedComm.
 - The edge-mounted Splitter takes one board input and supplies two independently named external jacks.
 - Swapping a cabinet to an Advanced Adapter takes a timed action.
 - The Advanced Display face shows weight from Advanced packets and shows bytes from Basic packets.

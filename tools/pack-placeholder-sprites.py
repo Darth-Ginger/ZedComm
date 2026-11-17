@@ -307,12 +307,14 @@ def switch_page(textures):
     floor_metadata = bytearray()
     directions = ((0, 0), *WIRE_DIRECTIONS)
 
-    def draw_lead(tile, start, end):
+    def draw_lead(tile, *points):
         draw = ImageDraw.Draw(tile)
         for stroke, color in LEAD_STROKES:
-            draw.line((start, end), fill=color, width=stroke)
+            draw.line(points, fill=color, width=stroke)
 
     for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
+        back_edge = TILE_CENTER[1] - TILE_WIDTH // 4 + abs(center - TILE_CENTER[0]) // 2
+        wall_base = (center, back_edge if facing < 2 else 2 * TILE_CENTER[1] - back_edge)
         for state, frame in enumerate(body):
             slot = facing * len(body) + state
             frame = frame.resize((width, height), Image.Resampling.LANCZOS)
@@ -337,7 +339,8 @@ def switch_page(textures):
                 if state == 0:
                     tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
                     seam = (TILE_CENTER[0] + dx, TILE_CENTER[1] + dy)
-                    draw_lead(tile, foot, seam)
+                    # Wall masks can hide the drop below the wall's projected base.
+                    draw_lead(tile, wall_base, foot, seam)
                     x, y, right, bottom = tile.getbbox()
                     index = facing * len(directions) + direction
                     atlas_x, atlas_y = (index % 8) * 128, (index // 8) * 64

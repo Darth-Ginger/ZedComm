@@ -18,7 +18,6 @@ local plateFrameOffset = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local lastNetwork, lastVersion
 local layoutNetwork, layoutVersion, cableSprites
 local pendingSquares = {}
-local switchFloors = setmetatable({}, { __mode = "k" })
 local missing = {}
 
 local function currentNetwork()
@@ -46,17 +45,23 @@ local function spritesFor(network)
     return cableSprites
 end
 
-local function updateSwitchFloor(square, name)
+local function updateSwitchLead(square, lead, name)
     local floor = square:getFloor()
-    local previous = switchFloors[square]
-    if previous and previous ~= floor then
-        ModuleVisuals.setAttachment(previous, nil, Switch.isFloorLead)
-    end
-    -- The wall renderer clips the grounded part of a lead against the floor.
-    if floor and ModuleVisuals.setAttachment(floor, name, Switch.isFloorLead) then
+    -- Older saves can still have a lead sprite attached to the floor.
+    if floor and ModuleVisuals.setAttachment(floor, nil, Switch.isFloorLead) then
         floor:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD)
     end
-    switchFloors[square] = name and floor or nil
+    if lead then
+        if name then
+            setWorldSprite(lead, name)
+        else
+            square:transmitRemoveItemFromSquare(lead)
+        end
+    elseif name and getSprite(name) then
+        lead = IsoObject.new(square, name, "ZedComm switch lead")
+        lead:getModData().zedcommSwitchLead = true
+        square:AddTileObject(lead)
+    end
 end
 
 local function refreshSquare(square, network)
@@ -64,10 +69,12 @@ local function refreshSquare(square, network)
     local sprites = spritesFor(network)
     local objects = square:getObjects()
     local endpoint, endpointIndex, changedOrder
-    local switchLead
+    local switchLead, switchLeadObject
     for i = 0, objects:size() - 1 do
         local object = objects:get(i)
-        local tag = object:hasModData() and object:getModData().zedcomm
+        local data = object:hasModData() and object:getModData()
+        if data and data.zedcommSwitchLead then switchLeadObject = object end
+        local tag = data and data.zedcomm
         if type(tag) == "table" then
             local piece = network.pieces[tag.id]
             if piece and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
@@ -104,7 +111,7 @@ local function refreshSquare(square, network)
         end
     end
     if changedOrder then endpoint:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD) end
-    updateSwitchFloor(square, switchLead)
+    updateSwitchLead(square, switchLeadObject, switchLead)
 end
 
 local function onTick()
@@ -113,7 +120,6 @@ local function onTick()
         lastNetwork, lastVersion = nil, nil
         layoutNetwork, layoutVersion, cableSprites = nil, nil, nil
         pendingSquares = {}
-        switchFloors = setmetatable({}, { __mode = "k" })
         return
     end
     local cell = getCell()
@@ -140,7 +146,6 @@ end
 Events.OnObjectAdded.Add(function(object)
     local square = object:getSquare()
     if not square then return end
-    if switchFloors[square] then pendingSquares[square] = true end
     if object:hasModData() then
         local data = object:getModData()
         local marker = type(data.movableData) == "table" and data.movableData.zedcommRelay
@@ -148,8 +153,13 @@ Events.OnObjectAdded.Add(function(object)
     end
 end)
 Events.OnObjectAboutToBeRemoved.Add(function(object)
-    local square = object:getSquare()
-    if square and switchFloors[square] then pendingSquares[square] = true end
+    if not object:hasModData() then return end
+    local data = object:getModData()
+    local tag = data.zedcomm
+    if data.zedcommSwitchLead or (type(tag) == "table" and tag.definitionId == Switch.ID) then
+        local square = object:getSquare()
+        if square then pendingSquares[square] = true end
+    end
 end)
 Events.OnTick.Add(onTick)
 Events.LoadGridsquare.Add(function(square) refreshSquare(square, currentNetwork()) end)

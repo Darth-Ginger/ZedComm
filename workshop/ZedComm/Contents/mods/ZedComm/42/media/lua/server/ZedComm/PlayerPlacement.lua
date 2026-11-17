@@ -13,26 +13,27 @@ local Switch = ZedComm.NetworkSwitch
 local serial = 0
 local items = {
     { itemType = "ZedComm.PressurePlate", name = "pressure plate", sprite = "zedcomm_devices_01_20",
-        kind = "endpoint", definitionId = "ZedComm.PressureSensor" },
+        kind = "endpoint", definitionId = "ZedComm.PressureSensor", fixtureType = "Plate" },
     { itemType = "ZedComm.SignalWire", name = "wire", sprite = "zedcomm_devices_01_1", kind = "cable" },
     { itemType = "ZedComm.NumericDisplay", name = "numeric display", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.NumericDisplay" },
+        kind = "endpoint", definitionId = "ZedComm.NumericDisplay", fixtureType = "Display" },
     { itemType = "ZedComm.AdvancedDisplay", name = "advanced display", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay" },
+        kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay", fixtureType = "Display" },
     { itemType = "ZedComm.OccupancyPlate", name = "occupancy plate", sprite = "zedcomm_devices_01_419",
-        kind = "endpoint", definitionId = "ZedComm.OccupancyPlate" },
+        kind = "endpoint", definitionId = "ZedComm.OccupancyPlate", fixtureType = "Plate" },
     { itemType = "ZedComm.WeightPlate", name = "weight plate", sprite = "zedcomm_devices_01_425",
-        kind = "endpoint", definitionId = "ZedComm.WeightPlate" },
+        kind = "endpoint", definitionId = "ZedComm.WeightPlate", fixtureType = "Plate" },
     { itemType = Circuit.CABINET_ID, name = "basic small cabinet", sprite = "zedcomm_devices_01_466",
-        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "basic" },
+        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "basic", fixtureType = "Cabinet" },
     { itemType = Circuit.ADVANCED_CABINET_ITEM, name = "advanced small cabinet", sprite = "zedcomm_devices_01_466",
-        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "advanced" },
+        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "advanced", fixtureType = "Cabinet" },
     { itemType = "ZedComm.DebugByteSource", name = "test byte source", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.DebugByteSource" },
+        kind = "endpoint", definitionId = "ZedComm.DebugByteSource", fixtureType = "Source" },
     { itemType = Switch.ID, name = "network switch", sprite = Switch.OFF_NORTH,
-        kind = "endpoint", definitionId = Switch.ID },
+        kind = "endpoint", definitionId = Switch.ID, fixtureType = "Switch" },
 }
-local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true }
+local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
+    fixtureType = "Lamp" }
 Placement.WIRE_TYPE = items[2].itemType
 
 local function specFor(itemType)
@@ -298,10 +299,11 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     local state = retained and retained.state
     if spec.adapter then
         state = { adapter = spec.adapter, circuit = state and state.circuit or { modules = {}, links = {} },
-            portLabels = state and state.portLabels }
+            portLabels = state and state.portLabels, fixtureName = state and state.fixtureName }
     end
     if spec.definitionId == Switch.ID then
-        state = { on = type(state) == "table" and state.on == true, mount = mount }
+        state = { on = type(state) == "table" and state.on == true, mount = mount,
+            fixtureName = state and state.fixtureName }
     end
     object:getModData().zedcomm = {
         id = id, kind = spec.kind, definitionId = spec.definitionId, placedItem = spec.itemType,

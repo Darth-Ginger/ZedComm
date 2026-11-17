@@ -49,17 +49,13 @@ local kinds = {
     outputExtension = { ports = { ["in"] = "in" }, jack = "source", item = "ZedComm.OutputExtension", label = "Output Extension" },
 }
 Circuit.kinds = kinds
-Circuit.moduleOrder = {
-    "threshold", "and", "inputExtension", "outputExtension", "adder", "or", "xor", "not",
-    "cache", "subtractor", "multiplier",
-    "timer", "wait", "mainsSource", "batterySource", "splitter",
-}
-Circuit.adapterModules = { "threshold", "not", "timer", "wait", "mainsSource", "batterySource" }
 
 function Circuit.size(cabinet) return cabinet and 6 or 3 end
 
 function Circuit.defaultRotation(kind)
-    return kind == "outputExtension" and 180 or 0
+    local spec = kinds[kind]
+    if spec and spec.item and (spec.jack == "source" or spec.externalOutputs) then return 180 end
+    return 0
 end
 
 function Circuit.footprint(rotation, kind)
@@ -75,16 +71,18 @@ local function rotatePoint(rotation, x, y)
     return x, y
 end
 
+local terminalRows = { a = 0.5, b = 1.5, data = 0.8, enable = 1.65 }
+local sourceTerminals = { [0] = { 1, 0.5 }, [90] = { 0.5, 1 }, [180] = { 0, 0.5 }, [270] = { 0.5, 0 } }
+
 -- Coordinates are relative to the rotated footprint, in cells.
 function Circuit.terminalPosition(rotation, terminal, kind)
-    if kinds[kind] and kinds[kind].source then
-        local points = { [0] = { 1, 0.5 }, [90] = { 0.5, 1 }, [180] = { 0, 0.5 }, [270] = { 0.5, 0 } }
-        return points[rotation][1], points[rotation][2]
+    local spec = kinds[kind]
+    if spec and spec.source then
+        local point = sourceTerminals[rotation]
+        return point[1], point[2]
     end
-    local x, y = terminal == "out" and 1 or 0, 1
-    if terminal == "a" or terminal == "data" then y = 0.5 end
-    if terminal == "b" or terminal == "enable" then y = 1.5 end
-    if kind == "outputExtension" or (kinds[kind] and kinds[kind].externalOutputs) then x = 1 end
+    local x, y = terminal == "out" and 1 or 0, terminalRows[terminal] or 1
+    if kind == "outputExtension" or (spec and spec.externalOutputs) then x = 1 end
     return rotatePoint(rotation, x, y)
 end
 

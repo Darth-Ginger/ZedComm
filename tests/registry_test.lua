@@ -810,8 +810,13 @@ local function menuAt(tile)
     fire("OnFillWorldObjectContextMenu", 0, contextMenu, { { getSquare = function() return tile end } }, false)
     return contextMenu.children.ZedComm or menu()
 end
-local function optionsAt(tile)
-    return menuAt(tile).options
+local function optionsAt(tile, group)
+    local root = menuAt(tile)
+    if group then return assert(root.children[group], "missing submenu: " .. group).options end
+    for _, child in pairs(root.children) do
+        for label, callback in pairs(child.options) do root.options[label] = root.options[label] or callback end
+    end
+    return root.options
 end
 local opts = optionsAt(far)
 assert(opts["Place pressure plate"])()
@@ -1485,24 +1490,33 @@ do
     end
     local original, attachments = setFloor()
     original:addAttachedAnimSprite(getSprite("zedcomm_devices_01_1"))
+    original:addAttachedAnimSprite(getSprite("zedcomm_switch_floor_01_1"))
     local placed, id = runPlacement(tile, { kind = "place", item = give("ZedComm.NetworkSwitch") })
     assert(placed)
     local laid, cable = lay(wireTile, give("ZedComm.SignalWire"), id, "signal")
     assert(laid)
+    local function leadObjects()
+        local found = {}
+        for _, object in ipairs(tile.objects) do
+            if object.sprite and ZedComm.NetworkSwitch.isFloorLead(object.sprite) then found[#found + 1] = object end
+        end
+        return found
+    end
     fire("OnTick")
-    check(#attachments == 2 and attachments[2]:getParentSprite():getName() == "zedcomm_switch_floor_01_1",
-        "the switch lead's grounded section attaches to the floor")
+    local lead = leadObjects()[1]
+    check(#attachments == 1 and lead and lead.sprite == "zedcomm_switch_floor_01_1",
+        "the switch lead replaces its floor attachment with an independently positioned overlay")
     fire("OnObjectAboutToBeRemoved", original)
     takeOff(tile, original)
     local replacement, replacementAttachments = setFloor()
     fire("OnObjectAdded", replacement)
     fire("OnTick")
-    check(#attachments == 1 and #replacementAttachments == 1, "reflooring reattaches the grounded lead")
+    check(#replacementAttachments == 0 and leadObjects()[1] == lead, "reflooring keeps the grounded overlay")
     fire("LoadGridsquare", tile)
-    check(#replacementAttachments == 1, "loading the floor does not duplicate the lead")
+    check(#leadObjects() == 1, "loading the floor does not duplicate the lead")
     assert(target(tile, id, "pickup"))
     fire("OnTick")
-    check(#replacementAttachments == 0 and playerRegistry.network:record(cable), "pickup clears only the floor lead")
+    check(#leadObjects() == 0 and playerRegistry.network:record(cable), "pickup clears only the floor lead")
     inventory:Remove(inventory:getFirstType("ZedComm.NetworkSwitch"))
 end
 
@@ -1692,8 +1706,7 @@ do
     give("ZedComm.SignalWire")
 
     local function choose(tile, label, group)
-        local parent = menuAt(tile)
-        local options = group and assert(parent.children[group], "missing submenu: " .. group).options or parent.options
+        local options = optionsAt(tile, group)
         assert(options[label], "missing option: " .. label)
         queued = nil
         options[label]()
@@ -2617,11 +2630,11 @@ do
     function lamp.getSprite() return nil end
     assert(runPlacement(lampTile, { kind = "install-relay", object = lamp }))
     local lampId = lamp:getModData().zedcomm.id
-    local install = assert(menuAt(lampTile).children.Debug.options["Install test lamp threshold"])
+    local install = assert(menuAt(lampTile).children.Lamp.options["Install test lamp threshold"])
     install()
     check(playerRegistry.network:record(lampId).state.circuit.modules.threshold.threshold == 50,
         "the debug menu installs a saved threshold preset")
-    local edit = assert(menuAt(lampTile).children.Debug.options["Set test lamp threshold"])
+    local edit = assert(menuAt(lampTile).children.Lamp.options["Set test lamp threshold"])
     edit()
     input = "120"
     confirm()
@@ -2658,10 +2671,11 @@ do
     local initial = runtime.inspect(wireId)
     check(initial.sourcePacket and initial.sourcePacket.type == "signal.basic"
         and initial.sourcePacket.value == 115, "the inspector reports the default basic packet")
-    check(menuAt(plateTile).children.Debug == nil, "the weight sender selector is debug-only")
+    check(not menuAt(plateTile).children.Plate.children["Weight plate sender (Basic Sender)"],
+        "the fixture's sender selector is debug-only")
     getDebug = function() return true end
     local function modeMenu(label)
-        return assert(assert(menuAt(plateTile).children.Debug).children["Weight plate sender (" .. label .. ")"])
+        return assert(menuAt(plateTile).children.Plate.children["Weight plate sender (" .. label .. ")"])
     end
 
     assert(playerRegistry:setDeviceState(plateId, { label = "Road plate" }))
@@ -2728,12 +2742,13 @@ do
     getDebug = debugBefore
 end
 
--- Exercise the actual editor callbacks through vanilla-style panel and dialog stubs.
-do
+local function testCircuitEditors()
     playerRegistry, playerJava = start()
     local previousDebug, previousCore = getDebug, getCore
     local input, confirm, panel
     local cursorX, cursorY = 0, 0
+    local originalMouseX, originalMouseY = getMouseX, getMouseY
+    getMouseX, getMouseY = function() return cursorX end, function() return cursorY end
     local rotateKey = 99 -- rebound from the default
     getDebug = function() return true end
     getCore = function()
@@ -2816,7 +2831,25 @@ do
     assert(optionsAt(lampTile)["Open Advanced Adapter"])()
     assert(panel and panel:refresh())
     panel:render()
-    local function grabCarried() panel:onMouseDown(294, 95) end
+    local function clickPalette(kind, group)
+        assert(panel:refresh())
+        for i, entry in ipairs(panel.paletteEntries) do
+            if (kind and entry.kind == kind) or (group and entry.group == group) then
+                panel.paletteOffset = math.max(0, math.min(i - 1, #panel.paletteEntries - 8))
+                panel:onMouseDown(panel.carriedX + 30, 84 + (i - panel.paletteOffset - 1) * 34)
+                return
+            end
+        end
+        error("Missing palette entry " .. tostring(kind or group))
+    end
+    local function dragCarried(kind) clickPalette(kind) end
+    local function grabCarried() dragCarried("threshold") end
+    clickPalette(nil, "Logic")
+    panel:refresh()
+    local collapsedCount = #panel.paletteEntries
+    clickPalette(nil, "Logic")
+    panel:refresh()
+    check(#panel.paletteEntries > collapsedCount, "the carried module group can collapse and expand")
     local function click(x, y)
         panel:onMouseDown(x, y)
         panel:onMouseUp(x, y)
@@ -2859,6 +2892,12 @@ do
     click(181, 142)
     fire("OnTick")
     check(lamp.active and #circuit().links == 2, "terminal selection completes the circuit")
+    panel:onRightMouseUp(94, 142)
+    fire("OnTick")
+    check(not lamp.active and #circuit().links == 1 and circuit().links[1].to == "output",
+        "right-clicking the drawn link removes only that link")
+    click(85, 142)
+    click(103, 142)
     panel:linkTerminal("threshold-1", "out")
     panel:linkTerminal("output", "in")
     fire("OnTick")
@@ -2938,7 +2977,7 @@ do
         and not inventory:contains(returnedPart), "a carried module can be installed directly in its rotated position")
     panel:removePart()
     local inverterItem = give("ZedComm.NotModule")
-    panel:onMouseDown(294, 118)
+    dragCarried("not")
     panel:onMouseUp(133, 142)
     panel.autoButton.click()
     fire("OnTick")
@@ -3029,11 +3068,11 @@ do
         panel:render()
         check(panel.gridSize == 6 and panel.parts.input.height == 120 and panel.parts.output.height == 120,
             "the cabinet uses the same editor with fixed two-cell parts on a 6 by 6 grid")
-        panel:onMouseDown(420, 84)
+        dragCarried("threshold")
         panel:onMouseUp(106, 124)
-        panel:onMouseDown(420, 118)
+        dragCarried("and")
         panel:onMouseUp(226, 244)
-        panel:onMouseDown(420, 152)
+        dragCarried("inputExtension")
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(207, 104)
         check(not inventory:contains(andItem) and not inventory:contains(extension)
@@ -3065,7 +3104,11 @@ do
         end
         tick()
         local net = playerRegistry.network
-        local labelMenu = assert(menuAt(cabinetTile).children["Label cabinet jack"])
+        local root = menuAt(cabinetTile)
+        local cabinetMenu = assert(root.children.Cabinet)
+        local labelMenu = assert(cabinetMenu.children["Label cabinet jack"])
+        check(cabinetMenu.options["Open Small Cabinet"] and not root.options["Open Small Cabinet"]
+            and not root.children["Label cabinet jack"], "the editor and jack labels are grouped under the cabinet")
         local boardBefore = cabinetPiece().board
         assert(labelMenu.options.IN)()
         input = "Load"
@@ -3172,7 +3215,7 @@ do
             and not cabinetPiece().state.portLabels["inputExtension-3"]
             and inventory:getFirstType("ZedComm.InputExtension"),
             "right-click removal returns the extension, clears its label and leaves its run loose")
-        panel:onMouseDown(420, 152)
+        dragCarried("inputExtension")
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(207, 104)
         check(cabinetPiece().ports["inputExtension-4"] == false and cabinetPiece().ports["inputExtension-3"] == nil,
@@ -3228,11 +3271,11 @@ do
             assert(placedSecond)
             local extensionItem, adderItem = give("ZedComm.InputExtension"), give("ZedComm.AdderModule")
             assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
-            panel:onMouseDown(420, 152)
+            dragCarried("inputExtension")
             for _ = 1, 3 do panel:onKeyPress(rotateKey) end
             panel:onMouseUp(146, 406)
             local secondJack = panel.selected
-            panel:onMouseDown(420, 220)
+            dragCarried("adder")
             panel:onMouseUp(106, 244)
             local adderId = panel.selected
             check(not inventory:contains(extensionItem) and not inventory:contains(adderItem)
@@ -3345,7 +3388,7 @@ do
         for ix, kind in ipairs({ "or", "xor", "not" }) do
             local itemType = ZedComm.InternalCircuit.kinds[kind].item
             local item = inventory:getFirstType(itemType) or give(itemType)
-            panel:onMouseDown(420, 254 + (ix - 1) * 34)
+            dragCarried(kind)
             panel:onMouseUp(106 + (ix - 1) * 60, 244)
             local logic = playerRegistry.network.pieces[logicId].state.circuit
             check(not inventory:contains(item) and logic.modules[panel.selected].kind == kind,
@@ -3379,13 +3422,24 @@ do
         plateTile.overlappingVehicle = { getMass = function() return mass end }
         local inputWire = runTestWire(floorTile(194, 124), plateId, "signal", cabinetTile, cabinetId, "input")
         runTestWire(floorTile(196, 124), cabinetId, "output", displayTile, displayId, "signal")
-        assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
+        local cabinet = placement.resolve(playerRegistry, cabinetId).object
+        local previousTime, previousUI = worldTime, UIManager
+        UIManager = { getSpeedControls = function() return nil end }
+        player.tile = floorTile(194, 124)
+        fire("OnObjectLeftMouseButtonDown", cabinet)
+        check(not panel, "one click on a cabinet leaves the editor closed")
+        worldTime = worldTime + 450
+        fire("OnObjectLeftMouseButtonDown", cabinet)
+        check(not panel, "two separated cabinet clicks leave the editor closed")
+        worldTime = worldTime + 180
+        fire("OnObjectLeftMouseButtonDown", cabinet)
+        check(panel and panel.target.id == cabinetId, "double-clicking a nearby cabinet opens its editor")
+        worldTime, UIManager = previousTime, previousUI
         local cache = give("ZedComm.CacheModule")
-        panel.nextPage.click()
-        panel:onMouseDown(420, 84)
+        dragCarried("cache")
         panel:onMouseUp(166, 184)
         local cacheId = panel.selected
-        check(not inventory:contains(cache) and cacheId ~= nil, "the carried palette can install Cache on its second page")
+        check(not inventory:contains(cache) and cacheId ~= nil, "the carried palette can install Cache from Connections")
         panel.configureButton.click()
         panel:linkTerminal("input", "out")
         panel:linkTerminal(cacheId, "data")
@@ -3399,6 +3453,20 @@ do
             return received
         end
         check(shown().value == 115, "advanced display receives only the byte from a basic output")
+        local faceReading, jackDetail
+        local cursorBeforeX, cursorBeforeY = cursorX, cursorY
+        cursorX, cursorY = panel.parts.input.x + 10, panel.parts.input.y + 10
+        function panel:drawTextCentre(value, x, y)
+            local jack = self.parts.input
+            if x == jack.x + jack.width / 2 and y == jack.y + 25 then faceReading = value end
+        end
+        function panel:drawText(value)
+            if value:find("IN |", 1, true) then jackDetail = value end
+        end
+        panel:render()
+        check(faceReading == "1150 kg" and jackDetail == "IN | 1150.25 kg (byte 115)",
+            "the Advanced cabinet shows weight and the jack detail includes the exact value and fallback")
+        cursorX, cursorY = cursorBeforeX, cursorBeforeY
         panel:onMouseDown(345, 96)
         panel:onMouseUp(345, 96)
         panel.configureButton.click()
@@ -3426,12 +3494,11 @@ do
         panel:removePart()
         give("ZedComm.MultiplierModule")
         give("ZedComm.BatterySourceModule")
-        panel.nextPage.click()
-        panel:onMouseDown(420, 152)
+        dragCarried("multiplier")
         panel:onMouseUp(166, 184)
         local multiplierId = panel.selected
         panel.configureButton.click()
-        panel:onMouseDown(420, 288)
+        dragCarried("batterySource")
         panel:onMouseUp(226, 214)
         local batteryId = panel.selected
         panel.configureButton.click()
@@ -3475,18 +3542,19 @@ do
         check(record().state.adapter == "basic", "a new default cabinet has a Basic Adapter")
         assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
         local splitter = give("ZedComm.SplitterModule")
-        panel.nextPage.click()
-        panel:onMouseDown(420, 322)
+        dragCarried("splitter")
         panel:onMouseUp(166, 184)
         check(inventory:contains(splitter) and record().state.circuit.modules["splitter-1"] == nil,
             "dropping the splitter in the middle leaves it in inventory")
-        panel:onMouseDown(420, 322)
-        panel:onMouseUp(46, 244)
+        dragCarried("splitter")
+        panel:onMouseUp(346, 244)
         local splitterId = assert(panel.selected)
         local firstPort = ZedComm.InternalCircuit.splitterPort(splitterId, 1)
         local secondPort = ZedComm.InternalCircuit.splitterPort(splitterId, 2)
-        check(not inventory:contains(splitter) and record().ports[firstPort] == false
-            and record().ports[secondPort] == false, "installing a splitter exposes two independent external jacks")
+        local splitterPart = record().state.circuit.modules[splitterId]
+        check(not inventory:contains(splitter) and splitterPart.rotation == 180 and splitterPart.column == 6
+            and record().ports[firstPort] == false and record().ports[secondPort] == false,
+            "installing a default right-facing splitter exposes two independent external jacks")
         panel:linkTerminal("input", "out")
         panel:linkTerminal(splitterId, "in")
         local inRun = runTestWire(floorTile(221, 124), plate, "signal", cabinetTile, cabinet, "input")
@@ -3495,6 +3563,14 @@ do
         assert(playerRegistry:renameRun(firstRun, "First branch"))
         assert(playerRegistry:renameRun(secondRun, "Second branch"))
         local firstName, secondName = playerRegistry:getRunName(firstRun), playerRegistry:getRunName(secondRun)
+        local board = playerRegistry.network.pieces[cabinet].board
+        assert(optionsAt(cabinetTile)["Rename Cabinet"])()
+        input = "East entrance"
+        confirm()
+        local namedMenu = menuAt(cabinetTile).children["Cabinet (East entrance)"]
+        check(namedMenu and namedMenu.options["Open Small Cabinet"]
+            and playerRegistry.network.pieces[cabinet].board == board and record().state.fixtureName == "East entrance"
+            and playerRegistry:getRunName(firstRun) == firstName, "fixture rename updates its menu and preserves its runs")
         check(reading(first) == 115 and reading(second) == 115, "Basic cabinet delivers a byte to both split runs")
         panel.selected = "output"
         panel.configureButton.click()
@@ -3538,12 +3614,27 @@ do
         check(panel:refresh() and panel.jackLabels[firstPort] == "First output" and not panel.jackLabels[secondPort]
             and playerRegistry:getRunName(firstRun) == firstName,
             "renaming an advanced output from the editor leaves the cable run name intact")
-        panel:onRightMouseUp(part.x + 6, part.y + 6)
+        panel.selected = splitterId
+        panel.configureButton.click()
         assert(jackMenu.options["Set SPL-1 to Advanced"])()
         check(reading(first).amount == 1150.25 and reading(second) == 115, "splitter branches respect their own output modes")
+        panel:linkTerminal("input", "out")
         panel:onRightMouseUp(part.x + 6, part.y + 6)
         assert(jackMenu.options["Set SPL-2 to Advanced"])()
         check(reading(second).amount == 1150.25, "both splitter runs can deliver the full reading")
+        give("ZedComm.CacheModule")
+        dragCarried("cache")
+        panel:onMouseUp(166, 184)
+        local cacheId = assert(panel.selected)
+        panel.configureButton.click()
+        panel:linkTerminal("input", "out")
+        panel:linkTerminal(splitterId, "in")
+        panel:linkTerminal("input", "out")
+        panel:linkTerminal(cacheId, "data")
+        panel:linkTerminal(cacheId, "out")
+        panel:linkTerminal(splitterId, "in")
+        check(reading(first).amount == 1150.25 and reading(second).amount == 1150.25,
+            "Cache forwards the full reading through both advanced splitter ports")
         assert(playerRegistry:unlink(secondRun, second))
         check(reading(first).amount == 1150.25 and reading(second) == nil, "unplugging a branch leaves the other live")
         assert(join(secondTile, secondRun, false, second, "signal"))
@@ -3553,13 +3644,15 @@ do
         panel:close()
         playerRegistry, playerJava = start(save(playerJava))
         check(record().state.adapter == "advanced" and reading(first).amount == 1150.25
-            and reading(second).amount == 1150.25, "upgrade and both splitter routes restore on reload")
+            and reading(second).amount == 1150.25 and record().state.fixtureName == "East entrance",
+            "upgrade, fixture name and both splitter routes restore on reload")
         assert(target(cabinetTile, cabinet, "pickup"))
         local moved = floorTile(226, 124)
         local item = assert(inventory:getFirstType("ZedComm.AdvancedSmallCabinet"))
         assert(runPlacement(moved, { kind = "place", item = item }))
-        check(record().state.adapter == "advanced" and #record().state.circuit.links == 1,
-            "replacing a picked-up cabinet preserves its adapter grade and circuit")
+        check(record().state.adapter == "advanced" and #record().state.circuit.links == 2
+            and record().state.fixtureName == "East entrance",
+            "replacing a picked-up cabinet preserves its adapter grade, circuit and name")
     end
     splitterScenario()
 
@@ -3584,13 +3677,12 @@ do
         local inputWire = runTestWire(floorTile(204, 124), inputId, "signal", cabinetTile, cabinetId, "input")
         runTestWire(floorTile(206, 124), cabinetId, "output", displayTile, displayId, "signal")
         assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
-        panel.nextPage.click()
         give("ZedComm.TimerModule")
         give("ZedComm.WaitModule")
-        panel:onMouseDown(420, 186)
+        dragCarried("timer")
         panel:onMouseUp(166, 244)
         local timer = panel.selected
-        panel:onMouseDown(420, 220)
+        dragCarried("wait")
         panel:onMouseUp(106, 124)
         local wait = panel.selected
         panel:linkTerminal("input", "out")
@@ -3603,19 +3695,32 @@ do
         assert(runtime.setTestByte(playerRegistry, inputId, 255))
         seconds(0)
         check(placedReading(displayId) == 0, "a native cabinet starts with Wait's OFF output")
-        seconds(2)
-        check(placedReading(displayId) == 255, "the cabinet runs scheduled Wait and Timer even with a quiet wire")
+        check(runtime.getTimingRemaining(cabinetId, wait) == 2 and runtime.getTimingRemaining(cabinetId, timer) == nil,
+            "only Wait has a countdown before it forwards the input")
+        seconds(1)
+        local countdown
+        function panel:drawTextCentre(value, _, y)
+            if y == self.parts[wait].y + 39 then countdown = value end
+        end
+        panel:render()
+        check(countdown == "1.0s", "the editor draws the remaining seconds below Wait's setting")
+        seconds(1)
+        check(placedReading(displayId) == 255 and runtime.getTimingRemaining(cabinetId, wait) == nil
+            and runtime.getTimingRemaining(cabinetId, timer) == 10,
+            "Timer begins counting when Wait forwards, even with a quiet input wire")
         assert(runtime.setTestByte(playerRegistry, inputId, 0))
         seconds(0)
         check(placedReading(displayId) == 255, "timer holds ON after valid zero")
         seconds(10)
-        check(placedReading(displayId) == 0, "timer expiration publishes OFF through the normal dispatch pass")
+        check(placedReading(displayId) == 0 and runtime.getTimingRemaining(cabinetId, timer) == nil,
+            "timer expiration publishes OFF and clears the countdown")
         assert(runtime.setTestByte(playerRegistry, inputId, 255))
         seconds(0)
         seconds(2)
         assert(playerRegistry:unlink(inputWire, cabinetId))
         seconds(0)
-        check(placedReading(displayId) == nil, "disconnect cancels the live timing chain")
+        check(placedReading(displayId) == nil and runtime.getTimingRemaining(cabinetId, timer) == nil,
+            "disconnect clears both the signal and countdown")
         panel:close()
 
         cabinetTile, displayTile = floorTile(213, 124), floorTile(215, 124)
@@ -3623,9 +3728,8 @@ do
         displayId = placeTestItem(displayTile, "ZedComm.NumericDisplay")
         runTestWire(floorTile(214, 124), cabinetId, "output", displayTile, displayId, "signal")
         assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
-        panel.nextPage.click()
         give("ZedComm.MainsSourceModule")
-        panel:onMouseDown(420, 254)
+        dragCarried("mainsSource")
         panel:onMouseUp(106, 94)
         local mains = panel.selected
         panel.configureButton.click()
@@ -3644,7 +3748,7 @@ do
         panel.selected = mains
         panel:removePart()
         give("ZedComm.BatterySourceModule")
-        panel:onMouseDown(420, 288)
+        dragCarried("batterySource")
         panel:onMouseUp(106, 94)
         local batterySource = panel.selected
         panel:linkTerminal(batterySource, "out")
@@ -3666,9 +3770,11 @@ do
     timingScenario()
 
     getTexture, UIFont, ISMouseDrag = originalTexture, originalFont, originalDrag
+    getMouseX, getMouseY = originalMouseX, originalMouseY
     KeybindId, Keyboard = originalBindings, originalKeyboard
     getDebug, getCore = previousDebug, previousCore
 end
+testCircuitEditors()
 
 print = realPrint
 print(string.format("%d checks, %d failed%s", checks, failures,

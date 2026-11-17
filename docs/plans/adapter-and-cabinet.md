@@ -37,9 +37,9 @@ Chunk 1 passed 614 offline Lua 5.1 checks and the Windows Workshop build. Live g
 
 ### Chunk 1 debug walkthrough
 
-Use a fresh disposable singleplayer save in debug mode. Fit an eligible powered vanilla lamp with **ZedComm → Install test relay**. Then choose **ZedComm → Debug → Install test lamp threshold** to install the preset with threshold 50. The preset includes the fixed input and output, one Threshold, and both internal links. The adapter uses the existing relay housing for this prototype.
+Use a fresh disposable singleplayer save in debug mode. Fit an eligible powered vanilla lamp with **ZedComm → Lamp → Install test relay**. Then choose **ZedComm → Lamp → Install test lamp threshold** to install the preset with threshold 50. The preset includes the fixed input and output, one Threshold, and both internal links. The adapter uses the existing relay housing for this prototype.
 
-Wire a Basic weight plate to the lamp and compare the byte in **Inspect circuit** with the lamp. An 80 kg player should produce 8 and leave the lamp off. The tested sheriff car produced 115 and should turn it on. With a steady load above 50, use **ZedComm → Debug → Set test lamp threshold** and choose a value above the current byte. The lamp should turn off while the byte on the wire stays steady. Set it back to 50 and expect it to turn on again.
+Wire a Basic weight plate to the lamp and compare the byte in **Inspect circuit** with the lamp. An 80 kg player should produce 8 and leave the lamp off. The tested sheriff car produced 115 and should turn it on. With a steady load above 50, use **ZedComm → Lamp → Set test lamp threshold** and choose a value above the current byte. The lamp should turn off while the byte on the wire stays steady. Set it back to 50 and expect it to turn on again.
 
 Disconnect the source side and expect the lamp to go off. Reconnect and check that it responds to the current load. Disconnect at the lamp and confirm its manual switch works. Reconnect, reload the same build, and confirm the setting and wiring persist. Pick up and replace the lamp with vanilla moveable tools and verify that its circuit follows it. Reconnect its exterior cable to resume network control.
 
@@ -69,8 +69,8 @@ getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
 getPlayer():getInventory():AddItems("ZedComm.SignalWire", 4)
 ```
 
-1. At a modifiable powered vanilla lamp choose **ZedComm → Install Advanced Adapter**. This fits the inventory item directly to an unconverted lamp. Wire the weight plate to the lamp.
-2. Open **ZedComm → Open Advanced Adapter**. Check the two fixed parts and the right-hand **Carried modules** count. Drag a Threshold from that pane and drop it into the top two cells of the center column. The count should decrease by one. The wired lamp stays off until the internal path is connected.
+1. At a modifiable powered vanilla lamp choose **ZedComm → Lamp → Install Advanced Adapter**. This fits the inventory item directly to an unconverted lamp. Wire the weight plate to the lamp.
+2. Open **ZedComm → Lamp → Open Advanced Adapter**. Check the two fixed parts and the right-hand **Carried modules** count. Drag a Threshold from that pane and drop it into the top two cells of the center column. The count should decrease by one. The wired lamp stays off until the internal path is connected.
 3. Click a module's output contact and the next part's input contact to connect the path from **Fixed IN → Threshold → Fixed OUT**. Selecting the same pair again cuts that link. **Auto-connect** restores the single Threshold path. Check that the input continues to show the plate byte during an internal cut and that the lamp goes off.
 4. Right-click the installed Threshold or use **ZedComm → Set threshold** at the lamp. Verify both edit the same saved setting. At threshold 50, the 80 kg player should leave the lamp off and the sheriff car should turn it on. Raise the threshold above the current byte to turn it off without changing the wire input.
 5. Hold the Threshold by its body and press the game's **Rotate Building** key (R by default). Drag it into two adjacent cells of the bottom row and release when the preview turns green. The links should follow the rotated contacts and the lamp should keep its current state. Try dropping on a fixed part with a red preview, releasing outside the board, and right-clicking while held. Each should leave the module and links in place.
@@ -92,7 +92,7 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 4)
 - [x] Add the 6×6 host, fixed ports, and rotatable input and output extensions. Reuse the circuit editor and extend the internal validator for modules with multiple terminals.
 - [x] Extend the existing wire topology and delivery to route by port, then validate external and internal edits against the same feedback rule.
 - [x] Add AND and prove the three-run circuit below with a player-operated Network Switch in the offline harness.
-- [ ] Run the combined in-game placement and cabinet verification.
+- [x] Run the combined in-game placement and cabinet verification. Darth-Ginger confirmed the six-checkpoint smoke test on Build 42.22.2 and the post-cleanup game check on 2026-11-17. See [the combined guide](../combined-smoke-test.md#verification) for evidence.
 
 ### Cabinet port rules
 
@@ -158,7 +158,7 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
 ```
 
 1. Verify the Advanced Adapter placement follow-up in the 3×3 editor. Check two-tile viewing over an open path, adjacent-only editing, and the contact legend. Drag a wired Threshold into the bottom row with **R** and verify both links follow. Try an overlapping drop and a right-click cancellation.
-2. Place the cabinet and weight plate. Mount the Network Switch on a tile next to a wall using native **Place** or **ZedComm → Place network switch**. All four edges are eligible. At a corner, placement checks north, west, south, then east. The new switch starts OFF. Use **ZedComm → Install test relay** on the cabinet's target lamp. Open **ZedComm → Open Small Cabinet**. Check the fixed two-cell parts and drag Threshold to column 2, row 1, and AND to column 4, row 3. Rotate an Input Extension 90° and place its top-left at column 3, row 1 so the jack faces out at the top. If installed in this order, its jack is **IN 3**. Set Threshold to 50 and connect the four internal links from the acceptance circuit.
+2. Place the cabinet and weight plate. Mount the Network Switch on a tile next to a wall using native **Place** or **ZedComm → Place network switch**. All four edges are eligible. At a corner, placement checks north, west, south, then east. The new switch starts OFF. Use **ZedComm → Lamp → Install test relay** on the cabinet's target lamp. Open **ZedComm → Cabinet → Open Small Cabinet**. Check the fixed two-cell parts and drag Threshold to column 2, row 1, and AND to column 4, row 3. Rotate an Input Extension 90° and place its top-left at column 3, row 1 so the jack faces out at the top. If installed in this order, its jack is **IN 3**. Set Threshold to 50 and connect the four internal links from the acceptance circuit.
 3. Connect the weight plate to **IN**, the Network Switch to **IN 3**, and **OUT** to the relay lamp. Name the three runs. Use **ZedComm → Turn network switch on** and check the raised toggle sprite and `255` on **IN 3**. An 80 kg player should give `8` on the load jack, `0` on **OUT**, and an OFF lamp. A vehicle yielding at least 50 should turn it on. Keep the load steady and turn the switch OFF. The down sprite and `0` should return, and the lamp should go off while the load jack retains its reading.
 4. Set arm back to 255. Use **Disconnect cabinet jack (IN 3)**, check for `--` on **OUT** and an OFF lamp, then reconnect and check that the lamp resumes with the held load. Move the wired extension to another edge and check its links. Remove it and confirm the cable stays in place with a free end, the item returns, and the lamp turns off. Reinstall the extension and explicitly reconnect its internal contact and new external jack.
 5. Save and reload with the switch ON. Verify switch state and appearance, module settings, port connections, and run names restore. Confirm the lamp follows the currently present load and arm reading. Pick up the switch and remount it on a south wall and then an east wall. Use tiles with only the wall under test so the corner priority does not pick another edge. Check the preview and both toggle positions against the wall. Verify the latch follows the item, the old cable stays on the ground, and explicitly reconnecting restores the arm signal. Capture the game console before leaving the save.
@@ -232,9 +232,9 @@ Craft each adapter directly from scrap and wire. Cabinet recipes consume one she
 | Advanced Small Cabinet | 3 | 1 Sheet Metal, 1 Advanced Adapter |
 | Splitter Module | 1 | 1 Electronics Scrap, 2 Electric Wire |
 
-With an Advanced Adapter in your main inventory, choose **ZedComm → Upgrade cabinet with Advanced Adapter** on a Basic cabinet. Completing the timed action returns the Basic Adapter and preserves installed modules, internal links, and external runs. Use the cabinet editor to enable Advanced mode on any output that should send the full reading.
+With an Advanced Adapter in your main inventory, choose **ZedComm → Cabinet → Upgrade cabinet with Advanced Adapter** on a Basic cabinet. Completing the timed action returns the Basic Adapter and preserves installed modules, internal links, and external runs. Use the cabinet editor to enable Advanced mode on any output that should send the full reading.
 
-The 1×2 Splitter mounts flush to a cabinet edge, with its two external jacks facing out and its sole internal input facing in. One internal link drives both external runs, including a valid zero. Each jack has a stable label and its own output mode. Right-click the Splitter to rename either jack or change its mode on an Advanced cabinet. Losing the input clears both branches. Disconnecting one output leaves the other live. Normal one-source-per-run and feedback rules apply to each branch.
+The 1×2 Splitter defaults to the right edge like the Output Extension. Mount it with its two external jacks facing out and its sole internal input facing in. One internal link drives both external runs, including a valid zero. Each jack has a stable label and its own output mode. Right-click the Splitter to rename either jack or change its mode. On an Advanced cabinet, selecting the Splitter and clicking Configure opens the same options. Losing the input clears both branches. Disconnecting one output leaves the other live. Normal one-source-per-run and feedback rules apply to each branch.
 
 ### Forwarding behavior
 
@@ -276,7 +276,7 @@ A Source occupies one cell and publishes a configured integer from `1` through `
 
 ### Advanced packet and timing smoke check
 
-Use these parts after Chunks 3 and 4. Use the **Next** and **Previous** buttons in the carried pane to find the additional cabinet modules.
+Open a group in **Carried modules** to find its parts. Scroll the pane to reach additional groups.
 
 ```lua
 getPlayer():getInventory():AddItem("ZedComm.AdvancedDisplay")

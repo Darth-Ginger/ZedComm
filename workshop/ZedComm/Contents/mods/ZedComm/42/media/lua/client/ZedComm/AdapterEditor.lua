@@ -12,6 +12,17 @@ local Editor = ISPanel:derive("ISZedCommAdapterEditor")
 local gridX, gridY = 16, 64
 local carriedY, carriedWidth, carriedHeight, carriedStep = 69, 164, 30, 34
 local paletteRows = 8
+local paletteGroups = {
+    { name = "Connections", kinds = { "inputExtension", "outputExtension", "splitter", "cache" } },
+    { name = "Logic", kinds = { "threshold", "and", "or", "xor", "not" } },
+    { name = "Arithmetic", kinds = { "adder", "subtractor", "multiplier" } },
+    { name = "Timing", kinds = { "timer", "wait" } },
+    { name = "Power", kinds = { "mainsSource", "batterySource" } },
+}
+local kindByItem = {}
+for kind, spec in pairs(Circuit.kinds) do
+    if spec.item then kindByItem[spec.item] = kind end
+end
 local textureFolder = "media/textures/"
 local textures = {}
 local panels = {}
@@ -129,7 +140,11 @@ end
 
 local function geometry(layout, cabinet, cell)
     local parts = Circuit.fixedParts(cabinet)
-    for id, module in pairs(layout.modules) do parts[id] = module end
+    for id, module in pairs(layout.modules) do
+        local part = {}
+        for field, value in pairs(module) do part[field] = value end
+        parts[id] = part
+    end
     for _, part in pairs(parts) do
         local width, height = Circuit.footprint(part.rotation, part.kind)
         part.x, part.y = gridX + (part.column - 1) * cell, gridY + (part.row - 1) * cell
@@ -149,8 +164,41 @@ local function terminalPosition(part, name)
     return px, py
 end
 
+local function linkPoints(parts, link)
+    local x1, y1 = terminalPosition(parts[link.from], link.output)
+    local x2, y2 = terminalPosition(parts[link.to], link.input)
+    return x1, y1, x2, y2, (x1 + x2) / 2
+end
+
+local function segmentDistanceSquared(x, y, x1, y1, x2, y2)
+    local dx = math.max(math.min(x1, x2) - x, x - math.max(x1, x2), 0)
+    local dy = math.max(math.min(y1, y2) - y, y - math.max(y1, y2), 0)
+    return dx * dx + dy * dy
+end
+
+local function nearestLink(parts, links, x, y)
+    local hit, tied
+    local closest = 5 * 5
+    for i, link in ipairs(links) do
+        local x1, y1, x2, y2, mid = linkPoints(parts, link)
+        local distance = math.min(segmentDistanceSquared(x, y, x1, y1, mid, y1),
+            segmentDistanceSquared(x, y, mid, y1, mid, y2), segmentDistanceSquared(x, y, mid, y2, x2, y2))
+        if distance <= closest then
+            tied = distance == closest and hit ~= nil
+            hit, closest = i, distance
+        end
+    end
+    return hit, tied
+end
+
 local function inside(x, y, left, top, width, height)
     return x >= left and x < left + width and y >= top and y < top + height
+end
+
+local function partAt(parts, x, y)
+    for id, part in pairs(parts) do
+        if inside(x, y, part.x, part.y, part.width, part.height) then return id, part end
+    end
 end
 
 function Editor:insideGrid(x, y)
@@ -175,15 +223,15 @@ function Editor:refresh()
     local circuit = entry and entry.piece.state and entry.piece.state.circuit
     if not circuit then self:endDrag(); return false end
     self.jackLabels = entry.piece.state.portLabels
+    self.fixtureName = entry.piece.state.fixtureName
     self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square) and true or false
     if not self.reachable then self:endDrag() end
     if circuit ~= self.expected then
         local layout = readLayout(self.registry, self.target.id)
         self.adapter = self.cabinet and entry.piece.state.adapter or nil
-        local evaluate = Circuit.compile(layout, self.cabinet, self.adapter)
-        if not evaluate then return false end
-        self.expected, self.layout, self.evaluate = circuit, layout, evaluate
-        self.parts = geometry(readLayout(self.registry, self.target.id), self.cabinet, self.cell)
+        if not Circuit.compile(layout, self.cabinet, self.adapter) then return false end
+        self.expected, self.layout = circuit, layout
+        self.parts = geometry(layout, self.cabinet, self.cell)
         self.terminal = nil
         self:endDrag()
         if not self.parts[self.selected] then self.selected = nil end
@@ -191,18 +239,35 @@ function Editor:refresh()
 
     local inventory = self.player:getInventory():getItems()
     local carried = {}
-    for _, kind in ipairs(self.moduleKinds) do
-        carried[Circuit.kinds[kind].item] = { count = 0 }
-    end
     for i = 0, inventory:size() - 1 do
         local item = inventory:get(i)
-        local row = carried[item:getFullType()]
-        if row then
-            row.count = row.count + 1
-            row.item = row.item or item
+        local kind = kindByItem[item:getFullType()]
+        if kind and Circuit.moduleAllowed(kind, self.cabinet) then
+            local row = carried[kind]
+            if row then
+                row.count = row.count + 1
+            else
+                carried[kind] = { kind = kind, item = item, count = 1 }
+            end
         end
     end
-    self.carried = carried
+    local entries = {}
+    for _, group in ipairs(paletteGroups) do
+        local header
+        for _, kind in ipairs(group.kinds) do
+            local row = carried[kind]
+            if row then
+                if not header then
+                    header = { group = group.name, count = 0 }
+                    entries[#entries + 1] = header
+                end
+                header.count = header.count + row.count
+                if not self.collapsed[group.name] then entries[#entries + 1] = row end
+            end
+        end
+    end
+    self.paletteEntries = entries
+    self.paletteOffset = math.min(self.paletteOffset, math.max(0, #entries - paletteRows))
     if not self.cabinet then
         local report = ZedComm.DeviceRuntime.inspect(self.target.id)
         self.input = report and report.sourceByte or nil
@@ -211,7 +276,6 @@ function Editor:refresh()
     return true
 end
 
--- Read-only from two tiles away: edits ask the player to step closer.
 function Editor:inReach()
     if not self:refresh() then return false end
     if self.reachable then return true end
@@ -319,7 +383,20 @@ end
 local function configurable(part, advanced)
     local spec = part and Circuit.kinds[part.kind]
     return spec and (part.kind == "threshold" or part.kind == "cache" or spec.timed or spec.source
-        or (advanced and (spec.full ~= nil or spec.jack == "source")))
+        or (advanced and (spec.full ~= nil or spec.jack == "source" or spec.externalOutputs ~= nil)))
+end
+
+local function addSplitterOptions(panel, context, id, branchCount)
+    for branch = 1, branchCount do
+        local port = Circuit.splitterPort(id, branch)
+        local label = Circuit.jackLabel(port, "source")
+        context:addOption("Rename " .. label, panel.player, Editor.renameJack, panel.registry, panel.target, port)
+        if panel.adapter == "advanced" then
+            local advanced = panel.layout.outputModes and panel.layout.outputModes[port] == "advanced"
+            context:addOption("Set " .. label .. " to " .. (advanced and "Basic" or "Advanced"),
+                panel, panel.toggleOutputMode, port)
+        end
+    end
 end
 
 function Editor:toggleOutputMode(id)
@@ -342,7 +419,11 @@ function Editor:configure()
         return
     end
     local spec = Circuit.kinds[part.kind]
-    if spec.timed then
+    if spec.externalOutputs then
+        local context = ISContextMenu.get(self.player:getPlayerNum(), getMouseX(), getMouseY())
+        addSplitterOptions(self, context, id, spec.externalOutputs)
+        return
+    elseif spec.timed then
         setNumber(self.player, self.registry, self.target, id, "seconds", "Duration in seconds", spec.defaultSeconds)
         return
     elseif spec.source then
@@ -420,52 +501,56 @@ function Editor:onMouseUp(x, y)
     self.moving = false
     ISMouseDrag.dragView = nil
     if not gridPress then return true end
-    for id, part in pairs(self.parts) do
-        if inside(x, y, part.x, part.y, part.width, part.height) then
-            local name = contactAt(part, x, y)
-            if name then self:linkTerminal(id, name); return true end
-            self.selected = (Circuit.kinds[part.kind].item or configurable(part, self.adapter == "advanced")) and id or nil
-            self.terminal, self.message = nil, nil
-            return true
-        end
+    local id, part = partAt(self.parts, x, y)
+    local name = part and contactAt(part, x, y)
+    if name then
+        self:linkTerminal(id, name)
+        return true
     end
-    self.selected, self.terminal, self.message = nil, nil, nil
+    local selectable = part and (Circuit.kinds[part.kind].item or configurable(part, self.adapter == "advanced"))
+    self.selected, self.terminal, self.message = selectable and id or nil, nil, nil
     return true
 end
 
 function Editor:onMouseDown(x, y)
     if self.drag then return true end
     self.gridPress = nil
-    for row = 1, paletteRows do
-        local kind = self.moduleKinds[self.paletteOffset + row]
-        if kind and inside(x, y, self.carriedX, carriedY + (row - 1) * carriedStep, carriedWidth, carriedHeight) then
-            self:bringToTop()
-            if self:inReach() then
-                local item = self.carried[Circuit.kinds[kind].item].item
-                if item then
-                    local width, height = Circuit.footprint(Circuit.defaultRotation(kind), kind)
-                    self:beginDrag(nil, item, width * self.cell / 2, height * self.cell / 2, kind)
-                end
-            end
-            return true
+    if inside(x, y, self.carriedX, carriedY, carriedWidth, paletteRows * carriedStep) then
+        if not self:refresh() then return true end
+        self:bringToTop()
+        local row = math.floor((y - carriedY) / carriedStep) + 1
+        local entry = self.paletteEntries[self.paletteOffset + row]
+        if not entry or (y - carriedY) % carriedStep >= carriedHeight then return true end
+        if entry.group then
+            self.collapsed[entry.group] = not self.collapsed[entry.group]
+        elseif self:inReach() then
+            local kind = entry.kind
+            local width, height = Circuit.footprint(Circuit.defaultRotation(kind), kind)
+            self:beginDrag(nil, entry.item, width * self.cell / 2, height * self.cell / 2, kind)
         end
+        return true
     end
     if self:insideGrid(x, y) then
         self:bringToTop()
         self.gridPress = true
         if self:inReach() then
-            for id, part in pairs(self.parts) do
-                if Circuit.kinds[part.kind].item and inside(x, y, part.x, part.y, part.width, part.height)
-                    and not contactAt(part, x, y) then
-                    self.gridPress = nil
-                    self:beginDrag(id, nil, math.floor(x - part.x), math.floor(y - part.y))
-                    break
-                end
+            local id, part = partAt(self.parts, x, y)
+            if part and Circuit.kinds[part.kind].item and not contactAt(part, x, y) then
+                self.gridPress = nil
+                self:beginDrag(id, nil, math.floor(x - part.x), math.floor(y - part.y))
             end
         end
         return true
     end
     return ISPanel.onMouseDown(self, x, y)
+end
+
+function Editor:onMouseWheel(delta)
+    if self.drag or not inside(self:getMouseX(), self:getMouseY(),
+        self.carriedX, carriedY, carriedWidth, paletteRows * carriedStep) then return false end
+    if not self:refresh() then return false end
+    self.paletteOffset = math.max(0, math.min(self.paletteOffset + delta, #self.paletteEntries - paletteRows))
+    return true
 end
 
 function Editor:onMouseUpOutside(x, y)
@@ -485,52 +570,67 @@ end
 
 function Editor:onRightMouseUp(x, y)
     if not self:refresh() then self:close(); return true end
-    if self.drag or self.terminal then
+    if self.drag then
         self:endDrag()
         self.gridPress, self.terminal, self.message = nil, nil, nil
         return true
     end
-    for id, part in pairs(self.parts) do
-        if inside(x, y, part.x, part.y, part.width, part.height) then
-            local spec = Circuit.kinds[part.kind]
-            local canRename = self.cabinet and spec.jack
-            local canConfigure = configurable(part, self.adapter == "advanced")
-            local canRemove = self.layout.modules[id] ~= nil
-            if not (canRename or canConfigure or canRemove) or not self:inReach() then return true end
-
-            local context = ISContextMenu.get(self.player:getPlayerNum(), getMouseX(), getMouseY())
-            if canRename then
-                context:addOption("Rename jack", self.player, Editor.renameJack, self.registry, self.target, id)
-            end
-            for branch = 1, spec.externalOutputs or 0 do
-                local port = Circuit.splitterPort(id, branch)
-                local label = Circuit.jackLabel(port, "source")
-                context:addOption("Rename " .. label, self.player, Editor.renameJack, self.registry, self.target, port)
-                if self.adapter == "advanced" then
-                    local advanced = self.layout.outputModes and self.layout.outputModes[port] == "advanced"
-                    context:addOption("Set " .. label .. " to " .. (advanced and "Basic" or "Advanced"),
-                        self, self.toggleOutputMode, port)
+    local selectingContact = self.terminal ~= nil
+    if selectingContact then self.gridPress, self.terminal, self.message = nil, nil, nil end
+    local id, part = partAt(self.parts, x, y)
+    if not selectingContact and self:insideGrid(x, y) and not (part and contactAt(part, x, y)) then
+        local link, tied = nearestLink(self.parts, self.layout.links, x, y)
+        if link then
+            if self:inReach() then
+                if tied then
+                    self.message = "Right-click a section where the links separate."
+                else
+                    local layout = readLayout(self.registry, self.target.id)
+                    table.remove(layout.links, link)
+                    self:commit(layout)
                 end
             end
-            if canConfigure then
-                context:addOption("Configure", self, editPart, id, self.configure)
-            end
-            if canRemove then
-                context:addOption("Remove module", self, editPart, id, self.removePart)
-            end
             return true
+        end
+    end
+    if part then
+        local spec = Circuit.kinds[part.kind]
+        local canRename = self.cabinet and spec.jack
+        local canConfigure = configurable(part, self.adapter == "advanced")
+        local canRemove = self.layout.modules[id] ~= nil
+        if not (canRename or canConfigure or canRemove) or not self:inReach() then return true end
+
+        local context = ISContextMenu.get(self.player:getPlayerNum(), getMouseX(), getMouseY())
+        if canRename then
+            context:addOption("Rename jack", self.player, Editor.renameJack, self.registry, self.target, id)
+        end
+        if spec.externalOutputs then
+            addSplitterOptions(self, context, id, spec.externalOutputs)
+        elseif canConfigure then
+            context:addOption("Configure", self, editPart, id, self.configure)
+        end
+        if canRemove then
+            context:addOption("Remove module", self, editPart, id, self.removePart)
         end
     end
     return true
 end
 
--- Blue = output contact, green = input contact, red = the contact picked for a link.
 local function contactColor(name, active)
     if active then return 0.95, 0.25, 0.25 end
     if name == "out" then return 0.52, 0.71, 0.93 end
     return 0.52, 0.71, 0.35
 end
 local LEGEND = { { "out", "Output contact" }, { "in", "Input contact" }, { "selected", "Selected contact" } }
+local contactLabels = { a = "A", b = "B", data = "Data", enable = "Enable" }
+local multiplierLabels = { a = "Reading", b = "Factor" }
+
+local function drawContact(panel, part, name, direction, active)
+    local x, y = terminalPosition(part, name)
+    local r, g, b = contactColor(direction, active)
+    panel:drawRect(x - 6, y - 6, 12, 12, 1, r, g, b)
+    return x, y
+end
 
 local function drawPart(panel, kind, rotation, x, y, width, height, alpha)
     local name = "ZedCommCircuit_" .. kind .. "_" .. rotation
@@ -552,12 +652,32 @@ local function drawJack(panel, part, branch)
     return x, y
 end
 
+local function jackReading(panel, id)
+    local report = ZedComm.DeviceRuntime.inspect(panel.target.id, id)
+    local packet = report and report.sourcePacket
+    local byte = report and report.sourceByte
+    if panel.adapter == "advanced" and packet and packet.type == "signal.advanced" then
+        local value = packet.value
+        local amount = tostring(value.amount)
+        local exact = amount .. " " .. value.unit
+        local compact = #amount <= 5 and amount or tostring(math.floor(value.amount + 0.5))
+        local face = #compact <= 5 and compact .. " " .. value.unit or "Weight"
+        return face, exact .. (byte ~= nil and (" (byte " .. byte .. ")") or "")
+    end
+    if byte ~= nil then return tostring(byte), "byte " .. byte end
+    return "--", "No signal"
+end
+
 function Editor:render()
     if not self:refresh() then self:close(); return end
     local cell = self.cell
+    local mouseX, mouseY = self:getMouseX(), self:getMouseY()
     local title = self.cabinet and (self.adapter == "advanced" and "Advanced Small Cabinet" or "Basic Small Cabinet")
         or "Advanced Adapter"
-    self:drawText(title, 16, 10, 1, 1, 1, 1, UIFont.Medium)
+    self:setStencilRect(16, 8, self.carriedX + 100, 23)
+    self:drawText(self.fixtureName and (title .. " (" .. self.fixtureName .. ")") or title,
+        16, 10, 1, 1, 1, 1, UIFont.Medium)
+    self:clearStencilRect()
     if not self.cabinet then
         self:drawText("Wire in  " .. tostring(self.input or "--"), 16, 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
         self:drawText("Lamp out  " .. tostring(self.output or "--"), 134, 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
@@ -579,33 +699,37 @@ function Editor:render()
         if spec.source then label = part.kind == "batterySource" and "Battery" or "Mains" end
         if self.cabinet and spec.jack then
             label = Circuit.jackLabel(id, spec.jack)
-            local report = ZedComm.DeviceRuntime.inspect(self.target.id, id)
-            local reading = report and report.sourceByte or "--"
-            if spec.jack == "source" and self.layout.outputModes and self.layout.outputModes[id] then
-                reading = "Adv " .. reading
-            end
-            self:drawTextCentre(tostring(reading), part.x + part.width / 2,
+            local advanced = self.layout.outputModes and self.layout.outputModes[id] == "advanced"
+            if advanced then label = label .. " Adv" end
+            local reading, detail = jackReading(self, id)
+            self:drawTextCentre(reading, part.x + part.width / 2,
                 part.y + 25, 1, 1, 0.91, 1, UIFont.Small)
             local custom = self.jackLabels and self.jackLabels[id]
             if custom then
                 self:setStencilRect(part.x + 6, part.y + 41, part.width - 12, 17)
                 self:drawText(custom, part.x + 6, part.y + 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
                 self:clearStencilRect()
-                if inside(self:getMouseX(), self:getMouseY(), part.x, part.y, part.width, part.height) then
-                    hoveredJack = Circuit.jackLabel(id, spec.jack, custom)
-                end
+            end
+            if inside(mouseX, mouseY, part.x, part.y, part.width, part.height) then
+                hoveredJack = Circuit.jackLabel(id, spec.jack, custom)
+                    .. (advanced and " [Advanced]" or "") .. " | " .. detail
             end
             drawJack(self, part)
         end
         for branch = 1, spec.externalOutputs or 0 do
             local x, y = drawJack(self, part, branch)
-            if math.abs(self:getMouseX() - x) <= 8 and math.abs(self:getMouseY() - y) <= 8 then
+            if math.abs(mouseX - x) <= 8 and math.abs(mouseY - y) <= 8 then
                 local port = Circuit.splitterPort(id, branch)
+                local _, detail = jackReading(self, port)
+                local advanced = self.layout.outputModes and self.layout.outputModes[port] == "advanced"
                 hoveredJack = Circuit.jackLabel(port, "source", self.jackLabels and self.jackLabels[port])
+                    .. (advanced and " [Advanced]" or "") .. " | " .. detail
             end
         end
         self:drawRect(part.x + 5, part.y + 5, part.width - 10, 18, 0.85, 0.08, 0.11, 0.08)
-        self:drawTextCentre(label, part.x + part.width / 2, part.y + 6, 1, 1, 0.91, 1, UIFont.Small)
+        local textX = part.x + part.width / 2
+        if spec.timed and part.width > part.height then textX = part.x + part.width / 4 end
+        self:drawTextCentre(label, textX, part.y + 6, 1, 1, 0.91, 1, UIFont.Small)
         if spec.full or part.kind == "cache" then
             local mode = spec.full and (part.fullReading and "Full" or "Byte")
                 or (part.always and "Always" or "Enabled")
@@ -613,35 +737,34 @@ function Editor:render()
         elseif spec.timed or spec.source then
             local setting = spec.timed and (tostring(part.seconds or spec.defaultSeconds) .. "s")
                 or tostring(part.level or 255)
-            self:drawTextCentre(setting, part.x + part.width / 2, part.y + 25, 1, 1, 0.91, 1, UIFont.Small)
-            if part.kind == "batterySource" then
+            self:drawTextCentre(setting, textX, part.y + 25, 1, 1, 0.91, 1, UIFont.Small)
+            if spec.timed then
+                local remaining = ZedComm.DeviceRuntime.getTimingRemaining(self.target.id, id)
+                if remaining then
+                    local seconds = math.ceil(remaining * 10) / 10
+                    self:drawTextCentre(string.format("%.1fs", seconds), textX, part.y + 39,
+                        1, 0.79, 0.42, 1, UIFont.Small)
+                end
+            elseif part.kind == "batterySource" then
                 self:drawTextCentre(part.charge and "Battery in" or "Empty",
                     part.x + part.width / 2, part.y + 39, 1, 1, 0.91, 1, UIFont.Small)
             end
         end
     end
     for _, link in ipairs(self.layout.links) do
-        local x1, y1 = terminalPosition(self.parts[link.from], link.output)
-        local x2, y2 = terminalPosition(self.parts[link.to], link.input)
-        local mid = (x1 + x2) / 2
+        local x1, y1, x2, y2, mid = linkPoints(self.parts, link)
         self:drawRect(math.min(x1, mid), y1 - 1, math.abs(mid - x1) + 1, 2, 1, 0.48, 0.86, 0.65)
         self:drawRect(mid - 1, math.min(y1, y2), 2, math.abs(y2 - y1) + 1, 1, 0.48, 0.86, 0.65)
         self:drawRect(math.min(mid, x2), y2 - 1, math.abs(x2 - mid) + 1, 2, 1, 0.48, 0.86, 0.65)
     end
     for id, part in pairs(self.parts) do
+        local labels = part.kind == "multiplier" and multiplierLabels or contactLabels
         for name, direction in pairs(Circuit.kinds[part.kind].ports) do
-            local x, y = terminalPosition(part, name)
             local active = self.terminal and self.terminal.id == id and self.terminal.name == name
-            local r, g, b = contactColor(direction, active)
-            self:drawRect(x - 6, y - 6, 12, 12, 1, r, g, b)
-            if self.cabinet and name ~= "in" and name ~= "out" then
-                local label = ({ a = part.kind == "multiplier" and "Reading" or "A",
-                    b = part.kind == "multiplier" and "Factor" or "B", data = "Data", enable = "Enable",
-                    outA = "Out A", outB = "Out B" })[name]
-                if label and self:getMouseX() >= x - 8 and self:getMouseX() <= x + 8
-                    and self:getMouseY() >= y - 8 and self:getMouseY() <= y + 8 then
-                    self:drawText(label, x + 8, y - 5, 1, 1, 1, 1, UIFont.Small)
-                end
+            local x, y = drawContact(self, part, name, direction, active)
+            local label = self.cabinet and labels[name]
+            if label and math.abs(mouseX - x) <= 8 and math.abs(mouseY - y) <= 8 then
+                hoveredJack = Circuit.kinds[part.kind].label .. " | " .. label
             end
         end
     end
@@ -649,11 +772,20 @@ function Editor:render()
     local drag = self.drag
     local hint = self.reachable and "Drag modules or select two contacts to link." or reachMessage(self.cabinet)
     if drag then
-        local preview = self:previewAt(self:getMouseX(), self:getMouseY())
+        local preview = self:previewAt(mouseX, mouseY)
         if preview then
             self:setStencilRect(gridX, gridY, self.gridWidth, self.gridWidth)
             local x, y, w, h = preview.x + 2, preview.y + 2, preview.width - 4, preview.height - 4
             drawPart(self, drag.part.kind, drag.rotation, x, y, w, h, 0.78)
+            local part = { kind = drag.part.kind, rotation = drag.rotation, cell = cell,
+                x = preview.x, y = preview.y, width = preview.width, height = preview.height }
+            local spec = Circuit.kinds[part.kind]
+            self:drawTextCentre(spec.label, x + w / 2, y + 5, 1, 1, 1, 1, UIFont.Small)
+            for name, direction in pairs(spec.ports) do
+                drawContact(self, part, name, direction)
+            end
+            if spec.jack then drawJack(self, part) end
+            for branch = 1, spec.externalOutputs or 0 do drawJack(self, part, branch) end
             if preview.valid then
                 self:drawRectBorder(x, y, w, h, 1, 0.45, 0.91, 0.55)
             else
@@ -668,23 +800,32 @@ function Editor:render()
     local carriedX = self.carriedX
     self:drawText("Carried modules", carriedX, 44, 1, 1, 1, 1, UIFont.Small)
     for row = 1, paletteRows do
-        local kind = self.moduleKinds[self.paletteOffset + row]
-        if not kind then break end
+        local entry = self.paletteEntries[self.paletteOffset + row]
+        if not entry then break end
         local y = carriedY + (row - 1) * carriedStep
-        local spec = Circuit.kinds[kind]
-        self:drawRectBorder(carriedX, y, carriedWidth, carriedHeight, 0.8, 0.34, 0.43, 0.35)
-        self:drawText(spec.label .. "  x" .. self.carried[spec.item].count,
-            carriedX + 23, y + 7, 0.91, 0.93, 0.86, 1, UIFont.Small)
-        drawPart(self, kind, Circuit.defaultRotation(kind), carriedX + 3, y + 2, 13, carriedHeight - 4)
+        if entry.group then
+            local marker = self.collapsed[entry.group] and "+ " or "- "
+            self:drawRect(carriedX, y, carriedWidth, carriedHeight, 0.9, 0.16, 0.23, 0.18)
+            self:drawText(marker .. entry.group .. " (" .. entry.count .. ")",
+                carriedX + 8, y + 7, 0.91, 0.93, 0.86, 1, UIFont.Small)
+        else
+            local spec = Circuit.kinds[entry.kind]
+            self:drawRectBorder(carriedX + 8, y, carriedWidth - 8, carriedHeight, 0.8, 0.34, 0.43, 0.35)
+            self:drawText(spec.label .. "  x" .. entry.count,
+                carriedX + 27, y + 7, 0.91, 0.93, 0.86, 1, UIFont.Small)
+            drawPart(self, entry.kind, Circuit.defaultRotation(entry.kind), carriedX + 11, y + 2, 13, carriedHeight - 4)
+        end
     end
-    -- Legend for the contact squares.
+    if #self.paletteEntries > paletteRows then
+        self:drawText("Scroll for more", carriedX + 83, 44, 0.75, 0.81, 0.74, 1, UIFont.Small)
+    end
     for i, row in ipairs(LEGEND) do
         local y = self.legendY + (i - 1) * 15
         local r, g, b = contactColor(row[1], row[1] == "selected")
         self:drawRect(carriedX + 4, y + 2, 10, 10, 1, r, g, b)
         self:drawText(row[2], carriedX + 20, y, 0.85, 0.90, 0.85, 1, UIFont.Small)
     end
-    self:drawText((self.reachable and self.message) or hoveredJack or hint, 16, gridY + self.gridWidth + 16,
+    self:drawText((not drag and hoveredJack) or (self.reachable and self.message) or hint, 16, gridY + self.gridWidth + 16,
         0.90, 0.90, 0.80, 1, UIFont.Small)
     local reach = self.reachable and not drag
     local selected = self.layout.modules[self.selected]
@@ -692,10 +833,6 @@ function Editor:render()
     self.configureButton:setEnable(reach and configurable(self.parts[self.selected], self.adapter == "advanced") == true)
     self.batteryButton:setEnable(reach and selected ~= nil and selected.kind == "batterySource")
     if self.autoButton then self.autoButton:setEnable(reach and onlyModule(self.layout) ~= nil) end
-    if self.nextPage then
-        self.previousPage:setEnable(not drag and self.paletteOffset > 0)
-        self.nextPage:setEnable(not drag and self.paletteOffset + paletteRows < #self.moduleKinds)
-    end
 end
 
 function Editor:createChildren()
@@ -706,7 +843,7 @@ function Editor:createChildren()
         return widget
     end
     local x = self.carriedX + 2
-    local controlsY = carriedY + math.min(paletteRows, #self.moduleKinds) * carriedStep
+    local controlsY = carriedY + paletteRows * carriedStep
     button(x + 109, 9, 54, "Close", self.close)
     if not self.cabinet then
         self.autoButton = button(x, controlsY, 162, "Auto-connect", self.autoConnect)
@@ -714,17 +851,7 @@ function Editor:createChildren()
     end
     self.removeButton = button(x, controlsY, 78, "Remove", self.removePart)
     self.configureButton = button(x + 84, controlsY, 78, "Configure", self.configure)
-    if #self.moduleKinds > paletteRows then
-        self.previousPage = button(x, controlsY + 28, 78, "Previous", function(editor)
-            if not editor.drag then editor.paletteOffset = math.max(0, editor.paletteOffset - paletteRows) end
-        end)
-        self.nextPage = button(x + 84, controlsY + 28, 78, "Next", function(editor)
-            if not editor.drag and editor.paletteOffset + paletteRows < #editor.moduleKinds then
-                editor.paletteOffset = editor.paletteOffset + paletteRows
-            end
-        end)
-    end
-    self.batteryButton = button(x, controlsY + (#self.moduleKinds > paletteRows and 56 or 28), 162,
+    self.batteryButton = button(x, controlsY + 28, 162,
         "Insert or remove battery", self.changeBattery)
 end
 
@@ -746,17 +873,16 @@ function Editor.open(player, registry, target)
     if panels[player] then panels[player]:close() end
     local cell, gridSize = cabinet and 60 or 78, Circuit.size(cabinet)
     local gridWidth = gridSize * cell
-    local moduleKinds = cabinet and Circuit.moduleOrder or Circuit.adapterModules
-    local controlsY = carriedY + math.min(paletteRows, #moduleKinds) * carriedStep
-    local legendY = math.max(cabinet and 375 or 266,
-        controlsY + (not cabinet and 88 or (#moduleKinds > paletteRows and 83 or 55)))
+    local controlsY = carriedY + paletteRows * carriedStep
+    local legendY = controlsY + (cabinet and 55 or 88)
     local width, height = gridWidth + 218, math.max(gridWidth + 111, legendY + 50)
     local panel = ISPanel.new(Editor, math.max(0, (getCore():getScreenWidth() - width) / 2),
         math.max(0, (getCore():getScreenHeight() - height) / 2), width, height)
     panel.player, panel.registry, panel.target = player, registry, target
     panel.cabinet, panel.cell, panel.gridSize, panel.gridWidth = cabinet, cell, gridSize, gridWidth
     panel.carriedX = gridX + gridWidth + 22
-    panel.moduleKinds, panel.paletteOffset, panel.legendY = moduleKinds, 0, legendY
+    panel.paletteOffset, panel.legendY = 0, legendY
+    panel.collapsed = {}
     panel.moveWithMouse = true
     panel:setWantKeyEvents(true)
     panel.backgroundColor = { r = 0.09, g = 0.13, b = 0.10, a = 1 }

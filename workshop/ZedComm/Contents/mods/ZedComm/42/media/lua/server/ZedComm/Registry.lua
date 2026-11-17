@@ -1,26 +1,6 @@
--- ZedComm server registry: saves every ZedComm piece and rebuilds the network
--- model from it on load.
---
--- Built on the game's global object system (SGlobalObjectSystem), which saves
--- one record per x,y,z to its own file and keeps it while the chunk is
--- unloaded. ZedComm lets several pieces share a square, so each square's
--- record holds a table of piece records keyed by id (Network:record format),
--- and the vanilla helpers that assume one object per square are overridden:
---
---   loadIsoObject           - registers a piece only if its id is missing,
---                             never touching the square's other pieces
---   OnObjectAboutToBeRemoved - removes that one piece, and the square's
---                             record only once it is empty
---   OnChunkLoaded           - drops piece records whose world object is gone,
---                             matching by id, not first object on the square
---
--- World tags carry a piece id and kind. An endpoint's tag also names its
--- definition and may carry seed state.
--- Durable device state and links live in the square records. The model is rebuilt from these records when the
--- system starts, so connectivity is derived, not stored twice.
---
--- Multiplayer clients are not synced: the client hooks are no-ops (ADR-305,
--- step 7).
+-- SGlobalObjectSystem saves one record per square, even when the chunk is unloaded.
+-- Each square record stores pieces by ID because several pieces can share a tile.
+-- Saved piece state and links rebuild the network at startup. World tags identify pieces.
 
 if isClient() then return end
 
@@ -38,7 +18,6 @@ local Switch = ZedComm.NetworkSwitch
 
 local function log(message) print("[ZedComm] registry: " .. message) end
 
--- The ZedComm tag on a world object, or nil.
 local function tagOf(isoObject)
     if not isoObject or not isoObject.hasModData or not isoObject:hasModData() then return nil end
     local data = isoObject:getModData()
@@ -60,9 +39,18 @@ local function syncFixture(self, object, tag)
     end
 end
 
----------------------------------------------------------------------------
--- One square's record
----------------------------------------------------------------------------
+local function syncLoadedFixture(self, piece)
+    if piece.definitionId ~= Relay.ID and piece.definitionId ~= Switch.ID then return end
+    local cell = getCell()
+    local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
+    if not square then return end
+    local objects = square:getObjects()
+    for i = 0, objects:size() - 1 do
+        local object = objects:get(i)
+        local tag = tagOf(object)
+        if tag and tag.id == piece.id then syncFixture(self, object, tag) end
+    end
+end
 
 SZedCommTile = SGlobalObject:derive("SZedCommTile")
 
@@ -81,10 +69,6 @@ end
 
 function SZedCommTile:stateToIsoObject(isoObject)
 end
-
----------------------------------------------------------------------------
--- The system
----------------------------------------------------------------------------
 
 SZedCommSystem = SGlobalObjectSystem:derive("SZedCommSystem")
 
@@ -172,11 +156,6 @@ local function syncAll(self, ids)
     end
 end
 
----------------------------------------------------------------------------
--- Changes. Placement, removal and wiring actions call these on the server.
----------------------------------------------------------------------------
-
--- Register a tagged world object that is now on a square.
 function SZedCommSystem:addPiece(isoObject)
     local tag, square = tagOf(isoObject), isoObject and isoObject:getSquare()
     if not tag or not square then return false, "not a placed ZedComm object" end
@@ -255,6 +234,16 @@ function SZedCommSystem:renameRun(cableId, name)
     return self.runLabels:rename(cableId, name)
 end
 
+function SZedCommSystem:renameFixture(id, name)
+    local ok, result = self.network:renameFixture(id, name)
+    if ok then
+        local piece = self.network.pieces[id]
+        self:syncPiece(id, piece.x, piece.y, piece.z)
+        syncLoadedFixture(self, piece)
+    end
+    return ok, result
+end
+
 function SZedCommSystem:renameCabinetPort(id, port, name)
     local ok, result = self.network:renameCabinetPort(id, port, name)
     if ok then
@@ -264,7 +253,6 @@ function SZedCommSystem:renameCabinetPort(id, port, name)
     return ok, result
 end
 
--- Replace a defined endpoint's durable state and sync its square record.
 function SZedCommSystem:setDeviceState(id, state)
     local piece = self.network.pieces[id]
     local partners, cuts = {}, {}
@@ -277,25 +265,10 @@ function SZedCommSystem:setDeviceState(id, state)
         for _, cut in ipairs(cuts) do self.runLabels:afterCut(cut) end
         syncAll(self, { id })
         syncAll(self, partners)
-        if piece.definitionId == Relay.ID or piece.definitionId == Switch.ID then
-            local cell = getCell()
-            local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
-            if square then
-                local objects = square:getObjects()
-                for i = 0, objects:size() - 1 do
-                    local object = objects:get(i)
-                    local tag = tagOf(object)
-                    if tag and tag.id == id then syncFixture(self, object, tag) end
-                end
-            end
-        end
+        syncLoadedFixture(self, piece)
     end
     return ok, err
 end
-
----------------------------------------------------------------------------
--- Vanilla hooks, made safe for several pieces on one square
----------------------------------------------------------------------------
 
 -- A tagged object appeared (placement, or a load of an object the registry
 -- has no record of). Registers it only if its id is new.

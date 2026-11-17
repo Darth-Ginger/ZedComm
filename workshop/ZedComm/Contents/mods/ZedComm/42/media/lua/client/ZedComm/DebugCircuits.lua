@@ -212,29 +212,29 @@ local function editLampThreshold(player, object)
     box:addToUIManager()
 end
 
-function Debug.optionsAt(registry, square)
-    local options = {}
-    local function add(label, callback, target)
+function Debug.optionsAt(registry, square, fixtureActions)
+    local tileOptions = { { "Place wired byte test rig", Debug.placeByteRig, square } }
+    local function add(options, label, callback, target)
         options[#options + 1] = { label, callback, target }
     end
 
-    add("Place wired byte test rig", Debug.placeByteRig, square)
     local tagged = taggedOn(square)
     for _, object in ipairs(tagged) do
         local tag = tagOf(object)
         local piece = registry.network.pieces[tag.id]
         if piece then
-            local label = #tagged > 1 and ("Inspect circuit (" .. tag.id .. ")") or "Inspect circuit"
-            if not piece.board then add(label, Debug.inspectCircuit, object) end
+            local options = fixtureActions[object] or tileOptions
+            local label = options == tileOptions and #tagged > 1 and ("Inspect circuit (" .. tag.id .. ")") or "Inspect circuit"
+            if not piece.board then add(options, label, Debug.inspectCircuit, object) end
             if piece.definitionId == "ZedComm.DebugByteSource" then
-                add("Set test byte", Debug.setByte, object)
+                add(options, "Set test byte", Debug.setByte, object)
             end
             if piece.definitionId == ZedComm.RelayLamp.ID then
                 local circuit = piece.state and piece.state.circuit
                 if thresholdModule(circuit) then
-                    add("Set test lamp threshold", editLampThreshold, object)
+                    add(options, "Set test lamp threshold", editLampThreshold, object)
                 else
-                    add("Install test lamp threshold", installThresholdPreset, object)
+                    add(options, "Install test lamp threshold", installThresholdPreset, object)
                 end
             end
             if piece.definitionId == "ZedComm.WeightPlate" then
@@ -253,15 +253,15 @@ function Debug.optionsAt(registry, square)
             end
             if tag.rigWire then
                 if tag.definitionId == "ZedComm.DebugByteSource" then
-                    add("Toggle test source link", Debug.toggleDeviceLink, object)
+                    add(options, "Toggle test source link", Debug.toggleDeviceLink, object)
                 elseif tag.definitionId == "ZedComm.NumericDisplay" then
-                    add("Read test display", Debug.showDeviceDisplay, object)
-                    add("Toggle test display link", Debug.toggleDeviceLink, object)
+                    add(options, "Read test display", Debug.showDeviceDisplay, object)
+                    add(options, "Toggle test display link", Debug.toggleDeviceLink, object)
                 end
             end
         end
     end
-    return options
+    return tileOptions
 end
 
 ZedComm = ZedComm or {}

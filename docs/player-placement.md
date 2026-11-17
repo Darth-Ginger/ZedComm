@@ -14,6 +14,8 @@ Native **Pickup** recovers a pressure plate or display with its settings. Its wi
 
 On a shared tile, a wire draws behind any registered device using a floor overlay sprite.
 
+Right-click a device and open **ZedComm** to find its submenu. For example, **Cabinet (East Entrance)** contains that cabinet's editor, jack labels, connections and pickup action. In debug mode, the device's testing actions appear there too. The shared test-rig command lives under **ZedComm → Debug**.
+
 ## Starting from a loose wire
 
 Click an empty floor tile with the inventory wire cursor to place a standalone segment. On a tile with a free device or cable end, choose **Place wire loose** or **Connect to** the exact end. A device can connect on its own tile when the floor is clear. For an existing cable or a fixture on a blocked tile, select the end and then click a valid adjacent tile. The connected segment becomes the new end of the run.
@@ -35,7 +37,17 @@ Connected runs get a saved number such as **Run 1**. Unconnected segments show *
 
 When runs join, a custom name takes precedence over a default. If both names are custom or both are defaults, the active run keeps its name. If a run is split, the connected part with the saved name anchor keeps the old name and other connected parts get new numbers. If the anchor is removed or becomes loose, a surviving connected part keeps the name.
 
-Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
+Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Cabinet → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
+
+Double-click a nearby cabinet to open its editor. On an Advanced cabinet, a jack carrying an Advanced weight packet shows kilograms. Hover over it to see the exact weight and fallback byte. A jack carrying a Basic packet shows the byte.
+
+Use the placed device's rename action, such as **ZedComm → Plate → Rename Plate**, **Rename Cabinet**, or **Rename Display**. The name appears in wiring choices and on the cabinet or adapter title. It follows the fixture through pickup and reload. Leave the field blank to reset it. Jack labels and cable run names can be edited independently.
+
+Carried modules are grouped by function. Click a group header to collapse or expand it, and scroll the pane to reach additional rows. When you drag a module over the board, its preview shows the orientation of its internal contacts and external jacks.
+
+An active Wait or Timer shows its remaining seconds below the configured duration. In a Wait → Timer chain, the Timer countdown starts when Wait forwards the input.
+
+In either circuit editor, right-click a drawn link between its contacts to remove it. If two links overlap, use a section where the link you want is separate. Right-click also cancels an active drag or contact selection.
 
 Right-click an installed part in the cabinet or Advanced Adapter editor and choose **Remove module** to return it to inventory. Removal clears its internal links. Removing a jack extension also leaves its cable end free. Fixed jacks stay on the board. For modules with settings, choose **Configure** from the same menu.
 
@@ -49,7 +61,7 @@ Select the free end of the intended run and left-click an occupied wire tile wit
 
 ## Pressure plate output
 
-Right-click a placed plate within reach and choose **ZedComm → Set pressure plate output**. The menu and dialog show the current setting. Enter a whole number from **1 to 255**. The basic plate sends that value when an actor, a corpse, an overlapping vehicle, a floor-level prop or container, or a loose inventory item occupies the tile. The output returns to **0** when the last load leaves. Plates without a saved setting use **1**, including plates from older saves. The setting survives reload and pickup followed by replacement.
+Right-click a placed plate within reach and choose **ZedComm → Plate → Set pressure plate output**. The menu and dialog show the current setting. Enter a whole number from **1 to 255**. The basic plate sends that value when an actor, a corpse, an overlapping vehicle, a floor-level prop or container, or a loose inventory item occupies the tile. The output returns to **0** when the last load leaves. Plates without a saved setting use **1**, including plates from older saves. The setting survives reload and pickup followed by replacement.
 
 ### Concealed basic plate check
 

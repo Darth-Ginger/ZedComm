@@ -9,6 +9,8 @@ local Cursor = { Type = "ISZedCommPlacementCursor" }
 local runs = {}
 local wireHover = {}
 local hoverOrder = 0
+local lastCabinetClick
+local cabinetDoubleClickMs = 400
 
 local function say(player, message)
     player:Say(message)
@@ -185,6 +187,13 @@ local function orderedPieces(placement, registry, square)
     return pieces
 end
 
+local function fixtureLabel(entry, base)
+    local state = entry.piece.state
+    local name = state and state.fixtureName
+    base = base or entry.spec.name
+    return name and (base .. " (" .. name .. ")") or base
+end
+
 local function portLabel(entry, port)
     if entry.piece.board then
         local labels = entry.piece.state.portLabels
@@ -196,7 +205,7 @@ end
 local function openEnds(placement, registry, square)
     local ends, wireNumber = {}, 0
     for _, entry in ipairs(orderedPieces(placement, registry, square)) do
-        local label = entry.spec.name
+        local label = fixtureLabel(entry)
         if entry.piece.kind == "cable" then
             wireNumber = wireNumber + 1
             label = label .. " " .. wireNumber .. " / " .. (registry:getRunName(entry.id) or "Loose wire")
@@ -419,6 +428,16 @@ local function renameRun(player, registry, target)
         local ok, result = registry:renameRun(target.id, value)
         return ok and ("Run name updated to " .. result .. ".") or result
     end)
+end
+
+local function renameFixture(player, registry, target, label)
+    local state = target.piece.state
+    editSetting(player, registry, target, label .. " (blank resets)",
+        state and state.fixtureName or "", function(value)
+            local ok, result = registry:renameFixture(target.id, value)
+            if not ok then return result end
+            return result and ("Fixture named " .. result .. ".") or "Fixture name reset."
+        end)
 end
 
 local function configurePressurePlate(player, registry, target)
@@ -716,23 +735,33 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     for _, entry in ipairs(targets) do
         if entry.piece.kind == "cable" then wireCount = wireCount + 1 end
     end
-    local inventory = player:getInventory():getItems()
+    local inventory = player:getInventory()
+    local items = inventory:getItems()
     local options = {}
+    local fixtureActions, fixtureMenuNames = {}, {}
     local wire
     local function addTo(list, label, callback, ...)
         list[#list + 1] = { label, callback, ... }
-    end
-    local function add(label, callback, ...)
-        addTo(options, label, callback, ...)
     end
     local function action(label, command, list)
         command.network, command.square = network, square
         addTo(list or options, label, queue, command)
     end
+    local function fixtureMenu(label)
+        local title, suffix = label, 2
+        while fixtureMenuNames[title] do
+            title = label .. " (" .. suffix .. ")"
+            suffix = suffix + 1
+        end
+        fixtureMenuNames[title] = true
+        local children = {}
+        options[#options + 1] = { title, children = children }
+        return children
+    end
 
     local counts, placements = {}, {}
-    for i = 0, inventory:size() - 1 do
-        local item = inventory:get(i)
+    for i = 0, items:size() - 1 do
+        local item = items:get(i)
         local spec = placement.getSpec(item:getFullType())
         if spec and spec.kind == "cable" and not wire then wire = item end
         if spec and spec.kind == "endpoint" then
@@ -759,7 +788,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     end
 
     if run then
-        add("Pause wire run", cancelRun)
+        addTo(options, "Pause wire run", cancelRun)
         if wire and placement.canLay(anchor, run.port, square) then
             local label = "Lay wire here"
             if wireCount > 0 then label = "Lay another wire here (" .. wireCount .. " present)" end
@@ -767,76 +796,75 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
     end
 
-    for i, lamp in ipairs(placement.relayCandidates(square)) do
-        local label = i == 1 and "Install test relay" or "Install test relay (" .. i .. ")"
-        action(label, { kind = "install-relay", object = lamp })
-        local adapter = player:getInventory():getFirstType("ZedComm.AdvancedAdapter")
-        if adapter then
-            local install = i == 1 and "Install Advanced Adapter" or ("Install Advanced Adapter (" .. i .. ")")
-            action(install, { kind = "install-advanced-adapter", object = lamp, item = adapter })
-        end
-    end
-
+    local adapter = inventory:getFirstType(ZedComm.InternalCircuit.ADVANCED_ADAPTER_ITEM)
     local wireNumber = 0
     for _, entry in ipairs(targets) do
-        local name = entry.spec.name
-        local group
+        local name = fixtureLabel(entry)
+        local group, groupedWire
         if entry.piece.kind == "cable" then
             wireNumber = wireNumber + 1
             if wireCount > 1 then
                 local number = wireNumber .. " of " .. wireCount
                 name = "wire " .. number
                 group = {}
+                groupedWire = true
                 options[#options + 1] = { "Wire " .. number, children = group, wire = entry.object }
             end
             addTo(group or options, group and "Inspect" or "Inspect wire", wireDetails, registry, entry.id, name)
             if registry:getRunName(entry.id) then
                 addTo(group or options, "Rename run", renameRun, registry, entry)
             end
+        else
+            local label = entry.spec.fixtureType
+            group = fixtureMenu(fixtureLabel(entry, label))
+            fixtureActions[entry.object] = group
+            if not entry.piece.definitionUnavailable then
+                local rename = "Rename " .. label
+                addTo(group, rename, renameFixture, registry, entry, rename)
+            end
+        end
+        local actions = group or options
+        local function addDevice(label, callback, ...)
+            addTo(actions, label, callback, ...)
         end
         local ports = placement.freePorts(entry)
         for _, port in ipairs(ports) do
             local label = name
             if port and (#ports > 1 or port ~= "signal") then label = label .. " (" .. portLabel(entry, port) .. ")" end
-            addTo(group or options, group and "Select free end" or "Select " .. label .. " free end",
+            addDevice(groupedWire and "Select free end" or "Select " .. label .. " free end",
                 selectEnd, network, entry, port, label)
             if run and placement.canJoin(network, anchor, run.port, entry, port) then
-                action(group and "Connect selected run" or "Connect wire to " .. label, {
+                action(groupedWire and "Connect selected run" or "Connect wire to " .. label, {
                     kind = "join", targetId = entry.id, object = entry.object, port = port,
                     anchorId = run.id, anchorPort = run.port, run = run,
                 }, group)
             end
         end
         if entry.piece.definitionId == "ZedComm.NumericDisplay" then
-            add("Read numeric display", readDisplay, entry.object)
+            addDevice("Read numeric display", readDisplay, entry.object)
         elseif entry.piece.definitionId == "ZedComm.AdvancedDisplay" then
-            add("Read full signal", readDisplay, entry.object)
+            addDevice("Read full signal", readDisplay, entry.object)
         elseif entry.spec.itemType == "ZedComm.PressurePlate" and ZedComm.DeviceRuntime then
             local value = ZedComm.DeviceRuntime.getPressureOutput(entry.piece)
-            add("Set pressure plate output (" .. value .. ")", configurePressurePlate, registry, entry)
+            addDevice("Set pressure plate output (" .. value .. ")", configurePressurePlate, registry, entry)
         elseif entry.piece.definitionId == ZedComm.NetworkSwitch.ID then
             local on = not (entry.piece.state and entry.piece.state.on)
             action(on and "Turn network switch on" or "Turn network switch off", {
                 kind = "set-network-switch", targetId = entry.id, object = entry.object, on = on,
-            })
+            }, group)
         end
-        if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(add, registry, entry) end
+        if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(addDevice, registry, entry) end
         if entry.piece.board then
-            if entry.spec.adapter == "basic" then
-                local adapter = player:getInventory():getFirstType(ZedComm.InternalCircuit.ADVANCED_ADAPTER_ITEM)
-                if adapter then
-                    action("Upgrade cabinet with Advanced Adapter", {
-                        kind = "upgrade-cabinet", targetId = entry.id, object = entry.object, item = adapter,
-                    })
-                end
+            if entry.spec.adapter == "basic" and adapter then
+                action("Upgrade cabinet with Advanced Adapter", {
+                    kind = "upgrade-cabinet", targetId = entry.id, object = entry.object, item = adapter,
+                }, group)
             end
             local ports, labels = {}, {}
-            for port in pairs(entry.piece.ports) do
-                ports[#ports + 1] = port
-            end
+            for port in pairs(entry.piece.ports) do ports[#ports + 1] = port end
             table.sort(ports)
             local editor = ZedComm.AdapterEditor
-            if editor then options[#options + 1] = { "Label cabinet jack", children = labels } end
+            if editor then group[#group + 1] = { "Label cabinet jack", children = labels } end
             for _, port in ipairs(ports) do
                 local label, cable = portLabel(entry, port), entry.piece.ports[port]
                 if editor then addTo(labels, label, editor.renameJack, registry, entry, port) end
@@ -844,22 +872,29 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                     action("Disconnect cabinet jack (" .. label .. ")", {
                         kind = "disconnect-port", targetId = entry.id, object = entry.object,
                         port = port, cableId = cable,
-                    })
+                    }, group)
                 end
             end
         end
         if entry.spec.nativePickup then
             if entry.piece.ports.signal then
-                action("Disconnect relay wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object })
+                action("Disconnect relay wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
             end
         else
-            action(group and "Pick up" or "Pick up " .. name,
+            action(groupedWire and "Pick up" or "Pick up " .. name,
                 { kind = "pickup", targetId = entry.id, object = entry.object }, group)
         end
     end
 
+    for _, lamp in ipairs(placement.relayCandidates(square)) do
+        local group = fixtureMenu("Lamp")
+        action("Install test relay", { kind = "install-relay", object = lamp }, group)
+        if adapter then
+            action("Install Advanced Adapter", { kind = "install-advanced-adapter", object = lamp, item = adapter }, group)
+        end
+    end
     if getDebug() and ZedComm.DebugCircuits then
-        options[#options + 1] = { "Debug", children = ZedComm.DebugCircuits.optionsAt(registry, square) }
+        options[#options + 1] = { "Debug", children = ZedComm.DebugCircuits.optionsAt(registry, square, fixtureActions) }
     end
     if #options == 0 then return end
     local root = context:addOption("ZedComm", nil, nil)
@@ -879,9 +914,13 @@ end)
 Events.OnFillWorldObjectContextMenu.Add(onFillMenu)
 Events.OnFillInventoryObjectContextMenu.Add(onFillInventoryMenu)
 Events.OnObjectLeftMouseButtonDown.Add(function(object)
+    local previous = lastCabinetClick
+    lastCabinetClick = nil
     if not object or not object:hasModData() then return end
     local tag = object:getModData().zedcomm
-    if type(tag) ~= "table" or tag.definitionId ~= ZedComm.NetworkSwitch.ID then return end
+    if type(tag) ~= "table" then return end
+    local cabinet = tag.definitionId == ZedComm.InternalCircuit.CABINET_ID
+    if not cabinet and tag.definitionId ~= ZedComm.NetworkSwitch.ID then return end
     local player, cell = getSpecificPlayer(0), getCell()
     if not player or not cell or cell:getDrag(0) or player:isDead() or player:isAiming()
         or player:isIgnoreContextKey() or player:isClimbingLadder() or player:isClimbingDownLadder() then return end
@@ -890,7 +929,18 @@ Events.OnObjectLeftMouseButtonDown.Add(function(object)
     local placement = ZedComm.PlayerPlacement
     local registry = placement.getRegistry()
     local entry = registry and placement.resolve(registry, tag.id)
-    if entry and entry.object == object and placement.canReach(player, entry.square) then
+    if not entry or entry.object ~= object then return end
+    if cabinet then
+        local editor = ZedComm.AdapterEditor
+        if not editor or not placement.canView(player, entry.square) then return end
+        local now = getTimestampMs()
+        if previous and previous.object == object and previous.registry == registry
+            and now > previous.time and now - previous.time <= cabinetDoubleClickMs then
+            editor.open(player, registry, entry)
+        else
+            lastCabinetClick = { object = object, registry = registry, time = now }
+        end
+    elseif placement.canReach(player, entry.square) then
         queue(player, { kind = "toggle-network-switch", targetId = entry.id, object = object,
             square = entry.square, network = registry.network })
     end

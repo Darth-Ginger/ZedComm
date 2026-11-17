@@ -31,7 +31,7 @@ A future threshold receiver could trip at a byte such as 50 if the live vehicle 
 
 ## Debug sender selection
 
-On a placed weight plate choose **ZedComm → Debug → Weight plate sender → Advanced Sender**. The plate sends its full estimated load in kg with the scaled byte as a fallback. The existing numeric display reads the fallback. Open **Inspect circuit** on the plate, wire, or display to compare the packet type, weight, fallback, and receiver reading. Choose **Basic Sender** in the same menu to restore the default.
+On a placed weight plate choose **ZedComm → Plate → Weight plate sender → Advanced Sender**. The plate sends its full estimated load in kg with the scaled byte as a fallback. The existing numeric display reads the fallback. Open **Inspect circuit** on the plate, wire, or display to compare the packet type, weight, fallback, and receiver reading. Choose **Basic Sender** in the same menu to restore the default.
 
 The selected sender follows the plate through pickup and reload. Reconnect after replacement. See the [maintained signal packets plan](plans/maintained-signal-packets.md#phase-c---singleplayer-proof) for the fresh-save test.
 

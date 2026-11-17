@@ -32,7 +32,7 @@ Keep all Lua under a `ZedComm/` subfolder of `shared`, `client` and `server`. Fi
 
 ## Two sets of tools
 
-Every tool exists for PowerShell (`.ps1`) and bash (`.sh`); they do the same thing. The bash versions run on Linux and in Git Bash on Windows, where they make a directory junction rather than a symlink. Bash options are spelled `--zip`, `--deploy`, `--remove` and `--workshop-dir <dir>`; the PowerShell ones `-Zip`, `-Deploy`, `-Remove` and `-WorkshopDir <dir>`. The bash build runs `tests/run.sh`, the PowerShell build `tests\run.ps1`.
+The build and link tools have PowerShell (`.ps1`) and bash (`.sh`) versions. The bash scripts run on Linux and in Git Bash on Windows. Both link tools use a directory junction on Windows. Bash options are `--zip`, `--deploy`, `--remove` and `--workshop-dir <dir>`. PowerShell options are `-Zip`, `-Deploy`, `-Remove` and `-WorkshopDir <dir>`.
 
 ## Testing in the game (Windows)
 
@@ -58,7 +58,7 @@ That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `wo
 
 `-Deploy` refuses while the dev link exists, because copying through it would overwrite the repo. Run `.\tools\link-dev.ps1 -Remove` first. To upload, point the in-game Workshop uploader at the deployed copy.
 
-The build stops if `mod.info` lacks `name`, `id` or `versionMin`, if a stray file type is in the item, or if `tests\run.ps1` exists and fails.
+The build stops if `mod.info` lacks `name`, `id` or `versionMin`, or if a stray file type is in the item. The bash build also runs the Lua suite. Run `tests/run.sh` separately when building with PowerShell.
 
 CI (`.github/workflows/build.yml`) runs both tool sets on every push: PowerShell and Git Bash on Windows, bash on Linux, each checking the link, the deploy guard and the stray-file check.
 
