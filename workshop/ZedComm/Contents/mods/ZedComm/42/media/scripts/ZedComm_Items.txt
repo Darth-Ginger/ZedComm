@@ -244,6 +244,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeBasicAdapterFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.BasicAdapter,
+        }
+    }
+
     craftRecipe ZedCommMakeAdvancedAdapter
     {
         timedAction = MakingElectrical,
@@ -256,6 +275,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 3 [Base.ElectronicsScrap],
             item 2 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.AdvancedAdapter,
+        }
+    }
+
+    craftRecipe ZedCommMakeAdvancedAdapterFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 100,
+        SkillRequired = Electricity:3,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 3 [Base.ElectronicsScrap],
+            item 4 [Base.Wire],
         }
         outputs
         {
@@ -279,6 +317,38 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeSignalWireFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 30,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 [Base.Wire],
+        }
+        outputs
+        {
+            item 5 ZedComm.SignalWire,
+        }
+    }
+
+    craftRecipe ZedCommMakeSignalWireFromWireRoll
+    {
+        timedAction = MakingElectrical,
+        time = 150,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 10 [Base.Wire],
+        }
+        outputs
+        {
+            item 50 ZedComm.SignalWire,
+        }
+    }
+
     craftRecipe ZedCommMakeNetworkSwitch
     {
         timedAction = MakingElectrical,
@@ -290,6 +360,24 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.NetworkSwitch,
+        }
+    }
+
+    craftRecipe ZedCommMakeNetworkSwitchFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -451,6 +539,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeInputExtensionFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 40,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.InputExtension,
+        }
+    }
+
     craftRecipe ZedCommMakeOutputExtension
     {
         timedAction = MakingElectrical,
@@ -463,6 +570,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.OutputExtension,
+        }
+    }
+
+    craftRecipe ZedCommMakeOutputExtensionFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 40,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -489,6 +615,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeSplitterModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 4 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.SplitterModule,
+        }
+    }
+
     craftRecipe ZedCommMakeThresholdModule
     {
         timedAction = MakingElectrical,
@@ -501,6 +646,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.ThresholdModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeThresholdModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -527,6 +691,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeNotModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.NotModule,
+        }
+    }
+
     craftRecipe ZedCommMakeAndModule
     {
         timedAction = MakingElectrical,
@@ -539,6 +722,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.AndModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeAndModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -565,6 +767,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeOrModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.OrModule,
+        }
+    }
+
     craftRecipe ZedCommMakeXorModule
     {
         timedAction = MakingElectrical,
@@ -577,6 +798,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.XorModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeXorModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -603,6 +843,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeAdderModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.AdderModule,
+        }
+    }
+
     craftRecipe ZedCommMakeSubtractorModule
     {
         timedAction = MakingElectrical,
@@ -615,6 +874,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.SubtractorModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeSubtractorModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -641,6 +919,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeMultiplierModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:3,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 3 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.MultiplierModule,
+        }
+    }
+
     craftRecipe ZedCommMakeCacheModule
     {
         timedAction = MakingElectrical,
@@ -653,6 +950,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.CacheModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeCacheModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -679,6 +995,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeTimerModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.TimerModule,
+        }
+    }
+
     craftRecipe ZedCommMakeWaitModule
     {
         timedAction = MakingElectrical,
@@ -691,6 +1026,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.WaitModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeWaitModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 2 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
@@ -717,6 +1071,25 @@ module ZedComm
         }
     }
 
+    craftRecipe ZedCommMakeMainsSourceModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 60,
+        SkillRequired = Electricity:2,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 4 [Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.MainsSourceModule,
+        }
+    }
+
     craftRecipe ZedCommMakeBatterySourceModule
     {
         timedAction = MakingElectrical,
@@ -729,6 +1102,25 @@ module ZedComm
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
             item 1 [Base.ElectricWire],
+        }
+        outputs
+        {
+            item 1 ZedComm.BatterySourceModule,
+        }
+    }
+
+    craftRecipe ZedCommMakeBatterySourceModuleFromWire
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [Base.ElectronicsScrap],
+            item 2 [Base.Wire],
         }
         outputs
         {
