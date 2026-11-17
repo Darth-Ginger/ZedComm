@@ -595,7 +595,7 @@ function Editor:render()
             carriedX + 23, y + 7, 0.91, 0.93, 0.86, 1, UIFont.Small)
         drawPart(self, kind, Circuit.defaultRotation(kind), carriedX + 3, y + 2, 13, carriedHeight - 4)
     end
-    -- Legend for the contact squares until the parts get clearer art.
+    -- Legend for the contact squares.
     for i, row in ipairs(LEGEND) do
         local y = self.legendY + (i - 1) * 15
         local r, g, b = contactColor(row[1], row[1] == "selected")

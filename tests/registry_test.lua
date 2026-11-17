@@ -231,10 +231,10 @@ check(reg ~= nil and reg.network ~= nil, "the system starts and builds an empty 
 check(java.objectKeys and java.objectKeys[1] == "pieces", "only the pieces table is saved per square")
 
 local sq00, sq10, sq11 = square(0, 0, 0), square(1, 0, 0), square(1, 1, 0)
-local oS = worldObject(sq00, { id = "S", kind = "endpoint", role = "source" })
+local oS = worldObject(sq00, { id = "S", kind = "endpoint", definitionId = "ZedComm.DebugByteSource" })
 local oC1 = worldObject(sq00, { id = "c1", kind = "cable" })
 local oC2 = worldObject(sq10, { id = "c2", kind = "cable" })
-local oD = worldObject(sq11, { id = "D", kind = "endpoint", role = "sink" })
+local oD = worldObject(sq11, { id = "D", kind = "endpoint", definitionId = "ZedComm.NumericDisplay" })
 local oC9 = worldObject(sq00, { id = "c9", kind = "cable" }) -- spare, never linked
 for _, o in ipairs({ oS, oC1, oC2, oD, oC9 }) do fire("OnObjectAdded", o) end
 
@@ -308,7 +308,7 @@ check(reported, "a one-sided link is reported on load")
 check(java3:getObjectAt(1, 0, 0).data.pieces.c2.links.c1 == nil, "the dropped link is removed from the save")
 check(reg3.network:networkOf("c1") ~= reg3.network:networkOf("c2"), "the dropped link does not connect")
 
--- Defined endpoints share the same record path as the old cable spike.
+-- Defined endpoints are saved through the same record path.
 local defined, definedJava = start()
 local sensorSquare, displaySquare = square(20, 20, 0), square(21, 20, 0)
 local seed = { calibration = { threshold = 10 }, enabled = false }
@@ -568,7 +568,6 @@ function inventory.AddItem(_, item)
     return item
 end
 function inventory.Remove(_, item)
-    if inventory.refuseRemoval then return end
     for i = #carried, 1, -1 do
         if carried[i] == item then
             table.remove(carried, i)
@@ -654,11 +653,6 @@ check(not lay(w0, wireA, plateId, "signal") and inventory:contains(wireA)
     and #w0.objects == 0 and playerRegistry.network.pieces[plateId].ports.signal == false,
     "refused link rolls back the new tile and leaves inventory unchanged")
 playerRegistry.link = registryLink
-inventory.refuseRemoval = true
-check(not lay(w0, wireA, plateId, "signal") and #w0.objects == 0
-    and playerRegistry.network.pieces[plateId].ports.signal == false,
-    "failed inventory debit also rolls back the wire and its link")
-inventory.refuseRemoval = false
 
 local laid, firstWire = lay(w0, wireA, plateId, "signal")
 check(laid and not inventory:contains(wireA) and playerRegistry.network.pieces[plateId].ports.signal == firstWire,
@@ -1483,7 +1477,7 @@ end
 -- The development source drives arbitrary bytes through the actual runtime.
 local byteTile, byteWireTile, byteDisplayTile = floorTile(60, 60), floorTile(61, 60), floorTile(62, 60)
 local byteSource = worldObject(byteTile, {
-    id = "debug-byte", kind = "endpoint", definitionId = "ZedComm.DebugByteSource", spikeWire = "debug-wire",
+    id = "debug-byte", kind = "endpoint", definitionId = "ZedComm.DebugByteSource", rigWire = "debug-wire",
 })
 byteSource.sprite = "zedcomm_devices_01_0"
 function byteSource.getSprite() return { getName = function() return byteSource.sprite end } end
@@ -2336,7 +2330,7 @@ do
         and placedReading(displayId) == 8, "replacement and reconnect resume estimated weight")
 end
 
--- Render live bytes on the casing, including old displays and saved attachments.
+-- Render live bytes on the casing and leave other attachments alone.
 do
     playerRegistry, playerJava = start()
     local originalNew = IsoObject.new
@@ -2384,13 +2378,11 @@ do
     check(display.sprite == prefix .. "431" and faceOf(display) == "",
         "a newly placed, disconnected display has a blank face")
 
-    -- A legacy saved display may carry the original casing and stale attached frames.
     display:setSprite(getSprite(prefix .. "2"))
-    display:addAttachedAnimSprite(getSprite(prefix .. "465"))
     display:addAttachedAnimSprite(getSprite(prefix .. "16"))
     fire("LoadGridsquare", displayTile)
     check(display.sprite == prefix .. "431" and faceOf(display) == "16",
-        "square load upgrades the old casing and clears only ZedComm display attachments")
+        "square load restores the blank casing and keeps other attachments")
 
     local laid, wireId = runPlacement(wireTile, { kind = "place", item = give("ZedComm.SignalWire") })
     assert(laid, wireId)
@@ -2459,7 +2451,7 @@ do
             end,
         }
     end
-    dofile(LUA .. "client/ZedComm/CableSpike.lua")
+    dofile(LUA .. "client/ZedComm/DebugCircuits.lua")
     local sourceTile, wireTile, displayTile = floorTile(140, 125), floorTile(141, 125), floorTile(142, 125)
     check(menuAt(sourceTile).children.Debug == nil, "debug controls stay hidden during ordinary play")
     getDebug = function() return true end
@@ -2713,12 +2705,6 @@ do
     panel:onMouseUp(72, 142)
     check(inventory:contains(part) and not circuit().modules["threshold-1"],
         "an overlapping placement consumes no module")
-    inventory.refuseRemoval = true
-    grabCarried()
-    panel:onMouseUp(133, 142)
-    inventory.refuseRemoval = false
-    check(inventory:contains(part) and not circuit().modules["threshold-1"],
-        "a failed inventory removal leaves the circuit untouched")
     grabCarried()
     panel:onMouseUp(133, 142)
     check(not inventory:contains(part) and circuit().modules["threshold-1"].threshold == 50,

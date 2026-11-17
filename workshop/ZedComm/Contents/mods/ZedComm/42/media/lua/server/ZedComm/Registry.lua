@@ -1,5 +1,5 @@
 -- ZedComm server registry: saves every ZedComm piece and rebuilds the network
--- model from it on load (Implement Endpoints And Cables).
+-- model from it on load.
 --
 -- Built on the game's global object system (SGlobalObjectSystem), which saves
 -- one record per x,y,z to its own file and keeps it while the chunk is
@@ -14,13 +14,13 @@
 --   OnChunkLoaded           - drops piece records whose world object is gone,
 --                             matching by id, not first object on the square
 --
--- World tags carry a piece id and kind, plus definitionId for defined endpoints.
--- Optional seed state and legacy endpoint fields are accepted on registration.
+-- World tags carry a piece id and kind. An endpoint's tag also names its
+-- definition and may carry seed state.
 -- Durable device state and links live in the square records. The model is rebuilt from these records when the
 -- system starts, so connectivity is derived, not stored twice.
 --
--- Multiplayer client sync is not done yet: the client hooks are no-ops until
--- the post-MVP multiplayer work (ADR-305, step 7).
+-- Multiplayer clients are not synced: the client hooks are no-ops (ADR-305,
+-- step 7).
 
 if isClient() then return end
 
@@ -107,7 +107,7 @@ function SZedCommSystem:isValidIsoObject(isoObject)
     return tagOf(isoObject) ~= nil
 end
 
--- Multiplayer sync comes later; nothing on the client listens yet.
+-- No client sync: nothing on the client listens.
 function SZedCommSystem:newLuaObjectOnClient(luaObject) end
 function SZedCommSystem:removeLuaObjectOnClient(luaObject) end
 function SZedCommSystem:updateLuaObjectOnClient(luaObject) end
@@ -197,7 +197,7 @@ function SZedCommSystem:addPiece(isoObject)
                 ok, err = false, "unavailable definition " .. tostring(tag.definitionId)
             end
         else
-            ok, err = self.network:addEndpoint(tag.id, x, y, z, tag.role, tag.ports, nil, tag.state)
+            ok, err = false, "endpoint tag has no definitionId"
         end
     else
         ok, err = false, "unknown kind " .. tostring(tag.kind)

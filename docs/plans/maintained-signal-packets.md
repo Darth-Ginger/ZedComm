@@ -65,7 +65,7 @@ The independent review found a dispatch ownership follow-up. Subscribers receive
 
 ### B2. Save and select the sender
 
-**Files** `server/ZedComm/DeviceRuntime.lua`, `client/ZedComm/CableSpike.lua`, and `tests/registry_test.lua`. The current `Registry:setDeviceState` and placement record paths provide persistence.
+**Files** `server/ZedComm/DeviceRuntime.lua`, `client/ZedComm/DebugCircuits.lua`, and `tests/registry_test.lua`. The current `Registry:setDeviceState` and placement record paths provide persistence.
 
 - [x] Add runtime tests for a default weight plate, explicit advanced selection, switching back to basic, an invalid selection, and an unsupported saved module. Use the existing linked weight plate and display fixture.
 - [x] Resolve the sender from `piece.state.senderModule.id` when present and pass it with `definition.readingKind` into the encoder. Add `Runtime.setWeightPlateSender(registry, id, moduleId)` returning success or a reason. Validate the target and module before saving, preserve unrelated state, and use `{ id = "ZedComm.AdvancedSender" }` for an advanced installation. Selecting Basic Sender restores the default by clearing the installation field. The next sample publishes the new format.
@@ -75,7 +75,7 @@ The independent review found a dispatch ownership follow-up. Subscribers receive
 
 ### B3. Inspect the packet and review the build
 
-**Files** `server/ZedComm/DeviceRuntime.lua`, `client/ZedComm/CableSpike.lua`, `tests/registry_test.lua`, and the signal module and weight plate guides.
+**Files** `server/ZedComm/DeviceRuntime.lua`, `client/ZedComm/DebugCircuits.lua`, `tests/registry_test.lua`, and the signal module and weight plate guides.
 
 - [x] Return a `sourcePacket` snapshot from `Runtime.inspect(id, port)`. Derive the effective byte from that same snapshot. Format the existing **Inspect circuit** action to show `signal.basic` and the byte, or `signal.advanced`, the weight with units, and its fallback. Keep the receiver reading and the unavailable state visible. Show a fallback of 0 as 0.
 - [x] Drive the same loaded plate in both modes. Verify the inspector changes from basic byte 115 to advanced 1,150 kg with fallback 115 while the display stays at 115. Change the load to 1,151 kg and verify the inspector updates the full payload while the display still reads 115. Verify source loss and reconnection through the existing runtime.

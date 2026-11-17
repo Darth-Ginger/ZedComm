@@ -55,13 +55,13 @@ function Debug.placeByteRig(player, square)
         end
     end
 
-    local prefix = "device-spike-" .. where(square) .. "-" .. getTimestampMs()
+    local prefix = "device-rig-" .. where(square) .. "-" .. getTimestampMs()
     local wireId = prefix .. "-wire"
     local tags = {
-        { id = prefix .. "-sensor", kind = "endpoint", spikeWire = wireId,
+        { id = prefix .. "-sensor", kind = "endpoint", rigWire = wireId,
             definitionId = "ZedComm.DebugByteSource" },
         { id = wireId, kind = "cable", useRouteSprite = true },
-        { id = prefix .. "-display", kind = "endpoint", definitionId = "ZedComm.NumericDisplay", spikeWire = wireId },
+        { id = prefix .. "-display", kind = "endpoint", definitionId = "ZedComm.NumericDisplay", rigWire = wireId },
     }
     local names = { "ZedCommTestByteSource", "ZedCommTestCable", "ZedCommTestDisplay" }
     local objects = {}
@@ -94,13 +94,13 @@ function Debug.toggleDeviceLink(player, object)
     local registry = ZedComm.Registry and ZedComm.Registry.instance
     local tag = tagOf(object)
     local piece = registry and tag and registry.network.pieces[tag.id]
-    if not piece or not tag.spikeWire then return end
+    if not piece or not tag.rigWire then return end
     local linked = piece.ports.signal
     local ok, err
     if linked then
         ok, err = registry:unlink(linked, tag.id)
     else
-        ok, err = registry:link(tag.spikeWire, tag.id, "signal")
+        ok, err = registry:link(tag.rigWire, tag.id, "signal")
     end
     say(player, ok and (linked and "test device disconnected" or "test device connected")
         or tostring(err))
@@ -251,15 +251,12 @@ function Debug.optionsAt(registry, square)
                     },
                 }
             end
-            if tag.spikeWire then
+            if tag.rigWire then
                 if tag.definitionId == "ZedComm.DebugByteSource" then
                     add("Toggle test source link", Debug.toggleDeviceLink, object)
                 elseif tag.definitionId == "ZedComm.NumericDisplay" then
                     add("Read test display", Debug.showDeviceDisplay, object)
                     add("Toggle test display link", Debug.toggleDeviceLink, object)
-                elseif tag.definitionId == "ZedComm.PressureSensor" then
-                    -- Existing pressure rigs retain their link control.
-                    add("Toggle test sensor link", Debug.toggleDeviceLink, object)
                 end
             end
         end

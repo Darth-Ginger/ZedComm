@@ -2,14 +2,14 @@
 -- recomputed network's packet. The pass itself is the same in every mode.
 --
 --   Local  - singleplayer: delivered inside the game process, this tick.
---   Server - multiplayer server: stub. Sending state to clients is validated
---            after the MVP (ADR-305, step 7); until then it only counts calls.
+--   Server - multiplayer server: delivered on the server and counted.
+--            Nothing is sent to clients (ADR-305, step 7).
 
 ZedComm = ZedComm or {}
 
 local Dispatch = {}
 
--- Receivers subscribe here once endpoints exist: fn(networkId, packet).
+-- Subscribers are called as fn(networkId, packet).
 local listeners = {}
 
 function Dispatch.subscribe(fn) listeners[#listeners + 1] = fn end
@@ -27,7 +27,6 @@ Dispatch.Server = {
     name = "server",
     sent = 0,
     deliver = function(networkId, packet)
-        -- Stub: later work sends this to clients (sendServerCommand).
         Dispatch.Server.sent = Dispatch.Server.sent + 1
         notify(networkId, packet)
     end,

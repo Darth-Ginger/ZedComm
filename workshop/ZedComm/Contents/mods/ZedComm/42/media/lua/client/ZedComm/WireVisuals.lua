@@ -9,9 +9,8 @@ local Shape = ZedComm.WireShape
 local ModuleVisuals = ZedComm.ModuleVisuals
 local Relay = ZedComm.RelayLamp
 local Switch = ZedComm.NetworkSwitch
-local pressureSensor = "ZedComm.PressureSensor"
 local plateSprites = {
-    [pressureSensor] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
+    ["ZedComm.PressureSensor"] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
     ["ZedComm.OccupancyPlate"] = { itemType = "ZedComm.OccupancyPlate", firstFrame = 419 },
     ["ZedComm.WeightPlate"] = { itemType = "ZedComm.WeightPlate", firstFrame = 425 },
 }
@@ -64,7 +63,7 @@ local function refreshSquare(square, network)
                 elseif piece.definitionId == Switch.ID and tag.definitionId == Switch.ID then
                     Switch.updateSprite(object, piece.state, network, piece)
                 elseif plate and piece.definitionId == tag.definitionId
-                    and (tag.placedItem == plate.itemType or (piece.definitionId == pressureSensor and tag.spikeWire)) then
+                    and tag.placedItem == plate.itemType then
                     local direction = Shape.portDirection(network, piece, "signal")
                     local frame = plate.firstFrame + (plateFrameOffset[direction] or 0)
                     setWorldSprite(object, "zedcomm_devices_01_" .. frame)

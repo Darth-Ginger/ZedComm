@@ -41,7 +41,7 @@ Network.DEFAULT_PORT = "signal"
 -- Status of a derived network.
 Network.OK = "ok"                     -- one live source packet
 Network.NO_SOURCE = "no-source"       -- nothing drives it: disconnected
-Network.MULTI_SOURCE = "multi-source" -- unsupported in the MVP: treated as disconnected
+Network.MULTI_SOURCE = "multi-source" -- more than one source: treated as disconnected
 
 local function portKey(endpointId, port)
     return endpointId .. "#" .. port
@@ -305,7 +305,6 @@ function Network:addCable(id, x, y, z)
     return true
 end
 
--- role: "source" or "sink". ports: list of port names (default { "signal" }).
 -- Kahlua modData can store string/number keys and plain serializable values.
 -- Reject unsupported state before changing a record. The copy also separates
 -- the caller, model and saved record so updates go through the registry.
@@ -348,6 +347,8 @@ end
 
 -- Persist device metadata without running callbacks. Sources start without a
 -- packet and publish their first live reading through the runtime.
+-- role: "source", "sink" or "cabinet". ports: list of port names (default
+-- { "signal" }); a cabinet's ports come from its circuit.
 function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     if type(id) ~= "string" or string.find(id, "#", 1, true) then return false, "bad id" end
     if not checkPosition(x, y, z) then return false, "bad position" end

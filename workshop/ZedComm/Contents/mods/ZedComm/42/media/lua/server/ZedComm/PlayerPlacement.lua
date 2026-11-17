@@ -1,4 +1,4 @@
--- Singleplayer inventory actions backed by the existing saved registry.
+-- Singleplayer inventory actions backed by the saved registry.
 if isClient() or isServer() then return end
 
 require "ZedComm/Network"
@@ -318,16 +318,14 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
             local connected, reason = link(registry, anchor, anchorPort, entry, false)
             if not connected then error(reason) end
         end
-        inventory:Remove(item)
-        if inventory:contains(item) then error("Could not consume the inventory item.") end
     end)
     if not ok then
         if onSquare(object, square) and not removeWorldPiece(registry, entry) then
             return false, "Placement failed and the object could not be removed: " .. tostring(err)
         end
-        if not inventory:contains(item) then inventory:AddItem(item) end
         return false, tostring(err)
     end
+    inventory:Remove(item)
     return true, id
 end
 
@@ -342,7 +340,6 @@ local function pickUp(registry, character, entry)
         item:getModData().zedcommPlacement = { id = record.id, state = record.state }
     end
     inventory:AddItem(item)
-    if not inventory:contains(item) then return false, "Could not return the item to inventory." end
     local ok, removed = pcall(removeWorldPiece, registry, entry)
     if not ok or not removed then
         if onSquare(entry.object, entry.square) then
@@ -377,7 +374,6 @@ local function installRelay(registry, square, lamp, character, adapterItem)
         end
         state.circuit = { modules = {}, links = {} }
         inventory:Remove(adapterItem)
-        if inventory:contains(adapterItem) then return false, "Could not install the Advanced Adapter." end
     end
     data.zedcomm = { id = id, kind = "endpoint", definitionId = Relay.ID, state = state }
     local called, ok, reason = pcall(registry.addPiece, registry, lamp)
@@ -400,25 +396,21 @@ local function upgradeCabinet(registry, character, entry, adapter)
     end
     local recovered = instanceItem(Circuit.BASIC_ADAPTER_ITEM)
     if not recovered then return false, "Could not recover the Basic Adapter." end
+    -- Taking the Advanced Adapter out first frees its weight for the swap.
     inventory:Remove(adapter)
-    if inventory:contains(adapter) then return false, "Could not install the Advanced Adapter." end
-    if inventory:hasRoomFor(character, recovered) then inventory:AddItem(recovered) end
-    if not inventory:contains(recovered) then
+    if not inventory:hasRoomFor(character, recovered) then
         inventory:AddItem(adapter)
         return false, "There is no room for the recovered Basic Adapter."
     end
+    inventory:AddItem(recovered)
 
     local state = registry.network:record(entry.id).state
     state.adapter = "advanced"
-    local called, ok, reason = pcall(registry.setDeviceState, registry, entry.id, state)
-    if not called and Circuit.cabinetAdapter(entry.piece.state) == "advanced" then
-        print("[ZedComm] Cabinet upgrade committed after sync error: " .. tostring(ok))
-        return true
-    end
-    if called and ok then return true end
+    local ok, reason = registry:setDeviceState(entry.id, state)
+    if ok then return true end
     inventory:Remove(recovered)
     inventory:AddItem(adapter)
-    return false, called and reason or tostring(ok)
+    return false, reason
 end
 
 -- Apply an edit only to the exact host and circuit the editor opened.
@@ -462,7 +454,6 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
             return false, "The battery source changed. Pick it up again."
         end
         inventory:Remove(install)
-        if inventory:contains(install) then return false, "Could not install the module." end
     elseif remove then
         recovered = instanceItem(Circuit.kinds[removedPart.kind].item)
         if not recovered or not inventory:hasRoomFor(character, recovered) then
@@ -475,27 +466,15 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
             recovered:getModData().zedcommSourceLevel = removedPart.level
         end
         inventory:AddItem(recovered)
-        if not inventory:contains(recovered) then return false, "Could not return the module." end
     end
 
-    local function save()
-        if not cabinet then return ZedComm.DeviceRuntime.setLampCircuit(registry, entry.id, layout) end
+    local ok, reason
+    if cabinet then
         local copy = registry.network:record(entry.id).state
         copy.circuit = layout
-        return registry:setDeviceState(entry.id, copy)
-    end
-    local called, ok, reason = pcall(save)
-    if not called then
-        -- Registry writes the circuit before syncing the world marker.
-        -- Keep the inventory in step with an edit that already committed.
-        if entry.piece.state.circuit ~= expected then
-            if not cabinet then
-                Relay.writeInstallation(entry.object:getModData(), entry.id, registry.network:record(entry.id).state)
-            end
-            print("[ZedComm] Circuit state committed after sync error: " .. tostring(ok))
-            return true
-        end
-        reason, ok = tostring(ok), false
+        ok, reason = registry:setDeviceState(entry.id, copy)
+    else
+        ok, reason = ZedComm.DeviceRuntime.setLampCircuit(registry, entry.id, layout)
     end
     if not ok then
         if install then inventory:AddItem(install) end
@@ -523,7 +502,6 @@ function Placement.changeCircuitBattery(character, registry, target, expected, i
         end
         battery:setUsedDelta(part.charge)
         inventory:AddItem(battery)
-        if not inventory:contains(battery) then return false, "Could not return the battery." end
         part.charge = nil
     else
         local items = inventory:getItems()
@@ -537,7 +515,6 @@ function Placement.changeCircuitBattery(character, registry, target, expected, i
         if not battery then return false, "Bring a charged battery in your main inventory." end
         part.charge = battery:getCurrentUsesFloat()
         inventory:Remove(battery)
-        if inventory:contains(battery) then return false, "Could not install the battery." end
         taken = true
     end
 
