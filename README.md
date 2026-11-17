@@ -13,6 +13,7 @@ tools/link-dev.ps1|sh  links the game's Workshop folder to workshop/ZedComm
 tools/build.ps1|sh     checks and copies workshop/ZedComm into dist/
 tools/selftest.sh      exercises the bash tools against a scratch Workshop folder
 tools/make-preview.py  redraws workshop/ZedComm/preview.png
+tools/make-recipes.py  writes the recipes, their names and docs/recipes.md from one table
 workshop/ZedComm/      the Workshop item: the only folder the game and the uploader see
   workshop.txt  preview.png
   Contents/mods/ZedComm/
