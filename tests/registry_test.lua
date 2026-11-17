@@ -1,13 +1,16 @@
--- Tests for the server registry (server/ZedComm/Registry.lua), run outside
--- the game with a Lua 5.1 interpreter.
+-- Tests for the server registry, device runtime, placement, menus and editor,
+-- run outside the game with a Lua 5.1 interpreter.
 --
--- The registry derives from the game's own Lua wrapper classes, so the test
--- loads them from a local copy of the game's media/lua (never committed to
--- this repo) and stubs only the Java side beneath them: the global object
--- system, squares, world objects and Events. Without that copy it skips.
+-- The registry derives from the game's own Lua wrapper classes. With PZ_LUA
+-- pointing at a copy of the game's media/lua (never committed to this repo)
+-- the test loads them from there and also runs the cursor checks, which need
+-- the game's building and moveable cursors. Without it, the two wrapper
+-- classes come from the stand-ins in tests/support/pz and the cursor checks
+-- are skipped. Only the Java side is stubbed here: the global object system,
+-- squares, world objects and Events.
 --
 -- Usage: lua5.1 tests/registry_test.lua   (from the repo root)
---   PZ_LUA=/path/to/ProjectZomboid/media/lua   (required)
+--   PZ_LUA=/path/to/ProjectZomboid/media/lua
 
 -- Regression: the game failed when the standard Lua next global was nil.
 next = nil
@@ -16,11 +19,8 @@ local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
 local PZ = os.getenv("PZ_LUA") or "/path/to/ProjectZomboid/media/lua"
 
 local probe = io.open(PZ .. "/server/Map/SGlobalObjectSystem.lua", "r")
-if not probe then
-    print("registry tests skipped: no game Lua at " .. PZ .. " (set PZ_LUA)")
-    return
-end
-probe:close()
+local GAME = probe ~= nil
+if probe then probe:close() else PZ = "tests/support/pz" end
 
 package.path = LUA .. "shared/?.lua;" .. LUA .. "server/?.lua;" .. LUA .. "client/?.lua;"
     .. PZ .. "/shared/?.lua;" .. PZ .. "/server/?.lua;" .. package.path
@@ -796,6 +796,7 @@ assert(opts["Pause wire run"])()
 check(not queued:isValid() and not queued:complete() and inventory:contains(spare)
     and #nextTile.objects == 0, "pausing the run cancels a queued wire placement")
 
+if GAME then
 -- The game loads the server building scripts after the client menu.
 require "BuildingObjects/ISBuildingObject"
 dofile(PZ .. "/client/TimedActions/WalkToTimedAction.lua")
@@ -1361,6 +1362,8 @@ do
     getCore, JoypadState, IsoSprite = originalGetCore, originalJoypad, originalSprite
     renderIsoRect = originalRenderRect
 end
+
+end -- GAME
 
 -- Update wires and plate terminals using the real topology and square-load callbacks.
 dofile(LUA .. "client/ZedComm/WireVisuals.lua")
@@ -3477,5 +3480,6 @@ do
 end
 
 print = realPrint
-print(string.format("%d checks, %d failed", checks, failures))
+print(string.format("%d checks, %d failed%s", checks, failures,
+    GAME and "" or " (cursor checks skipped: set PZ_LUA to the game's media/lua)"))
 if failures > 0 then os.exit(1) end
