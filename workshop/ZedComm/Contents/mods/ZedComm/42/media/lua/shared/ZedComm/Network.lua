@@ -369,7 +369,7 @@ function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     local evaluate, board
     if role == "cabinet" then
         evaluate, stateError, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, true,
-            Circuit.cabinetAdapter(stateCopy))
+            stateCopy and stateCopy.adapter)
         if not evaluate then return false, stateError end
         for port in pairs(board.directions) do portTable[port] = false end
     else
@@ -513,7 +513,7 @@ function Network:setDeviceState(id, state)
     if err then return false, err end
     if piece.board then
         local evaluate, reason, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, true,
-            Circuit.cabinetAdapter(stateCopy))
+            stateCopy and stateCopy.adapter)
         if not evaluate then return false, reason end
         if self:hasFeedback(nil, nil, { id = id, board = board }) then return false, "cabinet circuit feedback" end
         local affected, ports = self:affectedNodes({ id }), {}
