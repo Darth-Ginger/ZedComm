@@ -236,7 +236,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -255,7 +255,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 3 [Base.ElectronicsScrap],
-            item 2 [Base.ElectricWire],
+            item 2 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -271,11 +271,27 @@ module ZedComm
         category = Electrical,
         inputs
         {
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
             item 5 ZedComm.SignalWire,
+        }
+    }
+
+    craftRecipe ZedCommMakeSignalWireFromWireRoll
+    {
+        timedAction = MakingElectrical,
+        time = 150,
+        Tags = InHandCraft;Electrical,
+        category = Electrical,
+        inputs
+        {
+            item 10 [Base.Wire],
+        }
+        outputs
+        {
+            item 50 ZedComm.SignalWire,
         }
     }
 
@@ -289,7 +305,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -443,7 +459,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -462,7 +478,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -481,7 +497,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 2 [Base.ElectricWire],
+            item 2 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -500,7 +516,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -519,7 +535,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -538,7 +554,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -557,7 +573,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -576,7 +592,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -595,7 +611,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -614,7 +630,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -633,7 +649,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 3 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -652,7 +668,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -671,7 +687,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -690,7 +706,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 2 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -709,7 +725,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 2 [Base.ElectricWire],
+            item 2 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {
@@ -728,7 +744,7 @@ module ZedComm
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
             item 1 [Base.ElectronicsScrap],
-            item 1 [Base.ElectricWire],
+            item 1 [Base.ElectricWire;Base.Wire],
         }
         outputs
         {

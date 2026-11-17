@@ -2,6 +2,7 @@
     "ZedCommMakeBasicAdapter": "Make ZedComm Basic Adapter",
     "ZedCommMakeAdvancedAdapter": "Make ZedComm Advanced Adapter",
     "ZedCommMakeSignalWire": "Make ZedComm Signal Wire",
+    "ZedCommMakeSignalWireFromWireRoll": "Make ZedComm Signal Wire (whole Wire roll)",
     "ZedCommMakeNetworkSwitch": "Make ZedComm Network Switch",
     "ZedCommMakePressurePlate": "Make ZedComm Pressure Plate",
     "ZedCommMakeOccupancyPlate": "Make ZedComm Occupancy Plate",

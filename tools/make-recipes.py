@@ -21,8 +21,13 @@ RECIPE_NAMES = MEDIA / "lua/shared/Translate/EN/Recipes.json"
 TABLE = ROOT / "docs/recipes.md"
 
 SCRAP, WIRE, SHEET = "Base.ElectronicsScrap", "Base.ElectricWire", "Base.SheetMetal"
+# A roll of Base.Wire holds 10 units, and a recipe input counts units.
+ROLL, ROLL_UNITS = "Base.Wire", 10
 BASIC, ADVANCED = "ZedComm.BasicAdapter", "ZedComm.AdvancedAdapter"
-BASE_NAMES = {SCRAP: "Electronics Scrap", WIRE: "Electric Wire", SHEET: "Sheet Metal"}
+BASE_NAMES = {SCRAP: "Electronics Scrap", WIRE: "Electric Wire", SHEET: "Sheet Metal", ROLL: "Wire"}
+# One unit of roll wire stands in for one Electric Wire in every recipe.
+SCRIPT_TYPES = {WIRE: f"{WIRE};{ROLL}"}
+TABLE_NAMES = {WIRE: "Electric Wire or Wire"}
 
 # (section, item, Electrical level or None, time, ingredients, amount made, tool kept)
 RECIPES = [
@@ -70,12 +75,25 @@ def recipe_id(item):
     return RECIPE_IDS.get(item, "ZedCommMake" + item)
 
 
+def all_recipes():
+    """Each table row as (id, label suffix, row), plus the whole-roll Signal Wire recipe."""
+    out = []
+    for row in RECIPES:
+        item = row[1]
+        out.append((recipe_id(item), "", row))
+        if item == "SignalWire":
+            # Cutting a whole roll takes longer, but less than ten single cuts.
+            roll = row[:3] + (row[3] * 5, {ROLL: ROLL_UNITS}, row[5] * ROLL_UNITS, row[6])
+            out.append((recipe_id(item) + "FromWireRoll", " (whole Wire roll)", roll))
+    return out
+
+
 def display_name(names, full_type):
     return BASE_NAMES.get(full_type) or names[full_type].replace("ZedComm ", "", 1)
 
 
-def script_block(item, level, time, inputs, made, tool):
-    lines = [f"    craftRecipe {recipe_id(item)}", "    {",
+def script_block(identifier, item, level, time, inputs, made, tool):
+    lines = [f"    craftRecipe {identifier}", "    {",
              "        timedAction = MakingElectrical,", f"        time = {time},"]
     if level:
         lines.append(f"        SkillRequired = Electricity:{level},")
@@ -83,7 +101,8 @@ def script_block(item, level, time, inputs, made, tool):
               "        inputs", "        {"]
     if tool:
         lines.append("            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],")
-    lines += [f"            item {count} [{full_type}]," for full_type, count in inputs.items()]
+    lines += [f"            item {count} [{SCRIPT_TYPES.get(full_type, full_type)}],"
+              for full_type, count in inputs.items()]
     lines += ["        }", "        outputs", "        {",
               f"            item {made} ZedComm.{item},", "        }", "    }"]
     return "\n".join(lines)
@@ -92,31 +111,38 @@ def script_block(item, level, time, inputs, made, tool):
 def build(names):
     items = ITEMS.read_text()
     head = items[:items.index("    craftRecipe ")]
-    blocks = [script_block(*recipe[1:]) for recipe in RECIPES]
+    recipes = all_recipes()
+    blocks = [script_block(identifier, *row[1:]) for identifier, _suffix, row in recipes]
     script = head + "\n\n".join(blocks) + "\n}\n"
 
-    recipe_names = {recipe_id(r[1]): "Make " + names["ZedComm." + r[1]] for r in RECIPES}
+    recipe_names = {identifier: "Make " + names["ZedComm." + row[1]] + suffix
+                    for identifier, suffix, row in recipes}
     translations = json.dumps(recipe_names, indent=4) + "\n"
+
+    def listed(inputs):
+        return ", ".join(f"{count} {TABLE_NAMES.get(full_type) or display_name(names, full_type)}"
+                         for full_type, count in inputs.items())
 
     table = ["# ZedComm crafting recipes", "",
              "Every recipe is in the crafting menu under Electrical. Recipes marked with a screwdriver "
              "need one in the inventory and do not use it up. Electrical is the skill level required; "
              "a dash means none.", "",
+             f"Wire means the roll of wire, which holds {ROLL_UNITS} units; amounts of it are in units. "
+             "One unit can be used wherever a recipe asks for one Electric Wire.", "",
              "This file is written by `tools/make-recipes.py`. Change recipes there, not here.", ""]
     section = None
-    for group, item, level, _time, inputs, made, tool in RECIPES:
+    for _identifier, _suffix, (group, item, level, _time, inputs, made, tool) in recipes:
         if group != section:
             section = group
             table += [f"## {group}", "", "| Makes | Electrical | Ingredients | Screwdriver |",
                       "| --- | --- | --- | --- |"]
         name = display_name(names, "ZedComm." + item)
         makes = f"{made} × {name}" if made > 1 else name
-        parts = ", ".join(f"{count} {display_name(names, full_type)}" for full_type, count in inputs.items())
-        table.append(f"| {makes} | {level or '-'} | {parts} | {'Yes' if tool else 'No'} |")
-        following = RECIPES[RECIPES.index((group, item, level, _time, inputs, made, tool)) + 1:]
-        if not following or following[0][0] != group:
-            table.append("")
-    return {ITEMS: script, RECIPE_NAMES: translations, TABLE: "\n".join(table)}
+        table.append(f"| {makes} | {level or '-'} | {listed(inputs)} | {'Yes' if tool else 'No'} |")
+    text = "\n".join(table)
+    for heading in sorted({row[0] for _i, _s, row in recipes}):
+        text = text.replace(f"|\n## {heading}", f"|\n\n## {heading}")
+    return {ITEMS: script, RECIPE_NAMES: translations, TABLE: text + "\n"}
 
 
 def main():
@@ -130,7 +156,7 @@ def main():
         return
     for path, text in outputs.items():
         path.write_text(text)
-    print(f"wrote {len(RECIPES)} recipes")
+    print(f"wrote {len(all_recipes())} recipes")
 
 
 if __name__ == "__main__":

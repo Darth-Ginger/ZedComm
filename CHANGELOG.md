@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Roll wire (`Base.Wire`, 10 units a roll) can be used in place of Electric Wire, one unit for one, in every recipe. A whole roll makes 50 Signal Wire in one craft.
 - Every device, wire and module has a recipe except the debug test source. `tools/make-recipes.py` holds the one recipe table and writes the game script, the recipe names and `docs/recipes.md`; CI fails if they drift. The balance is a first proposal and has not been tried in game.
 - `tests/registry_test.lua` runs in CI. Stand-ins for the game's two global-object classes live in `tests/support/pz`; the cursor checks still need the game's own Lua (`PZ_LUA`).
 - A cabinet is Basic unless it carries an Advanced Adapter; `Circuit.cabinetAdapter` is gone.
