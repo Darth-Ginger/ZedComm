@@ -398,7 +398,8 @@ check(definitions.register({
 }), "restored sender definition registers")
 check(definitions.register({
     id = "Example.Display", role = "receiver", ports = { "signal" },
-    match = function() return false end, receive = function() end,
+    match = function() return false end, receiverModule = ZedComm.SignalModules.ON_OFF,
+    bindFixture = function() return { apply = function() return "applied" end } end,
 }), "restored receiver definition registers")
 local recovered, recoveredJava = start(missingSave)
 local recoveredId = recovered.network:networkOf("sensor")
@@ -1539,17 +1540,6 @@ fire("OnTick")
 check(runtime.inspect("debug-display").receivers[1].value == 170,
     "source reload restores the current byte without a sender change")
 
-local calls = {}
-local receiver = {
-    receive = function(_, value) calls[#calls + 1] = value == nil and "default-off" or value end,
-}
-definitions.deliver(receiver, {}, nil, {})
-receiver.onUnavailable = function() calls[#calls + 1] = "custom-unavailable" end
-definitions.deliver(receiver, {}, nil, {})
-definitions.deliver(receiver, {}, 0, {})
-check(calls[1] == "default-off" and calls[2] == "custom-unavailable" and calls[3] == 0,
-    "fallback override runs only on unavailable input, never for valid zero")
-
 -- Two player-built circuits share a square and stay independently selectable.
 do
     playerRegistry, playerJava = start()
@@ -1800,23 +1790,6 @@ do
         "reloading the fixture attaches a fresh module and reads the held byte")
 
     assert(playerRegistry:unlink("module-test-wire", "modular-fixture"))
-    local legacy = {}
-    assert(definitions.register({
-        id = "Example.LegacyFixture", role = "receiver", ports = { "signal" },
-        match = function() return false end,
-        receive = function(_, byte) legacy[#legacy + 1] = byte end,
-        onUnavailable = function() legacy[#legacy + 1] = "fallback" end,
-    }))
-    local legacyObject = worldObject(otherSquare, {
-        id = "legacy-fixture", kind = "endpoint", definitionId = "Example.LegacyFixture",
-    })
-    fire("OnObjectAdded", legacyObject)
-    assert(playerRegistry:link("module-test-wire", "legacy-fixture"))
-    assert(runtime.setTestByte(playerRegistry, "module-test-source", "0"))
-    fire("OnTick")
-    assert(playerRegistry:unlink("module-test-wire", "module-test-source"))
-    fire("OnTick")
-    check(legacy[1] == 0 and legacy[2] == "fallback", "legacy receiver and fallback hooks still receive valid zero and loss")
 end
 
 -- A relay uses native lamp power/switch behavior and vanilla moveable data.

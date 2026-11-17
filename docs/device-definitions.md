@@ -24,7 +24,7 @@ The example context is illustrative; its game adapter will be defined in later p
 - Roles are `source` or `receiver`. The later integration layer maps receiver to the model's `sink`; infrastructure is outside this endpoint contract.
 - Ports are a nonempty, dense list of unique names using letters, digits and underscores, beginning with a letter/underscore. Their declared order is preserved.
 - All definitions require a pure `match(object, context)` predicate returning a boolean. It must not mutate the world or register more definitions.
-- Sources require `sample(object, context)`. A source returns a byte by default or a raw estimate when it declares `readingKind = "weight"`. The sender encodes the reading. A receiver can use `receive(object, byte, context)` or bind a receiver module. Receivers do not declare source sampling.
+- Sources require `sample(object, context)`. A source returns a byte by default or a raw estimate when it declares `readingKind = "weight"`. The sender encodes the reading. A receiver names a receiver module (`receiverModule`) and supplies `bindFixture(object, context, config)`, which returns the fixture's `apply`, and optionally `isAvailable` and `release`. Receivers do not declare source sampling.
 - Unknown definition fields are rejected so misspellings cannot silently pass.
 
 `register(def)` returns `true`, or `false, reason`. Validation failures leave the registry unchanged. Registration copies the descriptor and port list; callbacks remain function references.

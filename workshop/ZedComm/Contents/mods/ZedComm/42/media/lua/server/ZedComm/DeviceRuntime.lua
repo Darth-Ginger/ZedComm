@@ -519,9 +519,6 @@ function Runtime.deliver(networkId, packet)
             local message = failed and ("receive failed: " .. tostring(failed))
             if receiver.circuitError then message = "invalid internal circuit: " .. receiver.circuitError end
             reportError(receiver.piece, message or nil)
-        elseif not receiver.definition.receiverModule then
-            local ok, err = pcall(Definitions.deliver, receiver.definition, receiver.object, value, context)
-            reportError(receiver.piece, not ok and ("receive failed: " .. tostring(err)) or nil)
         end
     end
 end
