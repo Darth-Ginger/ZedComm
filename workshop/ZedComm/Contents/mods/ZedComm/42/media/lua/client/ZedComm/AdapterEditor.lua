@@ -3,6 +3,7 @@ if isClient() or isServer() then return end
 
 require "ISUI/ISPanel"
 require "ISUI/ISButton"
+require "ISUI/ISContextMenu"
 require "ISUI/ISTextBox"
 require "ZedComm/InternalCircuit"
 
@@ -85,6 +86,32 @@ end
 
 function Editor.setThreshold(player, registry, target, id)
     setNumber(player, registry, target, id, "threshold", "Threshold (0 to 255)", 50)
+end
+
+function Editor.renameJack(player, registry, target, id)
+    local entry = selectedHost(player, registry, target)
+    local board = entry and entry.piece.board
+    local direction = board and board.directions[id]
+    if not direction then return end
+    local labels = entry.piece.state.portLabels
+    local label = labels and labels[id]
+
+    local function confirm(_, button)
+        if button.internal ~= "OK" then return end
+        if not selectedHost(player, registry, target) then
+            player:Say("That object is no longer within reach.")
+            return
+        end
+        local ok, result = registry:renameCabinetPort(target.id, id, button.parent.entry:getText())
+        local message = ok and ("Jack label updated to " .. result .. ".") or result
+        player:Say(message)
+        print("[ZedComm] " .. message)
+    end
+
+    local title = "Label " .. Circuit.jackLabel(id, direction, label) .. " (blank resets)"
+    local box = ISTextBox:new(0, 0, 320, 160, title, label or "", nil, confirm, player:getPlayerNum())
+    box:initialise()
+    box:addToUIManager()
 end
 
 function Editor.addOptions(add, registry, entry)
@@ -273,9 +300,15 @@ function Editor:removePart()
     if not self:inReach() or not self.selected then return end
     local layout = readLayout(self.registry, self.target.id)
     local id = self.selected
-    if not layout.modules[id] then return end
+    local part = layout.modules[id]
+    if not part then return end
     layout.modules[id] = nil
-    if layout.outputModes then layout.outputModes[id] = nil end
+    if layout.outputModes then
+        layout.outputModes[id] = nil
+        for branch = 1, Circuit.kinds[part.kind].externalOutputs or 0 do
+            layout.outputModes[Circuit.splitterPort(id, branch)] = nil
+        end
+    end
     for i = #layout.links, 1, -1 do
         local link = layout.links[i]
         if link.from == id or link.to == id then table.remove(layout.links, i) end
@@ -287,6 +320,17 @@ local function configurable(part, advanced)
     local spec = part and Circuit.kinds[part.kind]
     return spec and (part.kind == "threshold" or part.kind == "cache" or spec.timed or spec.source
         or (advanced and (spec.full ~= nil or spec.jack == "source")))
+end
+
+function Editor:toggleOutputMode(id)
+    if not self:inReach() or self.adapter ~= "advanced" then return end
+    local entry = selectedHost(self.player, self.registry, self.target)
+    if not entry or entry.piece.board.directions[id] ~= "source" then return end
+    local layout = readLayout(self.registry, self.target.id)
+    layout.outputModes = layout.outputModes or {}
+    local advanced = layout.outputModes[id] == nil
+    layout.outputModes[id] = advanced and "advanced" or nil
+    if self:commit(layout) then self.message = advanced and "Output: Advanced." or "Output: Basic." end
 end
 
 function Editor:configure()
@@ -304,20 +348,18 @@ function Editor:configure()
     elseif spec.source then
         setNumber(self.player, self.registry, self.target, id, "level", "Source byte (1 to 255)", 255)
         return
+    elseif spec.jack == "source" then
+        self:toggleOutputMode(id)
+        return
     end
     local layout = readLayout(self.registry, self.target.id)
     local message
     if part.kind == "cache" then
         layout.modules[id].always = not part.always
         message = layout.modules[id].always and "Cache: Always." or "Cache: When enabled."
-    elseif Circuit.kinds[part.kind].full then
+    else
         layout.modules[id].fullReading = not part.fullReading
         message = layout.modules[id].fullReading and "Mode: Full reading." or "Mode: Byte."
-    else
-        layout.outputModes = layout.outputModes or {}
-        local advanced = layout.outputModes[id] == nil
-        layout.outputModes[id] = advanced and "advanced" or nil
-        message = advanced and "Output: Advanced." or "Output: Basic."
     end
     if self:commit(layout) then self.message = message end
 end
@@ -436,6 +478,11 @@ function Editor:onRightMouseUpOutside()
     self:endDrag()
 end
 
+local function editPart(editor, id, action)
+    editor.selected = id
+    action(editor)
+end
+
 function Editor:onRightMouseUp(x, y)
     if not self:refresh() then self:close(); return true end
     if self.drag or self.terminal then
@@ -444,10 +491,33 @@ function Editor:onRightMouseUp(x, y)
         return true
     end
     for id, part in pairs(self.parts) do
-        if configurable(part, self.adapter == "advanced") and x >= part.x and x < part.x + part.width
-            and y >= part.y and y < part.y + part.height then
-            self.selected = id
-            self:configure()
+        if inside(x, y, part.x, part.y, part.width, part.height) then
+            local spec = Circuit.kinds[part.kind]
+            local canRename = self.cabinet and spec.jack
+            local canConfigure = configurable(part, self.adapter == "advanced")
+            local canRemove = self.layout.modules[id] ~= nil
+            if not (canRename or canConfigure or canRemove) or not self:inReach() then return true end
+
+            local context = ISContextMenu.get(self.player:getPlayerNum(), getMouseX(), getMouseY())
+            if canRename then
+                context:addOption("Rename jack", self.player, Editor.renameJack, self.registry, self.target, id)
+            end
+            for branch = 1, spec.externalOutputs or 0 do
+                local port = Circuit.splitterPort(id, branch)
+                local label = Circuit.jackLabel(port, "source")
+                context:addOption("Rename " .. label, self.player, Editor.renameJack, self.registry, self.target, port)
+                if self.adapter == "advanced" then
+                    local advanced = self.layout.outputModes and self.layout.outputModes[port] == "advanced"
+                    context:addOption("Set " .. label .. " to " .. (advanced and "Basic" or "Advanced"),
+                        self, self.toggleOutputMode, port)
+                end
+            end
+            if canConfigure then
+                context:addOption("Configure", self, editPart, id, self.configure)
+            end
+            if canRemove then
+                context:addOption("Remove module", self, editPart, id, self.removePart)
+            end
             return true
         end
     end
@@ -472,6 +542,14 @@ local function drawPart(panel, kind, rotation, x, y, width, height, alpha)
     alpha = alpha or 1
     panel:drawRect(x, y, width, height, alpha, 0.18, 0.25, 0.19)
     if texture then panel:drawTextureScaled(texture, x, y, width, height, alpha, 1, 1, 1) end
+end
+
+local function drawJack(panel, part, branch)
+    local jackX, jackY = Circuit.jackAt(part, branch)
+    local x = part.x + math.max(4, math.min(part.width - 4, jackX * part.cell))
+    local y = part.y + math.max(4, math.min(part.height - 4, jackY * part.cell))
+    panel:drawRect(x - 3, y - 3, 6, 6, 1, 0.84, 0.66, 0.29)
+    return x, y
 end
 
 function Editor:render()
@@ -517,10 +595,14 @@ function Editor:render()
                     hoveredJack = Circuit.jackLabel(id, spec.jack, custom)
                 end
             end
-            local jackX, jackY = Circuit.jackAt(part)
-            local px = math.max(4, math.min(part.width - 4, jackX * cell))
-            local py = math.max(4, math.min(part.height - 4, jackY * cell))
-            self:drawRect(part.x + px - 3, part.y + py - 3, 6, 6, 1, 0.84, 0.66, 0.29)
+            drawJack(self, part)
+        end
+        for branch = 1, spec.externalOutputs or 0 do
+            local x, y = drawJack(self, part, branch)
+            if math.abs(self:getMouseX() - x) <= 8 and math.abs(self:getMouseY() - y) <= 8 then
+                local port = Circuit.splitterPort(id, branch)
+                hoveredJack = Circuit.jackLabel(port, "source", self.jackLabels and self.jackLabels[port])
+            end
         end
         self:drawRect(part.x + 5, part.y + 5, part.width - 10, 18, 0.85, 0.08, 0.11, 0.08)
         self:drawTextCentre(label, part.x + part.width / 2, part.y + 6, 1, 1, 0.91, 1, UIFont.Small)

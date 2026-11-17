@@ -17,12 +17,14 @@ FLOOR_CABINET = ROOT / "art" / "cabinet-prototypes" / "network-cabinet-floor-fra
 CABINET_FRAME = 466
 SWITCH_FRAME = 467
 SWITCH_LEAD_SET = "zedcomm_switch_01"
+SWITCH_FLOOR_SET = "zedcomm_switch_floor_01"
 SWITCH_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
 SWITCH_ART = (CONCEPT_ART / "manual-network-switch.png", CONCEPT_ART / "manual-network-switch-on.png")
 OCCUPANCY_FIRST_FRAME = 419
 WEIGHT_FIRST_FRAME = 425
 DISPLAY_FIRST_FRAME = 431
 DISPLAY_SET = "zedcomm_display_01"
+WEIGHT_FACE_SET = "zedcomm_weight_face_01"
 PLATE_TERMINAL_MASK = ((88, 229), (107, 218), (108, 249), (88, 249))
 WEIGHT_TERMINAL_MASK = ((72, 235), (81, 231), (85, 234), (82, 237), (79, 238), (75, 241), (73, 241))
 PLATE_SOCKETS = ((85, 235), (42, 235), (42, 208), (85, 208))
@@ -301,7 +303,15 @@ def switch_page(textures):
     metadata = bytearray()
     wired = Image.new("RGBA", (1024, 640))
     wired_metadata = bytearray()
+    floor = Image.new("RGBA", (1024, 192))
+    floor_metadata = bytearray()
     directions = ((0, 0), *WIRE_DIRECTIONS)
+
+    def draw_lead(tile, start, end):
+        draw = ImageDraw.Draw(tile)
+        for stroke, color in LEAD_STROKES:
+            draw.line((start, end), fill=color, width=stroke)
+
     for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
         for state, frame in enumerate(body):
             slot = facing * len(body) + state
@@ -315,10 +325,7 @@ def switch_page(textures):
                 tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
                 socket = (center, baseline - 3)
                 foot = (center, 216 if facing < 2 else 232)
-                seam = (TILE_CENTER[0] + dx, TILE_CENTER[1] + dy)
-                draw = ImageDraw.Draw(tile)
-                for stroke, color in LEAD_STROKES:
-                    draw.line((socket, foot, seam), fill=color, width=stroke, joint="curve")
+                draw_lead(tile, socket, foot)
                 tile.alpha_composite(frame, (center - width // 2, baseline - height))
                 x, y, right, bottom = tile.getbbox()
                 index = slot * len(directions) + direction
@@ -327,13 +334,25 @@ def switch_page(textures):
                 wired.alpha_composite(tile.crop((x, y, right, bottom)), (atlas_x, atlas_y))
                 wired_metadata.extend(sprite_record(index, atlas_x, atlas_y, right - x, bottom - y,
                                                     x, y, SWITCH_LEAD_SET))
+                if state == 0:
+                    tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
+                    seam = (TILE_CENTER[0] + dx, TILE_CENTER[1] + dy)
+                    draw_lead(tile, foot, seam)
+                    x, y, right, bottom = tile.getbbox()
+                    index = facing * len(directions) + direction
+                    atlas_x, atlas_y = (index % 8) * 128, (index // 8) * 64
+                    assert bottom - y <= 64
+                    floor.alpha_composite(tile.crop((x, y, right, bottom)), (atlas_x, atlas_y))
+                    floor_metadata.extend(sprite_record(index, atlas_x, atlas_y, right - x, bottom - y,
+                                                        x, y, SWITCH_FLOOR_SET))
     icon = Image.new("RGBA", (64, 64))
     body[0].thumbnail((52, 52), Image.Resampling.LANCZOS)
     icon.alpha_composite(body[0], ((64 - body[0].width) // 2, (64 - body[0].height) // 2))
     icon.save(textures / "Item_ZedCommNetworkSwitch.png")
     count = len(SWITCH_MOUNTS) * len(body)
     return (texture_page(SET + "_switch", atlas, metadata, count)
-            + texture_page(SWITCH_LEAD_SET, wired, wired_metadata, count * len(directions)))
+            + texture_page(SWITCH_LEAD_SET, wired, wired_metadata, count * len(directions))
+            + texture_page(SWITCH_FLOOR_SET, floor, floor_metadata, len(SWITCH_MOUNTS) * len(directions)))
 
 
 def route_page(start):
@@ -387,7 +406,7 @@ DISPLAY_DIGITS = ("abcdef", "bc", "abdeg", "abcdg", "bcfg", "acdfg",
                   "acdefg", "abc", "abcdefg", "abcdfg", "g")
 
 
-def display_glyph(size, slot_start, strokes, color):
+def display_glyph(size, slot_start, strokes, color, width_scale=1):
     scale = 4
     surface = Image.new("RGBA", (size[0] * scale, size[1] * scale))
     pen = ImageDraw.Draw(surface)
@@ -396,12 +415,11 @@ def display_glyph(size, slot_start, strokes, color):
     bx, by = DISPLAY_FACE_BOTTOM
 
     def project(x, y):
-        u, v = (slot_start + x) / 36, y / 9
+        u, v = (slot_start + x * width_scale) / 36, y / 9
         return (round(scale * (ox + u * (rx - ox) + v * (bx - ox))),
                 round(scale * (oy + u * (ry - oy) + v * (by - oy))))
 
-    for segment in strokes:
-        x0, y0, x1, y1 = DISPLAY_SEGMENTS[segment]
+    for x0, y0, x1, y1 in strokes:
         pen.polygon([project(x0, y0), project(x1, y0), project(x1, y1), project(x0, y1)], fill=color)
     return surface.resize(size, Image.Resampling.LANCZOS)
 
@@ -411,7 +429,8 @@ def display_art():
     glyphs = []
     for slot in DISPLAY_SLOT_STARTS:
         glyphs.append([
-            display_glyph(casing.size, slot, strokes, "#bd6750" if value == 10 else "#ffb457")
+            display_glyph(casing.size, slot, (DISPLAY_SEGMENTS[segment] for segment in strokes),
+                          "#bd6750" if value == 10 else "#ffb457")
             for value, strokes in enumerate(DISPLAY_DIGITS)
         ])
     led = Image.new("RGBA", casing.size)
@@ -467,6 +486,31 @@ def display_faces_page(casing, x, y, glyphs, led):
         metadata.extend(sprite_record(frame, atlas_x, atlas_y, art.width, art.height,
                                       x + bounds[0], y + bounds[1], tileset=DISPLAY_SET))
     return texture_page(DISPLAY_SET, atlas, metadata, 257)
+
+
+def weight_face_page(casing, x, y, led):
+    atlas = Image.new("RGBA", (512, 128))
+    metadata = bytearray()
+    strokes = tuple(tuple(DISPLAY_SEGMENTS[segment] for segment in digit)
+                    for digit in (*DISPLAY_DIGITS[:10], "bcefg", "ef"))
+
+    def put(art, frame):
+        bounds = art.getchannel("A").getbbox()
+        assert bounds
+        art = art.crop(bounds)
+        row, column = divmod(frame, 20)
+        atlas_x, atlas_y = column * 24, row * 24
+        assert art.width <= 24 and art.height <= 24
+        atlas.alpha_composite(art, (atlas_x, atlas_y))
+        metadata.extend(sprite_record(frame, atlas_x, atlas_y, art.width, art.height,
+                                      x + bounds[0], y + bounds[1], tileset=WEIGHT_FACE_SET))
+
+    for slot, start in enumerate((1, 8, 15, 22, 29)):
+        for index, glyph in enumerate(strokes):
+            put(display_glyph(casing.size, start, glyph, "#ffb457", 0.7), slot * 12 + index)
+    put(display_glyph(casing.size, 28, ((0, 7.6, 1.25, 9),), "#ffb457"), 60)
+    put(led, 61)
+    return texture_page(WEIGHT_FACE_SET, atlas, metadata, 62)
 
 
 def main():
@@ -547,6 +591,7 @@ def main():
     display = display_art()
     legacy_displays, count = legacy_display_page(display_start, *display)
     display_faces = display_faces_page(*display)
+    weight_face = weight_face_page(display[0], display[1], display[2], display[4])
     cabinet = Image.open(FLOOR_CABINET).convert("RGBA")
     left, top, right, bottom = cabinet.getbbox()
     cropped_cabinet = cabinet.crop((left, top, right, bottom))
@@ -557,11 +602,12 @@ def main():
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 7) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        b"PZPK" + ints(1, 9) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        + weight_face
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 3) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 5) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
     switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
@@ -584,6 +630,13 @@ def main():
     tiles += ints(8, 5, 3, switch_count * 5)
     for props in wall_overlays:
         tiles += props * (len(SWITCH_ART) * 5)
+    floor_count = len(SWITCH_MOUNTS) * 5
+    tiles += f"{SWITCH_FLOOR_SET}\n{SWITCH_FLOOR_SET}.png\n".encode("ascii")
+    tiles += ints(8, 3, 4, floor_count)
+    tiles += (ints(1) + b"FloorOverlay\n\n") * floor_count
+    tiles += f"{WEIGHT_FACE_SET}\n{WEIGHT_FACE_SET}.png\n".encode("ascii")
+    tiles += ints(12, 6, 5, 62)
+    tiles += (ints(1) + b"FloorOverlay\n\n") * 62
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 

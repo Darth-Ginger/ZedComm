@@ -29,34 +29,42 @@ local function firstFrame(object)
     return mountStart + (row * 3 + column) * 6
 end
 
-function ModuleVisuals.refresh(object, network, piece, port)
-    local direction = ZedComm.WireShape.portDirection(network, piece, port)
-    local name = prefix .. (firstFrame(object) + (directionFrame[direction] or 0))
-    local sprite = getSprite(name)
-    if not sprite then
+function ModuleVisuals.setAttachment(object, name, matches)
+    local sprite = name and getSprite(name)
+    if name and not sprite then
         if not missing[name] then
             missing[name] = true
-            print("[ZedComm] missing module housing sprite " .. name)
+            print("[ZedComm] missing attachment sprite " .. name)
         end
         return
     end
-    -- Preserve the fixture's own attachments and replace only our housing.
-    local kept = false
+    local kept, changed = false, false
     local children = object:getAttachedAnimSprite()
     if children then
         for i = children:size() - 1, 0, -1 do
             local parent = children:get(i):getParentSprite()
             local current = parent and parent:getName()
-            if isHousing(current) then
+            if matches(current) then
                 if current == name and not kept then
                     kept = true
                 else
                     object:RemoveAttachedAnim(i)
+                    changed = true
                 end
             end
         end
     end
-    if not kept then object:addAttachedAnimSprite(sprite) end
+    if sprite and not kept then
+        object:addAttachedAnimSprite(sprite)
+        changed = true
+    end
+    return changed
+end
+
+function ModuleVisuals.refresh(object, network, piece, port)
+    local direction = ZedComm.WireShape.portDirection(network, piece, port)
+    local name = prefix .. (firstFrame(object) + (directionFrame[direction] or 0))
+    ModuleVisuals.setAttachment(object, name, isHousing)
 end
 
 ZedComm.ModuleVisuals = ModuleVisuals

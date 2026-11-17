@@ -51,7 +51,8 @@ end
 function Action:new(character, command)
     local action = ISBaseTimedAction.new(self, character)
     action.command = command
-    action.maxTime = character:isTimedActionInstant() and 1 or 25
+    local duration = command.kind == "upgrade-cabinet" and 120 or 25
+    action.maxTime = character:isTimedActionInstant() and 1 or duration
     return action
 end
 
@@ -70,6 +71,11 @@ function Action:isValid()
     end
     if command.kind == "place" then
         return carries(self.character, command.item) and placement.canPlace(command.square, command.item:getFullType())
+    end
+    if command.kind == "upgrade-cabinet" then
+        local target = placement.resolve(registry, command.targetId)
+        return target and target.object == command.object and target.square == command.square
+            and placement.canUpgradeCabinet(self.character, target, command.item)
     end
     return true
 end
@@ -413,15 +419,6 @@ local function renameRun(player, registry, target)
         local ok, result = registry:renameRun(target.id, value)
         return ok and ("Run name updated to " .. result .. ".") or result
     end)
-end
-
-local function labelCabinetJack(player, registry, target, port)
-    local labels = target.piece.state.portLabels
-    editSetting(player, registry, target, "Label " .. portLabel(target, port) .. " (blank resets)",
-        labels and labels[port] or "", function(value)
-            local ok, result = registry:renameCabinetPort(target.id, port, value)
-            return ok and ("Jack label updated to " .. result .. ".") or result
-        end)
 end
 
 local function configurePressurePlate(player, registry, target)
@@ -838,10 +835,11 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                 ports[#ports + 1] = port
             end
             table.sort(ports)
-            options[#options + 1] = { "Label cabinet jack", children = labels }
+            local editor = ZedComm.AdapterEditor
+            if editor then options[#options + 1] = { "Label cabinet jack", children = labels } end
             for _, port in ipairs(ports) do
                 local label, cable = portLabel(entry, port), entry.piece.ports[port]
-                addTo(labels, label, labelCabinetJack, registry, entry, port)
+                if editor then addTo(labels, label, editor.renameJack, registry, entry, port) end
                 if cable then
                     action("Disconnect cabinet jack (" .. label .. ")", {
                         kind = "disconnect-port", targetId = entry.id, object = entry.object,

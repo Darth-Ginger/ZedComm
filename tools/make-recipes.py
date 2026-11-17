@@ -97,7 +97,7 @@ def script_block(identifier, item, level, time, inputs, made, tool):
              "        timedAction = MakingElectrical,", f"        time = {time},"]
     if level:
         lines.append(f"        SkillRequired = Electricity:{level},")
-    lines += ["        Tags = InHandCraft;Electrical,", "        category = Electrical,",
+    lines += ["        Tags = InHandCraft;Electrical,", "        category = ZedComm,",
               "        inputs", "        {"]
     if tool:
         lines.append("            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],")
@@ -109,7 +109,7 @@ def script_block(identifier, item, level, time, inputs, made, tool):
 
 
 def build(names):
-    items = ITEMS.read_text()
+    items = ITEMS.read_text(encoding="utf-8")
     head = items[:items.index("    craftRecipe ")]
     recipes = all_recipes()
     blocks = [script_block(identifier, *row[1:]) for identifier, _suffix, row in recipes]
@@ -124,7 +124,7 @@ def build(names):
                          for full_type, count in inputs.items())
 
     table = ["# ZedComm crafting recipes", "",
-             "Every recipe is in the crafting menu under Electrical. Recipes marked with a screwdriver "
+             "Every recipe is in the crafting menu under ZedComm. Recipes marked with a screwdriver "
              "need one in the inventory and do not use it up. Electrical is the skill level required; "
              "a dash means none.", "",
              f"Wire means the roll of wire, which holds {ROLL_UNITS} units; amounts of it are in units. "
@@ -146,16 +146,16 @@ def build(names):
 
 
 def main():
-    names = json.loads(NAMES.read_text())
+    names = json.loads(NAMES.read_text(encoding="utf-8"))
     outputs = build(names)
     if "--check" in sys.argv[1:]:
         stale = [str(path.relative_to(ROOT)) for path, text in outputs.items()
-                 if not path.exists() or path.read_text() != text]
+                 if not path.exists() or path.read_text(encoding="utf-8") != text]
         if stale:
             sys.exit("out of date, run tools/make-recipes.py: " + ", ".join(stale))
         return
     for path, text in outputs.items():
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8", newline="\n")
     print(f"wrote {len(all_recipes())} recipes")
 
 

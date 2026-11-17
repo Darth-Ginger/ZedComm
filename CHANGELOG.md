@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- ZedComm items have a dedicated inventory category and recipes appear under ZedComm in Crafting. Native Place groups candidates by registered source, receiver, cabinet, and wire tags. These tags require Build 42.13 or later.
+- Wires draw beneath same-tile devices that use the game's floor overlay layer.
+- Network Switches use native drag-to-rotate placement at corners. The grounded section of a connected switch lead draws on the finished floor.
+- Right-click a jack in the cabinet editor to rename it. Right-click an installed module in either editor to remove it or open its settings.
+- The edge-mounted Splitter takes one board input and supplies two independently named external jacks.
+- Swapping a cabinet to an Advanced Adapter takes a timed action.
+- The Advanced Display face shows weight from Advanced packets and shows bytes from Basic packets.
 - Roll wire (`Base.Wire`, 10 units a roll) can be used in place of Electric Wire, one unit for one, in every recipe. A whole roll makes 50 Signal Wire in one craft.
 - Every device, wire and module has a recipe except the debug test source. `tools/make-recipes.py` holds the one recipe table and writes the game script, the recipe names and `docs/recipes.md`; CI fails if they drift. The balance is a first proposal and has not been tried in game.
 - `tests/registry_test.lua` runs in CI. Stand-ins for the game's two global-object classes live in `tests/support/pz`; the cursor checks still need the game's own Lua (`PZ_LUA`).

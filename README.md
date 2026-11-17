@@ -2,7 +2,11 @@
 
 A Project Zomboid (Build 42) mod for modular wired electronics and simulated digital signals: redstone-style on/off signaling, with a path toward counters, addressed communication and player-built networks.
 
-Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through Small Cabinets that hold a 6×6 circuit of logic, arithmetic and timing modules. Adapters, cabinets, the Splitter and the switch have recipes; the other items and lamp conversion are debug-only. Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
+Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through Small Cabinets that hold a 6×6 circuit of logic, arithmetic and timing modules. The [recipe table](docs/recipes.md) lists the craftable parts. The latest recipe changes await in-game verification, and lamp conversion is available in debug mode. Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
+
+Use the [contributor rules](AGENTS.md) when changing code, tests, or documentation.
+
+ZedComm requires Build 42.13 or later for custom item tags. Its items have a **ZedComm** inventory category and its recipes appear under **ZedComm** in Crafting.
 
 ## Layout
 

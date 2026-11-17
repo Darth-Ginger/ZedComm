@@ -2,6 +2,9 @@
 if isClient() or isServer() then return end
 
 local installedClass
+local tags = ZedComm.ItemTags
+local placementGroups = { tags.source, tags.receiver, tags.cabinet, tags.wire }
+local wallsByFacing = { "north", "west", "south", "east" }
 
 local function propsFor(sprite, name, detail)
     if not sprite then return nil end
@@ -20,16 +23,25 @@ local function inventoryKey(item, spec)
     return spec.itemType
 end
 
-local function addCandidate(cursor, objects, item, spec, key, detail)
+local function addCandidate(groups, item, spec, key, detail)
     local props = propsFor(getSprite(spec.sprite), item:getName(), detail)
     if not props then return end
-    objects[#objects + 1] = { object = item, moveProps = props, zedcommKey = key }
-    if cursor.zedcommKey == key then cursor.objectIndex = #objects end
+    local index = #placementGroups + 1
+    for i, tag in ipairs(placementGroups) do
+        if item:hasTag(tag) then
+            index = i
+            break
+        end
+    end
+    local group = groups[index]
+    group[#group + 1] = { object = item, moveProps = props, zedcommKey = key }
 end
 
 local function addInventoryItems(cursor, objects, placement, actions)
     local items = cursor.character:getInventory():getItems()
     local seen = {}
+    local groups = {}
+    for i = 1, #placementGroups + 1 do groups[i] = {} end
     local wireType = placement.WIRE_TYPE
     local runLabel = actions.activeWireLabel(cursor)
     for i = 0, items:size() - 1 do
@@ -40,15 +52,21 @@ local function addInventoryItems(cursor, objects, placement, actions)
             if not seen[key] then
                 seen[key] = true
                 local detail = key == wireType and runLabel
-                if spec.definitionId == ZedComm.NetworkSwitch.ID then detail = "Shift + Rotate Building changes wall" end
-                addCandidate(cursor, objects, item, spec, key, detail)
+                if spec.definitionId == ZedComm.NetworkSwitch.ID then detail = "Hold left-click and drag toward a wall" end
+                addCandidate(groups, item, spec, key, detail)
             end
         end
     end
     local active = actions.activeWireItem(cursor)
     if active and not seen[wireType] then
         -- Keep the active end selectable so it can be joined with no spare wire.
-        addCandidate(cursor, objects, active, placement.getSpec(wireType), wireType, runLabel)
+        addCandidate(groups, active, placement.getSpec(wireType), wireType, runLabel)
+    end
+    for _, group in ipairs(groups) do
+        for _, entry in ipairs(group) do
+            objects[#objects + 1] = entry
+            if cursor.zedcommKey == entry.zedcommKey then cursor.objectIndex = #objects end
+        end
     end
     return objects
 end
@@ -180,6 +198,21 @@ local function install()
             actions.pickUp(self, selected.zedcommPickup, square)
         else
             actions.place(self, selected.object, square)
+        end
+    end
+
+    local setCursorFacing = class.setCursorFacing
+    function class:setCursorFacing(facing)
+        local square = self.currentSquare
+        local selected = self.zedcommKey and selectedAt(self, square)
+        if not selected or not selected.zedcommKey or selected.object:getFullType() ~= ZedComm.NetworkSwitch.ID then
+            return setCursorFacing(self, facing)
+        end
+        local wall = wallsByFacing[facing]
+        if wall and ZedComm.NetworkSwitch.mount(square, wall) == wall
+            and placement.switchMount(square, selected.object, self.zedcommMount) ~= wall then
+            self.zedcommMount = wall
+            getSoundManager():playUISound("UIObjectMenuObjectRotateOutline")
         end
     end
 

@@ -17,7 +17,8 @@ local plateSprites = {
 local plateFrameOffset = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local lastNetwork, lastVersion
 local layoutNetwork, layoutVersion, cableSprites
-local pendingRelaySquares = {}
+local pendingSquares = {}
+local switchFloors = setmetatable({}, { __mode = "k" })
 local missing = {}
 
 local function currentNetwork()
@@ -45,10 +46,25 @@ local function spritesFor(network)
     return cableSprites
 end
 
+local function updateSwitchFloor(square, name)
+    local floor = square:getFloor()
+    local previous = switchFloors[square]
+    if previous and previous ~= floor then
+        ModuleVisuals.setAttachment(previous, nil, Switch.isFloorLead)
+    end
+    -- The wall renderer clips the grounded part of a lead against the floor.
+    if floor and ModuleVisuals.setAttachment(floor, name, Switch.isFloorLead) then
+        floor:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD)
+    end
+    switchFloors[square] = name and floor or nil
+end
+
 local function refreshSquare(square, network)
     if not square or not network then return end
     local sprites = spritesFor(network)
     local objects = square:getObjects()
+    local endpoint, endpointIndex, changedOrder
+    local switchLead
     for i = 0, objects:size() - 1 do
         local object = objects:get(i)
         local tag = object:hasModData() and object:getModData().zedcomm
@@ -58,19 +74,37 @@ local function refreshSquare(square, network)
                 local plate = plateSprites[piece.definitionId]
                 if piece.kind == "cable" and (tag.placedItem == "ZedComm.SignalWire" or tag.useRouteSprite) then
                     setWorldSprite(object, sprites[tag.id])
+                    -- Build 42 draws floor overlays in square object order.
+                    if endpoint then
+                        objects:set(endpointIndex, object)
+                        objects:set(i, endpoint)
+                        endpointIndex, changedOrder = i, true
+                    end
                 elseif piece.definitionId == Relay.ID and tag.definitionId == Relay.ID then
                     ModuleVisuals.refresh(object, network, piece, "signal")
                 elseif piece.definitionId == Switch.ID and tag.definitionId == Switch.ID then
                     Switch.updateSprite(object, piece.state, network, piece)
+                    if piece.state then
+                        switchLead = Switch.floorLead(piece.state.mount, Shape.portDirection(network, piece, "signal"))
+                    end
                 elseif plate and piece.definitionId == tag.definitionId
                     and tag.placedItem == plate.itemType then
                     local direction = Shape.portDirection(network, piece, "signal")
                     local frame = plate.firstFrame + (plateFrameOffset[direction] or 0)
                     setWorldSprite(object, "zedcomm_devices_01_" .. frame)
                 end
+                if piece.kind == "endpoint" and piece.definitionId and piece.definitionId == tag.definitionId then
+                    local sprite = object:getSprite()
+                    local props = sprite and sprite:getProperties()
+                    if props and props:has(IsoFlagType.FloorOverlay) then
+                        endpoint, endpointIndex = object, i
+                    end
+                end
             end
         end
     end
+    if changedOrder then endpoint:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD) end
+    updateSwitchFloor(square, switchLead)
 end
 
 local function onTick()
@@ -78,13 +112,14 @@ local function onTick()
     if not network then
         lastNetwork, lastVersion = nil, nil
         layoutNetwork, layoutVersion, cableSprites = nil, nil, nil
-        pendingRelaySquares = {}
+        pendingSquares = {}
+        switchFloors = setmetatable({}, { __mode = "k" })
         return
     end
     local cell = getCell()
     if not cell then return end
-    local seen = pendingRelaySquares
-    pendingRelaySquares = {}
+    local seen = pendingSquares
+    pendingSquares = {}
     for square in pairs(seen) do refreshSquare(square, network) end
     if network == lastNetwork and network.version == lastVersion then return end
     for _, piece in pairs(network.pieces) do
@@ -103,11 +138,18 @@ end
 -- Native placement restores movableData before OnObjectAdded. Wait until
 -- the registry has had a chance to restore the relay tag and endpoint.
 Events.OnObjectAdded.Add(function(object)
-    if not object:hasModData() then return end
-    local data = object:getModData()
-    local marker = type(data.movableData) == "table" and data.movableData.zedcommRelay
-    local square = marker and object:getSquare()
-    if square then pendingRelaySquares[square] = true end
+    local square = object:getSquare()
+    if not square then return end
+    if switchFloors[square] then pendingSquares[square] = true end
+    if object:hasModData() then
+        local data = object:getModData()
+        local marker = type(data.movableData) == "table" and data.movableData.zedcommRelay
+        if marker then pendingSquares[square] = true end
+    end
+end)
+Events.OnObjectAboutToBeRemoved.Add(function(object)
+    local square = object:getSquare()
+    if square and switchFloors[square] then pendingSquares[square] = true end
 end)
 Events.OnTick.Add(onTick)
 Events.LoadGridsquare.Add(function(square) refreshSquare(square, currentNetwork()) end)

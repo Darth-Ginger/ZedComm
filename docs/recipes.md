@@ -1,6 +1,6 @@
 # ZedComm crafting recipes
 
-Every recipe is in the crafting menu under Electrical. Recipes marked with a screwdriver need one in the inventory and do not use it up. Electrical is the skill level required; a dash means none.
+Every recipe is in the crafting menu under ZedComm. Recipes marked with a screwdriver need one in the inventory and do not use it up. Electrical is the skill level required; a dash means none.
 
 Wire means the roll of wire, which holds 10 units; amounts of it are in units. One unit can be used wherever a recipe asks for one Electric Wire.
 

@@ -1,7 +1,7 @@
 name=ZedComm
 id=ZedComm
 description=Modular wired electronics and simulated digital signals.
-versionMin=42.0.0
+versionMin=42.13.0
 modversion=0.0.1
 pack=zedcomm_devices_01
 tiledef=zedcomm_devices_01 7637

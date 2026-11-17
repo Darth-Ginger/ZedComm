@@ -6,11 +6,13 @@ Right-click a pressure plate, numeric display, or signal wire in the main invent
 
 ## Native Place and Pickup
 
-Use the normal **Place** tool and its **Cycle through objects** control to select the plate, display, or wire. The cursor previews the selected piece on the floor and walks to the clicked tile. After placing a plate or display, stay in Place and cycle to the next item. Normal stock of each ZedComm type appears once in the cycle. Recovered endpoints with saved settings can be selected individually.
+Use the normal **Place** tool and its **Cycle through objects** control to select the device or wire. The cursor previews the selected piece on the floor and walks to the clicked tile. After placing a plate or display, stay in Place and cycle to the next item. ZedComm candidates appear after vanilla moveables, grouped into sources, receivers, cabinets, and wire. Normal stock of each type appears once. Recovered endpoints with saved settings can be selected individually.
 
 Cycling to wire and placing the first segment starts a run. On a tile with a free end, choose **Place wire loose** or **Connect to** the specific end. Starting from an existing cable requires a neighboring tile for the first new segment. Subsequent clicks extend the active end or open the connection choices when a compatible free end is present. Cycling to another item releases that end. Right-click exits the tool and keeps the last reachable end selected for an explicit connection.
 
 Native **Pickup** recovers a pressure plate or display with its settings. Its wire stays in place with a free end. Place the device again and reconnect it to resume the circuit. To recover wire, use **Pickup** on its tile. On shared tiles, cycle through the numbered cables and use the cyan outline to identify the selected segment.
+
+On a shared tile, a wire draws behind any registered device using a floor overlay sprite.
 
 ## Starting from a loose wire
 
@@ -33,11 +35,13 @@ Connected runs get a saved number such as **Run 1**. Unconnected segments show *
 
 When runs join, a custom name takes precedence over a default. If both names are custom or both are defaults, the active run keeps its name. If a run is split, the connected part with the saved name anchor keeps the old name and other connected parts get new numbers. If the anchor is removed or becomes loose, a surviving connected part keeps the name.
 
-Use **ZedComm → Label cabinet jack** to name a fixed jack or extension on the cabinet. The label follows that jack through rotation, pickup, and reload. It appears in the cabinet editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
+Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
+
+Right-click an installed part in the cabinet or Advanced Adapter editor and choose **Remove module** to return it to inventory. Removal clears its internal links. Removing a jack extension also leaves its cable end free. Fixed jacks stay on the board. For modules with settings, choose **Configure** from the same menu.
 
 ## Wall switches
 
-At a corner, press **Shift + Rotate Building** with the Network Switch selected in native **Place** to cycle the eligible walls. In **Place with ZedComm cursor**, use **Rotate Building** alone. The ZedComm world placement menu also lists the available walls at a corner. Left-click a placed switch within reach to toggle it. Its wall sprite retains a lead to the connected wire while the switch is ON or OFF.
+In native **Place**, select the Network Switch, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. A connected cable follows the wall down to the floor.
 
 ## Multiple wires on one tile
 
@@ -64,7 +68,7 @@ The weight variant uses the same placement, pickup, and wiring tools. It sends a
 
 ## In-game check
 
-Restart Project Zomboid with the linked development mod enabled and open a disposable singleplayer save. These prototype items can be added through the Lua debug console. Recipes and final art are later work.
+Restart Project Zomboid with the linked development mod enabled and open a disposable singleplayer save. Obtain the parts through the **ZedComm** crafting category or grant them through the Lua debug console.
 
 ```lua
 getPlayer():getInventory():AddItem("ZedComm.PressurePlate")

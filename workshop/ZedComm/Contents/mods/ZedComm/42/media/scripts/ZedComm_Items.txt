@@ -2,7 +2,8 @@ module ZedComm
 {
     item PressurePlate
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 1.0,
         Icon = ZedCommPressurePlate,
@@ -10,7 +11,8 @@ module ZedComm
 
     item OccupancyPlate
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 1.0,
         Icon = ZedCommOccupancyPlate,
@@ -18,7 +20,8 @@ module ZedComm
 
     item WeightPlate
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 2.0,
         Icon = ZedCommWeightPlate,
@@ -26,7 +29,8 @@ module ZedComm
 
     item SignalWire
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:wire,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommSignalWire,
@@ -34,7 +38,8 @@ module ZedComm
 
     item NumericDisplay
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:receiver,
         ItemType = base:normal,
         Weight = 0.5,
         Icon = ZedCommNumericDisplay,
@@ -42,7 +47,8 @@ module ZedComm
 
     item AdvancedDisplay
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:receiver,
         ItemType = base:normal,
         Weight = 0.5,
         Icon = ZedCommNumericDisplay,
@@ -50,7 +56,8 @@ module ZedComm
 
     item CacheModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -58,7 +65,8 @@ module ZedComm
 
     item BasicAdapter
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:adapter,
         ItemType = base:normal,
         Weight = 0.2,
         Icon = ZedCommAdvancedAdapter,
@@ -66,7 +74,8 @@ module ZedComm
 
     item AdvancedAdapter
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:adapter,
         ItemType = base:normal,
         Weight = 0.2,
         Icon = ZedCommAdvancedAdapter,
@@ -74,7 +83,8 @@ module ZedComm
 
     item ThresholdModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -82,7 +92,8 @@ module ZedComm
 
     item SmallCabinet
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:cabinet,
         ItemType = base:normal,
         Weight = 4.0,
         Icon = ZedCommSmallCabinet,
@@ -90,7 +101,8 @@ module ZedComm
 
     item AdvancedSmallCabinet
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:cabinet,
         ItemType = base:normal,
         Weight = 4.0,
         Icon = ZedCommSmallCabinet,
@@ -98,7 +110,8 @@ module ZedComm
 
     item SplitterModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -106,7 +119,8 @@ module ZedComm
 
     item InputExtension
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -114,7 +128,8 @@ module ZedComm
 
     item OutputExtension
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -122,7 +137,8 @@ module ZedComm
 
     item AndModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -130,7 +146,8 @@ module ZedComm
 
     item AdderModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -138,7 +155,8 @@ module ZedComm
 
     item SubtractorModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -146,7 +164,8 @@ module ZedComm
 
     item MultiplierModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -154,7 +173,8 @@ module ZedComm
 
     item OrModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -162,7 +182,8 @@ module ZedComm
 
     item XorModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -170,7 +191,8 @@ module ZedComm
 
     item NotModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -178,7 +200,8 @@ module ZedComm
 
     item DebugByteSource
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 0.5,
         Icon = ZedCommNumericDisplay,
@@ -186,7 +209,8 @@ module ZedComm
 
     item NetworkSwitch
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 0.2,
         Icon = ZedCommNetworkSwitch,
@@ -195,7 +219,8 @@ module ZedComm
 
     item TimerModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -203,7 +228,8 @@ module ZedComm
 
     item WaitModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -211,7 +237,8 @@ module ZedComm
 
     item MainsSourceModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -219,7 +246,8 @@ module ZedComm
 
     item BatterySourceModule
     {
-        DisplayCategory = Electronics,
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:infrastructure;zedcomm:module,
         ItemType = base:normal,
         Weight = 0.1,
         Icon = ZedCommThresholdModule,
@@ -231,7 +259,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -250,7 +278,7 @@ module ZedComm
         time = 100,
         SkillRequired = Electricity:3,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -268,7 +296,7 @@ module ZedComm
         timedAction = MakingElectrical,
         time = 30,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 [Base.ElectricWire;Base.Wire],
@@ -284,7 +312,7 @@ module ZedComm
         timedAction = MakingElectrical,
         time = 150,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 10 [Base.Wire],
@@ -300,7 +328,7 @@ module ZedComm
         timedAction = MakingElectrical,
         time = 60,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -319,7 +347,7 @@ module ZedComm
         time = 80,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -338,7 +366,7 @@ module ZedComm
         time = 80,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -358,7 +386,7 @@ module ZedComm
         time = 100,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -378,7 +406,7 @@ module ZedComm
         time = 80,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -397,7 +425,7 @@ module ZedComm
         time = 100,
         SkillRequired = Electricity:3,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -416,7 +444,7 @@ module ZedComm
         time = 80,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -435,7 +463,7 @@ module ZedComm
         time = 80,
         SkillRequired = Electricity:3,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -454,7 +482,7 @@ module ZedComm
         time = 40,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -473,7 +501,7 @@ module ZedComm
         time = 40,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -492,7 +520,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -511,7 +539,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -530,7 +558,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -549,7 +577,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -568,7 +596,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -587,7 +615,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -606,7 +634,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -625,7 +653,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -644,7 +672,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:3,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -663,7 +691,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -682,7 +710,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -701,7 +729,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -720,7 +748,7 @@ module ZedComm
         time = 60,
         SkillRequired = Electricity:2,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
@@ -739,7 +767,7 @@ module ZedComm
         time = 50,
         SkillRequired = Electricity:1,
         Tags = InHandCraft;Electrical,
-        category = Electrical,
+        category = ZedComm,
         inputs
         {
             item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],

@@ -158,12 +158,10 @@ check(assert(Circuit.compilePackets(direct, true, "advanced"))({ input = weight 
 
 local split = { modules = {
     splitter = { kind = "splitter", column = 3, row = 1, rotation = 90 },
-    spare = { kind = "outputExtension", column = 3, row = 6, rotation = 270 },
 }, links = {
     { from = "input", output = "out", to = "splitter", input = "in" },
-    { from = "splitter", output = "outA", to = "output", input = "in" },
-    { from = "splitter", output = "outB", to = "spare", input = "in" },
 } }
+local firstPort, secondPort = Circuit.splitterPort("splitter", 1), Circuit.splitterPort("splitter", 2)
 local splitterPart = split.modules.splitter
 for _, mount in ipairs({ { 1, 3, 0 }, { 3, 1, 90 }, { 6, 3, 180 }, { 5, 6, 270 } }) do
     splitterPart.column, splitterPart.row, splitterPart.rotation = mount[1], mount[2], mount[3]
@@ -172,25 +170,26 @@ end
 splitterPart.column, splitterPart.row, splitterPart.rotation = 3, 2, 90
 check(not Circuit.compilePackets(split, true, "basic"), "the cabinet rejects an interior splitter")
 splitterPart.row, splitterPart.rotation = 1, 270
-check(not Circuit.compilePackets(split, true, "basic"), "the cabinet rejects splitter outputs facing out")
+check(not Circuit.compilePackets(split, true, "basic"), "the cabinet rejects splitter jacks facing in")
 splitterPart.rotation = 90
 local basicSplit, _, splitBoard = Circuit.compilePackets(split, true, "basic")
 local branches = basicSplit({ input = weight })
-check(branches.output.value == 115 and branches.spare.value == 115, "a Basic cabinet splits the exact fallback byte")
+check(branches[firstPort].value == 115 and branches[secondPort].value == 115,
+    "one internal input supplies both external jacks with the exact fallback byte")
 branches = basicSplit({ input = packet.basic(0) })
-check(branches.output.value == 0 and branches.spare.value == 0, "splitter forwards connected zero")
+check(branches[firstPort].value == 0 and branches[secondPort].value == 0, "splitter forwards connected zero")
 branches = basicSplit({ input = noFallback })
-check(branches.output == nil and branches.spare == nil, "a Basic splitter clears both branches without a fallback")
-check(splitBoard.dependencies.output.input and splitBoard.dependencies.spare.input,
+check(branches[firstPort] == nil and branches[secondPort] == nil, "a Basic splitter clears both branches without a fallback")
+check(splitBoard.dependencies[firstPort].input and splitBoard.dependencies[secondPort].input,
     "both splitter outputs depend on the same input run")
-split.outputModes = { output = "advanced", spare = "advanced" }
+split.outputModes = { [firstPort] = "advanced", [secondPort] = "advanced" }
 check(not Circuit.compilePackets(split, true, "basic"), "a Basic cabinet rejects advanced output configuration")
 local advancedSplit = assert(Circuit.compilePackets(split, true, "advanced"))
 branches = advancedSplit({ input = noFallback })
-check(packet.equal(branches.output, noFallback) and packet.equal(branches.spare, noFallback),
+check(packet.equal(branches[firstPort], noFallback) and packet.equal(branches[secondPort], noFallback),
     "an Advanced cabinet can split the full packet even without a fallback")
-split.links[1] = { from = "input", output = "out", to = "splitter", input = "outA" }
-check(not Circuit.compilePackets(split, true, "advanced"), "a splitter output cannot be used as a second input")
+split.links[2] = { from = "splitter", output = "outA", to = "output", input = "in" }
+check(not Circuit.compilePackets(split, true, "advanced"), "a splitter jack cannot drive an internal link")
 
 evaluatorBoard.links[1].input, evaluatorBoard.links[2].input = "a", "b"
 evaluatorBoard.modules.module = { kind = "adder", column = 3, row = 3, rotation = 0, fullReading = true }

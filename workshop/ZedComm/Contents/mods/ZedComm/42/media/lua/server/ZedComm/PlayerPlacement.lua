@@ -387,13 +387,21 @@ local function installRelay(registry, square, lamp, character, adapterItem)
     return true, id
 end
 
-local function upgradeCabinet(registry, character, entry, adapter)
+function Placement.canUpgradeCabinet(character, entry, adapter)
+    if not entry or not entry.piece.board then return false, "That cabinet is no longer available." end
     if entry.spec.adapter ~= "basic" then return false, "This cabinet already has an Advanced Adapter." end
     local inventory = character:getInventory()
     if not adapter or adapter:getFullType() ~= Circuit.ADVANCED_ADAPTER_ITEM
         or adapter:getContainer() ~= inventory or not inventory:contains(adapter) then
         return false, "Bring an Advanced Adapter in your main inventory."
     end
+    return true
+end
+
+local function upgradeCabinet(registry, character, entry, adapter)
+    local valid, reason = Placement.canUpgradeCabinet(character, entry, adapter)
+    if not valid then return false, reason end
+    local inventory = character:getInventory()
     local recovered = instanceItem(Circuit.BASIC_ADAPTER_ITEM)
     if not recovered then return false, "Could not recover the Basic Adapter." end
     -- Taking the Advanced Adapter out first frees its weight for the swap.

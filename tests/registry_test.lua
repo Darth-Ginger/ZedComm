@@ -15,7 +15,8 @@
 -- Regression: the game failed when the standard Lua next global was nil.
 next = nil
 
-local LUA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/lua/"
+local MEDIA = "workshop/ZedComm/Contents/mods/ZedComm/42/media/"
+local LUA = MEDIA .. "lua/"
 local PZ = os.getenv("PZ_LUA") or "/path/to/ProjectZomboid/media/lua"
 
 local probe = io.open(PZ .. "/server/Map/SGlobalObjectSystem.lua", "r")
@@ -43,11 +44,14 @@ local function list(items)
     return {
         size = function() return #items end,
         get = function(_, i) return items[i + 1] end,
+        set = function(_, i, item) items[i + 1] = item end,
     }
 end
 
 -- Squares and world objects.
-IsoFlagType = { solid = "solid", solidtrans = "solidtrans", solidfloor = "solidfloor", WallOverlay = "WallOverlay" }
+IsoFlagType = { solid = "solid", solidtrans = "solidtrans", solidfloor = "solidfloor",
+    WallOverlay = "WallOverlay", FloorOverlay = "FloorOverlay" }
+FBORenderChunk = { DIRTY_OBJECT_ADD = 64 }
 local squares = {}
 local loaded = {} -- key -> true when the square is "loaded"
 local function key(x, y, z) return x .. "," .. y .. "," .. z end
@@ -61,6 +65,7 @@ local function square(x, y, z)
         function sq.getY() return y end
         function sq.getZ() return z end
         function sq.getObjects() return list(objects) end
+        function sq.getFloor() return sq.floor end
         function sq.getWorldObjects() return list(sq.looseItems or {}) end
         function sq.getStaticMovingObjects() return list(sq.staticActors or {}) end
         function sq.getWall(_, north)
@@ -88,6 +93,7 @@ local function worldObject(sq, tag)
     function o.getModData() return data end
     function o.getSquare() return sq end
     function o.getProperties() return nil end
+    function o.getSprite() return nil end
     function o.getName() return tag and tag.id or "ZedComm device" end
     sq.objects[#sq.objects + 1] = o
     return o
@@ -201,6 +207,8 @@ print = function(msg) logged[#logged + 1] = tostring(msg) end
 ---------------------------------------------------------------------------
 
 ZedComm = nil
+ItemTag = { register = function(name) return name end }
+dofile(MEDIA .. "registries.lua")
 require("ZedComm/Simulation")
 require("ZedComm/Registry")
 local Packet = ZedComm.SignalModules.Packet
@@ -495,9 +503,15 @@ getSprite = function(name)
     local index = tonumber(string.match(name, "^zedcomm_devices_01_(%d+)$"))
     local displayIndex = tonumber(string.match(name, "^zedcomm_display_01_(%d+)$"))
     local switchIndex = tonumber(string.match(name, "^zedcomm_switch_01_(%d+)$"))
-    if (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40) then
+    local switchFloor = tonumber(string.match(name, "^zedcomm_switch_floor_01_(%d+)$"))
+    local weightGlyph = tonumber(string.match(name, "^zedcomm_weight_face_01_(%d+)$"))
+    if (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40)
+        or (switchFloor and switchFloor < 20) or (weightGlyph and weightGlyph < 62) then
         if not registeredSprites[name] then
-            registeredSprites[name] = { getName = function() return name end }
+            local floorOverlay = displayIndex ~= nil
+                or (index and ((index >= 20 and index <= 25) or (index >= 419 and index <= 431)))
+            local properties = { has = function(_, flag) return floorOverlay and flag == IsoFlagType.FloorOverlay end }
+            registeredSprites[name] = { getName = function() return name end, getProperties = function() return properties end }
         end
         return registeredSprites[name]
     end
@@ -519,7 +533,13 @@ IsoObject = {
         function object.setSprite(_, sprite)
             object.sprite, object.spriteInstance = sprite:getName(), sprite
         end
-        function object.getAttachedAnimSprite() return nil end
+        function object:invalidateRenderChunkLevel(flag) self.chunkDirty = flag end
+        local attachments = {}
+        function object.getAttachedAnimSprite() return #attachments > 0 and list(attachments) or nil end
+        function object:addAttachedAnimSprite(sprite)
+            attachments[#attachments + 1] = { getParentSprite = function() return sprite end }
+        end
+        function object:RemoveAttachedAnim(index) table.remove(attachments, index + 1) end
         object.outlineColors = {}
         object.outlined = {}
         function object.getOutlineHighlightCol(_, index) return object.outlineColors[index] or -1 end
@@ -577,12 +597,25 @@ function inventory.Remove(_, item)
         end
     end
 end
+local itemTags = {}
+do
+    local file = assert(io.open(MEDIA .. "scripts/ZedComm_Items.txt", "r"))
+    local script = file:read("*a")
+    file:close()
+    for name, block in script:gmatch("    item (%w+)%s*{([^}]+)}") do
+        local tags = {}
+        for tag in (block:match("Tags%s*=%s*([^,]+)") or ""):gmatch("[^;%s]+") do tags[tag] = true end
+        itemTags["ZedComm." .. name] = tags
+    end
+end
+
 instanceItem = function(itemType)
     local item = { data = {} }
     function item.getFullType() return itemType end
     function item.getName() return itemType end
     function item.getContainer() return item.container end
     function item.getModData() return item.data end
+    function item:hasTag(tag) return itemTags[itemType] and itemTags[itemType][tag] == true end
     function item:getCurrentUsesFloat() return self.charge or 1 end
     function item:setUsedDelta(charge) self.charge = charge end
     return item
@@ -1103,6 +1136,17 @@ do
         give("ZedComm.PressurePlate")
         give("ZedComm.NumericDisplay")
         for _ = 1, 4 do give("ZedComm.SignalWire") end
+        local cabinetItem = give("ZedComm.SmallCabinet")
+        local indexes = {}
+        for i, entry in ipairs(native:getInventoryObjectList()) do
+            indexes[entry.object:getFullType()] = i
+        end
+        check(indexes["Base.TestMoveable"] < indexes["ZedComm.PressurePlate"]
+            and indexes["ZedComm.PressurePlate"] < indexes["ZedComm.NumericDisplay"]
+            and indexes["ZedComm.NumericDisplay"] < indexes["ZedComm.SmallCabinet"]
+            and indexes["ZedComm.SmallCabinet"] < indexes["ZedComm.SignalWire"],
+            "native placement keeps vanilla entries and groups ZedComm candidates by item tag")
+        inventory:Remove(cabinetItem)
 
         check(selectType(nativePlateTile, "Base.TestMoveable").object == vanilla and native.canCreate,
             "native cycling retains vanilla Moveables")
@@ -1123,6 +1167,29 @@ do
         check(arrive():complete() and not inventory:contains(displayCandidate.object)
             and getCell():getDrag(0) == native, "the same native tool cycles to and places the display")
         local nativeDisplay = placement.piecesAt(playerRegistry, nativeDisplayTile)[1]
+
+        local switchTile = floorTile(63, 55)
+        switchTile.northWall, switchTile.westWall = {}, {}
+        local switchItem = give("ZedComm.NetworkSwitch")
+        selectType(switchTile, "ZedComm.NetworkSwitch")
+        local oldMouseX, oldMouseY, oldSound = screenToIsoX, screenToIsoY, getSoundManager
+        screenToIsoX = function() return 62.5 end
+        screenToIsoY = function() return 55.5 end
+        getSoundManager = function() return { playUISound = function() end } end
+        ISMoveableCursor.rotateMouse(native, 62, 55)
+        native:isValid(switchTile)
+        check(native.objectSprite:getName() == "zedcomm_devices_01_469",
+            "native mouse drag faces the switch toward the selected corner wall")
+        screenToIsoX = function() return 64.5 end
+        ISMoveableCursor.rotateMouse(native, 64, 55)
+        native:isValid(switchTile)
+        check(native.objectSprite:getName() == "zedcomm_devices_01_469",
+            "dragging toward an open edge keeps the selected wall")
+        screenToIsoX, screenToIsoY, getSoundManager = oldMouseX, oldMouseY, oldSound
+        click(switchTile)
+        check(arrive():complete() and not inventory:contains(switchItem)
+            and placement.piecesAt(playerRegistry, switchTile)[1].piece.state.mount == "west",
+            "the vanilla moveable cursor commits the wall chosen by mouse drag")
 
         local laid, previousWire = lay(nativePlateTile, give("ZedComm.SignalWire"), nativePlate.id, "signal")
         assert(laid, previousWire)
@@ -1402,13 +1469,75 @@ check(spriteOf(replacement) == "zedcomm_devices_01_9", "wire shapes are rederive
 check(spriteOf(plateId) == "zedcomm_devices_01_22", "plate direction is rederived from the saved link")
 
 do
+    local tile, wireTile = floorTile(50, 59), floorTile(51, 59)
+    tile.northWall = {}
+    local function setFloor()
+        local floor = worldObject(tile)
+        local attachments = {}
+        function floor:getAttachedAnimSprite() return list(attachments) end
+        function floor:addAttachedAnimSprite(sprite)
+            attachments[#attachments + 1] = { getParentSprite = function() return sprite end }
+        end
+        function floor:RemoveAttachedAnim(index) table.remove(attachments, index + 1) end
+        function floor:invalidateRenderChunkLevel() end
+        tile.floor = floor
+        return floor, attachments
+    end
+    local original, attachments = setFloor()
+    original:addAttachedAnimSprite(getSprite("zedcomm_devices_01_1"))
+    local placed, id = runPlacement(tile, { kind = "place", item = give("ZedComm.NetworkSwitch") })
+    assert(placed)
+    local laid, cable = lay(wireTile, give("ZedComm.SignalWire"), id, "signal")
+    assert(laid)
+    fire("OnTick")
+    check(#attachments == 2 and attachments[2]:getParentSprite():getName() == "zedcomm_switch_floor_01_1",
+        "the switch lead's grounded section attaches to the floor")
+    fire("OnObjectAboutToBeRemoved", original)
+    takeOff(tile, original)
+    local replacement, replacementAttachments = setFloor()
+    fire("OnObjectAdded", replacement)
+    fire("OnTick")
+    check(#attachments == 1 and #replacementAttachments == 1, "reflooring reattaches the grounded lead")
+    fire("LoadGridsquare", tile)
+    check(#replacementAttachments == 1, "loading the floor does not duplicate the lead")
+    assert(target(tile, id, "pickup"))
+    fire("OnTick")
+    check(#replacementAttachments == 0 and playerRegistry.network:record(cable), "pickup clears only the floor lead")
+    inventory:Remove(inventory:getFirstType("ZedComm.NetworkSwitch"))
+end
+
+do
+    local tile = floorTile(49, 50)
+    local placed, display = runPlacement(tile, { kind = "place", item = give("ZedComm.NumericDisplay") })
+    assert(placed)
+    local laid, cable = lay(tile, give("ZedComm.SignalWire"), display, "signal")
+    assert(laid)
+    local displayObject = placement.resolve(playerRegistry, display).object
+    local cableObject = placement.resolve(playerRegistry, cable).object
+    fire("OnTick")
+    check(tile.objects[1] == cableObject and tile.objects[2] == displayObject
+        and displayObject.chunkDirty == FBORenderChunk.DIRTY_OBJECT_ADD,
+        "a wire laid after a display renders beneath its face")
+    tile.objects[1], tile.objects[2] = displayObject, cableObject
+    fire("LoadGridsquare", tile)
+    check(tile.objects[1] == cableObject and playerRegistry.network:record(display).ports.signal == cable,
+        "square load restores draw order without touching the wire connection")
+    displayObject:setSprite(getSprite("zedcomm_devices_01_466"))
+    tile.objects[1], tile.objects[2] = displayObject, cableObject
+    fire("LoadGridsquare", tile)
+    check(tile.objects[1] == displayObject and tile.objects[2] == cableObject,
+        "a raised sprite does not reorder same-tile wires even on a display definition")
+end
+
+do
     local tile = floorTile(50, 50)
     local ok, id = runPlacement(tile, { kind = "place", item = give("ZedComm.PressurePlate") })
     assert(ok, id)
     local decoy = worldObject(floorTile(51, 50), { id = "plate-visual-decoy", kind = "cable" })
     fire("OnObjectAdded", decoy)
     local plateObject = placement.resolve(playerRegistry, id).object
-    plateObject.spriteInstance = { getName = function() return "zedcomm_devices_01_20" end }
+    plateObject.spriteInstance = { getName = function() return "zedcomm_devices_01_20" end,
+        getProperties = getSprite("zedcomm_devices_01_20").getProperties }
     fire("OnTick")
     check(plateObject:getSprite() == getSprite("zedcomm_devices_01_20"),
         "an unlinked neighbor leaves an empty socket using the registered floor sprite")
@@ -1484,7 +1613,7 @@ local byteSource = worldObject(byteTile, {
     id = "debug-byte", kind = "endpoint", definitionId = "ZedComm.DebugByteSource", rigWire = "debug-wire",
 })
 byteSource.sprite = "zedcomm_devices_01_0"
-function byteSource.getSprite() return { getName = function() return byteSource.sprite end } end
+function byteSource.getSprite() return getSprite(byteSource.sprite) end
 function byteSource.setSprite(_, sprite) byteSource.sprite = sprite:getName() end
 local byteWire = worldObject(byteWireTile, { id = "debug-wire", kind = "cable" })
 local byteDisplay = worldObject(byteDisplayTile, {
@@ -1940,7 +2069,9 @@ do
         getOffsetX = function() return 59 end, getWidth = function() return 30 end,
         getOffsetY = function() return 95 end, getHeight = function() return 58 end,
     }
-    function restored.getSprite() return { getTextureForCurrentFrame = function() return tabletopTexture end } end
+    function restored.getSprite()
+        return { getTextureForCurrentFrame = function() return tabletopTexture end, getProperties = function() return nil end }
+    end
     function restored.getDir() return "N" end
     function restored.getRenderYOffset() return 18 end
     fire("OnObjectAdded", restored)
@@ -2312,19 +2443,18 @@ do
     local originalNew = IsoObject.new
     IsoObject.new = function(...)
         local object = originalNew(...)
-        local children = {}
         local setSprite = object.setSprite
+        local attach, detach = object.addAttachedAnimSprite, object.RemoveAttachedAnim
         function object:setSprite(sprite)
             setSprite(self, sprite)
             self.faceChanges = (self.faceChanges or 0) + 1
         end
-        function object:getAttachedAnimSprite() return list(children) end
         function object:addAttachedAnimSprite(sprite)
-            children[#children + 1] = { getParentSprite = function() return sprite end }
+            attach(self, sprite)
             self.faceChanges = (self.faceChanges or 0) + 1
         end
         function object:RemoveAttachedAnim(index)
-            table.remove(children, index + 1)
+            detach(self, index)
             self.faceChanges = (self.faceChanges or 0) + 1
         end
         return object
@@ -2344,7 +2474,7 @@ do
     local function faceOf(object)
         local frames = {}
         local children = object:getAttachedAnimSprite()
-        for i = 0, children:size() - 1 do
+        for i = 0, (children and children:size() or 0) - 1 do
             local name = children:get(i):getParentSprite():getName()
             frames[#frames + 1] = tonumber(name:sub(#prefix + 1))
         end
@@ -2403,6 +2533,36 @@ do
     assert(join(displayTile, wireId, false, displayId, "signal"))
     check(placedReading(displayId) == 85 and replacement.sprite == "zedcomm_display_01_86" and faceOf(replacement) == "",
         "the replacement redraws its received byte after reconnect")
+
+    local plateTile, leadTile, advancedTile = floorTile(130, 127), floorTile(131, 127), floorTile(132, 127)
+    local platePlaced, plateId = runPlacement(plateTile, { kind = "place", item = give("ZedComm.WeightPlate") })
+    local displayPlaced, advancedId = runPlacement(advancedTile,
+        { kind = "place", item = give("ZedComm.AdvancedDisplay") })
+    assert(platePlaced and displayPlaced)
+    local wirePlaced, lead = lay(leadTile, give("ZedComm.SignalWire"), plateId, "signal")
+    assert(wirePlaced and join(advancedTile, lead, false, advancedId, "signal"))
+    assert(runtime.setWeightPlateSender(playerRegistry, plateId, ZedComm.SignalModules.ADVANCED_SENDER))
+    local advancedDisplay = placement.resolve(playerRegistry, advancedId).object
+    local amount = 1150.25
+    plateTile.overlappingVehicle = { getMass = function() return amount end }
+    local function glyphs()
+        local out = {}
+        local children = advancedDisplay:getAttachedAnimSprite()
+        for i = 0, (children and children:size() or 0) - 1 do
+            local frame = children:get(i):getParentSprite():getName():match("^zedcomm_weight_face_01_(%d+)$")
+            if frame then out[#out + 1] = frame end
+        end
+        return table.concat(out, ",")
+    end
+    local byte, _, _, packet = placedReading(advancedId)
+    check(byte == 115 and packet.value.amount == 1150.25 and glyphs() == "1,13,29,36,51,60,61",
+        "the Advanced Display face shows 1150.3 and retains the exact packet for inspection")
+    amount = 1150.42
+    check(placedReading(advancedId) == 115 and glyphs() == "1,13,29,36,52,60,61",
+        "the Advanced Display redraws when only the full reading changes")
+    assert(runtime.setWeightPlateSender(playerRegistry, plateId, ZedComm.SignalModules.BASIC_SENDER))
+    check(placedReading(advancedId) == 115 and advancedDisplay.sprite == "zedcomm_display_01_116"
+        and glyphs() == "", "a Basic signal restores the byte face without stale weight digits")
     IsoObject.new = originalNew
 end
 
@@ -2617,7 +2777,13 @@ do
     end }
     package.loaded["ISUI/ISPanel"] = true
     package.loaded["ISUI/ISButton"] = true
+    package.loaded["ISUI/ISContextMenu"] = true
     package.loaded["ISUI/ISTextBox"] = true
+    local jackMenu
+    ISContextMenu.get = function()
+        jackMenu = menu()
+        return jackMenu
+    end
     local originalTexture, originalFont, originalDrag = getTexture, UIFont, ISMouseDrag
     local originalBindings, originalKeyboard = KeybindId, Keyboard
     getTexture = function() return {} end
@@ -2710,11 +2876,12 @@ do
     check(circuit().modules["threshold-1"].rotation == 0 and #circuit().links == 2,
         "rotation that overlaps a fixed part leaves the existing board intact")
     panel:onRightMouseUp(122, 105)
+    assert(jackMenu.options.Configure)()
     input = "120"
     confirm()
     fire("OnTick")
     check(not lamp.active and circuit().modules["threshold-1"].threshold == 120,
-        "right-clicking the installed part edits its threshold on a steady byte")
+        "Configure from an installed module's context menu edits its threshold on a steady byte")
     assert(optionsAt(lampTile)["Set threshold"])()
     input = "50"
     panel:onMouseDown(122, 105)
@@ -2982,7 +3149,14 @@ do
         tick()
         check(output() == 255 and lamp.active, "restoring an internal arm link uses the existing wire reading")
 
-        assert(playerRegistry:renameCabinetPort(cabinetId, "inputExtension-3", "Arm"))
+        local jack = panel.parts["inputExtension-3"]
+        panel:onRightMouseUp(jack.x + 6, jack.y + 6)
+        assert(jackMenu.options["Rename jack"])()
+        input = "Arm"
+        confirm()
+        check(panel:refresh() and panel.jackLabels["inputExtension-3"] == "Arm"
+            and cabinetPiece().ports["inputExtension-3"] == armWire,
+            "renaming a wired input from the editor updates its label and preserves the cable")
         panel:onMouseDown(160, 89) -- top-edge extension body
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(365, 289)
@@ -2990,11 +3164,14 @@ do
             and cabinetPiece().state.circuit.modules["inputExtension-3"].rotation == 180
             and cabinetPiece().state.portLabels["inputExtension-3"] == "Arm",
             "moving a wired extension to another edge preserves its jack identity")
-        panel:removePart()
+        jack = panel.parts["inputExtension-3"]
+        panel:onRightMouseUp(jack.x + 6, jack.y + 6)
+        assert(jackMenu.options["Remove module"])()
         tick()
         check(output() == nil and not lamp.active and not net:record(armWire).links[cabinetId]
             and not cabinetPiece().state.portLabels["inputExtension-3"]
-            and inventory:getFirstType("ZedComm.InputExtension"), "extension removal returns the item and clears its label")
+            and inventory:getFirstType("ZedComm.InputExtension"),
+            "right-click removal returns the extension, clears its label and leaves its run loose")
         panel:onMouseDown(420, 152)
         panel:onKeyPress(rotateKey)
         panel:onMouseUp(207, 104)
@@ -3298,7 +3475,6 @@ do
         check(record().state.adapter == "basic", "a new default cabinet has a Basic Adapter")
         assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
         local splitter = give("ZedComm.SplitterModule")
-        local extension = give("ZedComm.OutputExtension")
         panel.nextPage.click()
         panel:onMouseDown(420, 322)
         panel:onMouseUp(166, 184)
@@ -3307,21 +3483,15 @@ do
         panel:onMouseDown(420, 322)
         panel:onMouseUp(46, 244)
         local splitterId = assert(panel.selected)
-        panel.previousPage.click()
-        panel:onMouseDown(420, 186)
-        panel:onMouseUp(346, 244)
-        local extensionId = assert(panel.selected)
-        check(not inventory:contains(splitter) and not inventory:contains(extension),
-            "the editor installs the output extension on the right without rotating it")
+        local firstPort = ZedComm.InternalCircuit.splitterPort(splitterId, 1)
+        local secondPort = ZedComm.InternalCircuit.splitterPort(splitterId, 2)
+        check(not inventory:contains(splitter) and record().ports[firstPort] == false
+            and record().ports[secondPort] == false, "installing a splitter exposes two independent external jacks")
         panel:linkTerminal("input", "out")
         panel:linkTerminal(splitterId, "in")
-        panel:linkTerminal(splitterId, "outA")
-        panel:linkTerminal("output", "in")
-        panel:linkTerminal(splitterId, "outB")
-        panel:linkTerminal(extensionId, "in")
         local inRun = runTestWire(floorTile(221, 124), plate, "signal", cabinetTile, cabinet, "input")
-        local firstRun = runTestWire(floorTile(223, 124), cabinet, "output", firstTile, first, "signal")
-        local secondRun = runTestWire(floorTile(222, 125), cabinet, extensionId, secondTile, second, "signal")
+        local firstRun = runTestWire(floorTile(223, 124), cabinet, firstPort, firstTile, first, "signal")
+        local secondRun = runTestWire(floorTile(222, 125), cabinet, secondPort, secondTile, second, "signal")
         assert(playerRegistry:renameRun(firstRun, "First branch"))
         assert(playerRegistry:renameRun(secondRun, "Second branch"))
         local firstName, secondName = playerRegistry:getRunName(firstRun), playerRegistry:getRunName(secondRun)
@@ -3332,7 +3502,16 @@ do
         panel:close()
 
         local upgrade = give("ZedComm.AdvancedAdapter")
+        local instant = player.isTimedActionInstant
+        player.isTimedActionInstant = function() return false end
         assert(optionsAt(cabinetTile)["Upgrade cabinet with Advanced Adapter"])()
+        check(queued.maxTime == 120 and inventory:contains(upgrade) and record().state.adapter == "basic",
+            "cabinet upgrade waits for the timed action before swapping adapters")
+        inventory:Remove(upgrade)
+        check(not queued:isValid() and not queued:complete() and record().state.adapter == "basic",
+            "moving the adapter out of inventory invalidates the queued upgrade")
+        inventory:AddItem(upgrade)
+        player.isTimedActionInstant = instant
         inventory.full = true
         check(not queued:complete() and inventory:contains(upgrade) and record().state.adapter == "basic",
             "failed cabinet upgrade returns the Advanced Adapter")
@@ -3341,17 +3520,29 @@ do
         assert(queued:isValid() and queued:complete())
         local upgraded = record()
         check(not inventory:contains(upgrade) and inventory:getFirstType("ZedComm.BasicAdapter")
-            and upgraded.state.adapter == "advanced" and #upgraded.state.circuit.links == 3
-            and upgraded.ports.input == inRun and upgraded.ports.output == firstRun
-            and upgraded.ports[extensionId] == secondRun, "upgrade returns the Basic Adapter and preserves circuit and runs")
+            and upgraded.state.adapter == "advanced" and #upgraded.state.circuit.links == 1
+            and upgraded.ports.input == inRun and upgraded.ports[firstPort] == firstRun
+            and upgraded.ports[secondPort] == secondRun, "upgrade returns the Basic Adapter and preserves circuit and runs")
         check(playerRegistry:getRunName(firstRun) == firstName and playerRegistry:getRunName(secondRun) == secondName,
             "cabinet upgrade keeps both splitter run names")
         assert(optionsAt(cabinetTile)["Open Small Cabinet"])()
-        panel.selected = "output"
-        panel.configureButton.click()
+        assert(panel:refresh())
+        local jack = panel.parts.output
+        panel:onRightMouseUp(jack.x + 6, jack.y + 6)
+        check(not jackMenu.options["Remove module"], "fixed output cannot be removed from the context menu")
+        local part = panel.parts[splitterId]
+        panel:onRightMouseUp(part.x + 6, part.y + 6)
+        assert(jackMenu.options["Rename SPL-1"])()
+        input = "First output"
+        confirm()
+        check(panel:refresh() and panel.jackLabels[firstPort] == "First output" and not panel.jackLabels[secondPort]
+            and playerRegistry:getRunName(firstRun) == firstName,
+            "renaming an advanced output from the editor leaves the cable run name intact")
+        panel:onRightMouseUp(part.x + 6, part.y + 6)
+        assert(jackMenu.options["Set SPL-1 to Advanced"])()
         check(reading(first).amount == 1150.25 and reading(second) == 115, "splitter branches respect their own output modes")
-        panel.selected = extensionId
-        panel.configureButton.click()
+        panel:onRightMouseUp(part.x + 6, part.y + 6)
+        assert(jackMenu.options["Set SPL-2 to Advanced"])()
         check(reading(second).amount == 1150.25, "both splitter runs can deliver the full reading")
         assert(playerRegistry:unlink(secondRun, second))
         check(reading(first).amount == 1150.25 and reading(second) == nil, "unplugging a branch leaves the other live")
@@ -3367,7 +3558,7 @@ do
         local moved = floorTile(226, 124)
         local item = assert(inventory:getFirstType("ZedComm.AdvancedSmallCabinet"))
         assert(runPlacement(moved, { kind = "place", item = item }))
-        check(record().state.adapter == "advanced" and #record().state.circuit.links == 3,
+        check(record().state.adapter == "advanced" and #record().state.circuit.links == 1,
             "replacing a picked-up cabinet preserves its adapter grade and circuit")
     end
     splitterScenario()

@@ -218,7 +218,9 @@ end
 -- Expose current readings without handing rendering code the mutable cache.
 function Runtime.forEachDisplay(visit)
     for object, reading in pairs(readings) do
-        visit(object, reading.value, reading.lit)
+        local packet = reading.packet
+        local weight = packet and packet.type == "signal.advanced" and packet.value.amount or nil
+        visit(object, reading.value, reading.lit, weight)
     end
 end
 

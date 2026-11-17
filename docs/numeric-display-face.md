@@ -4,6 +4,8 @@
 
 The current Numeric Display shows the live byte on the casing. Values from **0 to 255** are right-aligned, with no leading zeros. The small yellow indicator is lit for nonzero input. An attached display with no live source shows red **---**, while an unattached display has a blank face. **Read numeric display** remains available for an exact diagnostic reading.
 
+The Advanced Display uses the byte face for Basic packets. With an Advanced weight packet, it shows kilograms using five digit positions. Fractional readings show one decimal place when it fits. Larger readings show whole kilograms, and rounded values beyond five digits show **HI**. **Read full signal** always gives the exact kg reading. For example, an 80 kg load shows **80** on Advanced and **8** on Basic.
+
 Placed displays and debug-rig displays use the same casing. A saved display with the old casing picks up the current sprite as its square loads.
 
 ## Integration and artwork

@@ -35,8 +35,8 @@ local kinds = {
         label = "NOT", adapter = true, transform = function(value) return value == 0 and 255 or 0 end },
     cache = { ports = { data = "in", enable = "in", out = "out" },
         item = "ZedComm.CacheModule", label = "Cache" },
-    splitter = { ports = { ["in"] = "in", outA = "out", outB = "out" },
-        item = "ZedComm.SplitterModule", label = "Splitter", edgeMount = true },
+    splitter = { ports = { ["in"] = "in" }, externalOutputs = 2,
+        item = "ZedComm.SplitterModule", label = "Splitter" },
     timer = { ports = { ["in"] = "in", out = "out" }, item = "ZedComm.TimerModule",
         label = "Timer", adapter = true, timed = true, defaultSeconds = 10 },
     wait = { ports = { ["in"] = "in", out = "out" }, item = "ZedComm.WaitModule",
@@ -84,21 +84,28 @@ function Circuit.terminalPosition(rotation, terminal, kind)
     local x, y = terminal == "out" and 1 or 0, 1
     if terminal == "a" or terminal == "data" then y = 0.5 end
     if terminal == "b" or terminal == "enable" then y = 1.5 end
-    if terminal == "outA" then x, y = 1, 0.5 end
-    if terminal == "outB" then x, y = 1, 1.5 end
-    if kind == "splitter" and terminal == "in" then x = 0.2 end
-    if kind == "outputExtension" then x = 1 end
+    if kind == "outputExtension" or (kinds[kind] and kinds[kind].externalOutputs) then x = 1 end
     return rotatePoint(rotation, x, y)
 end
 
-function Circuit.jackAt(part)
-    local x, y = rotatePoint(part.rotation, part.kind == "output" and 1 or 0, 1)
-    return x, y
+function Circuit.jackAt(part, branch)
+    return rotatePoint(part.rotation, part.kind == "output" and 1 or 0, branch and branch - 0.5 or 1)
+end
+
+function Circuit.splitterPort(id, branch)
+    return id .. "/spl-" .. branch
 end
 
 function Circuit.jackLabel(id, direction, custom)
-    local number = id:match("%-(%d+)$")
-    local label = (direction == "sink" and "IN" or "OUT") .. (number and (" " .. number) or "")
+    local splitter, branch = id:match("^([^/]+)/spl%-(%d+)$")
+    local label
+    if splitter then
+        local number = tonumber(splitter:match("%-(%d+)$")) or 1
+        label = "SPL-" .. ((number - 1) * kinds.splitter.externalOutputs + tonumber(branch))
+    else
+        local number = id:match("%-(%d+)$")
+        label = (direction == "sink" and "IN" or "OUT") .. (number and (" " .. number) or "")
+    end
     return custom and label .. " (" .. custom .. ")" or label
 end
 
@@ -146,7 +153,7 @@ local function collectParts(modules, cabinet)
     local size = Circuit.size(cabinet)
     for _, part in pairs(parts) do occupy(cells, part, size) end
     for id, part in pairs(modules) do
-        if type(id) ~= "string" or id == "" or id:find("#", 1, true) or parts[id] or type(part) ~= "table"
+        if type(id) ~= "string" or id == "" or id:find("[#/]") or parts[id] or type(part) ~= "table"
             or not Circuit.moduleAllowed(part.kind, cabinet) or not rotations[part.rotation]
             or (part.kind == "threshold" and not integer(part.threshold, 0, 255)) then
             return nil, "invalid circuit module"
@@ -154,8 +161,8 @@ local function collectParts(modules, cabinet)
         local ok, reason = occupy(cells, part, size)
         if not ok then return nil, reason end
         local spec = kinds[part.kind]
-        if (spec.jack or spec.edgeMount) and not mountFacesEdge(part, size) then
-            return nil, spec.edgeMount and "Splitter must mount on an edge with outputs facing in"
+        if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size) then
+            return nil, spec.externalOutputs and "Splitter must mount on an edge with its jacks facing out"
                 or "extension jack must face out from an edge"
         end
         if part.always ~= nil and (part.kind ~= "cache" or type(part.always) ~= "boolean") then
@@ -290,24 +297,13 @@ function Circuit.compilePackets(layout, cabinet, adapter)
     if not drivers then return nil, linkError end
     local order = orderParts(parts, drivers)
     if not order then return nil, "internal circuit feedback" end
-    local modes = {}
-    if layout.outputModes ~= nil then
-        if not cabinet or type(layout.outputModes) ~= "table" then return nil, "invalid output modes" end
-        for id, mode in pairs(layout.outputModes) do
-            if basicCabinet then return nil, "Advanced output requires an Advanced Cabinet" end
-            if not parts[id] or kinds[parts[id].kind].jack ~= "source" or mode ~= "advanced" then
-                return nil, "invalid output mode"
-            end
-            modes[id] = mode
-        end
-    end
-
-    local directions, dependencies, ancestors = {}, {}, {}
+    local directions, dependencies, ancestors, partOutputs = {}, {}, {}, {}
     local hasMains
     for _, id in ipairs(order) do
         local kind = parts[id].kind
         if kind == "mainsSource" then hasMains = true end
-        local jack = kinds[kind].jack
+        local spec = kinds[kind]
+        local jack = spec.jack
         directions[id] = jack
         local inputs = {}
         if jack == "sink" then inputs[id] = true end
@@ -315,7 +311,28 @@ function Circuit.compilePackets(layout, cabinet, adapter)
             for input in pairs(ancestors[driver]) do inputs[input] = true end
         end
         ancestors[id] = inputs
-        if jack == "source" then dependencies[id] = inputs end
+        if jack == "source" then
+            partOutputs[id] = { id }
+            dependencies[id] = inputs
+        elseif spec.externalOutputs then
+            local ports = {}
+            for branch = 1, spec.externalOutputs do
+                local port = Circuit.splitterPort(id, branch)
+                ports[branch] = port
+                directions[port], dependencies[port] = "source", inputs
+            end
+            partOutputs[id] = ports
+        end
+    end
+
+    local modes = {}
+    if layout.outputModes ~= nil then
+        if not cabinet or type(layout.outputModes) ~= "table" then return nil, "invalid output modes" end
+        for id, mode in pairs(layout.outputModes) do
+            if basicCabinet then return nil, "Advanced output requires an Advanced Cabinet" end
+            if directions[id] ~= "source" or mode ~= "advanced" then return nil, "invalid output mode" end
+            modes[id] = mode
+        end
     end
 
     local function evaluate(inputs, environment)
@@ -325,7 +342,6 @@ function Circuit.compilePackets(layout, cabinet, adapter)
             local part, ports = parts[id], drivers[id] or {}
             local kind = part.kind
             local spec = kinds[kind]
-            -- Both Splitter contacts share the value of their sole input.
             local value = values[ports["in"]]
             if directions[id] == "sink" then
                 value = inputs[id]
@@ -353,16 +369,18 @@ function Circuit.compilePackets(layout, cabinet, adapter)
                     local result = spec.transform and spec.transform(byte) or (byte >= part.threshold and 255 or 0)
                     value = Packet.basic(result)
                 end
-            elseif directions[id] == "source" then
+            elseif directions[id] == "source" and directions[ports["in"]] == "sink" then
                 local byte = Packet.basicValue(value)
-                if directions[ports["in"]] == "sink" then
-                    value = byte ~= nil and Packet.basic(byte > 0 and 255 or 0) or nil
-                elseif modes[id] ~= "advanced" then
-                    value = byte ~= nil and Packet.basic(byte) or nil
-                end
+                value = byte ~= nil and Packet.basic(byte > 0 and 255 or 0) or nil
             end
             values[id] = value
-            if directions[id] == "source" then outputs[id] = value end
+            local outgoing = partOutputs[id]
+            if outgoing then
+                local basic = Packet.basic(Packet.basicValue(value))
+                for _, port in ipairs(outgoing) do
+                    outputs[port] = modes[port] == "advanced" and value or basic
+                end
+            end
         end
         return outputs, deadline
     end

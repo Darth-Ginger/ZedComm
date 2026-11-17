@@ -30,6 +30,21 @@
 
 **Basic and Advanced are adapter hardware tiers.** On a fixture, an Advanced Adapter adds a small local circuit. A cabinet has room for modules in either tier. An Advanced cabinet also supports full readings and a choice of transmission mode per output. The wire carries the packet published on its run. The Phase B prototype's Basic Sender and Advanced Sender labels refer to the sender's packet format. ADR-309 describes the maintained packet transport.
 
+## Item groups
+
+Craftable items use the **ZedComm** inventory and crafting categories. Item scripts use registered `zedcomm:` tags to describe item roles.
+
+| Items | Tags |
+| --- | --- |
+| Plates, switch and debug source | `endpoint`, `source` |
+| Displays | `endpoint`, `receiver` |
+| Adapters | `adapter` |
+| Cabinet items | `infrastructure`, `cabinet` |
+| Circuit module items | `infrastructure`, `module` |
+| Signal Wire | `wire` |
+
+Native Place groups supported items using the source, receiver, cabinet, and wire tags. Device definitions supply placement behavior and ports. The placed sprite's floor overlay property controls shared-tile wire draw order.
+
 ## Draft player workflows
 
 | Workflow | What the player does | What they get |

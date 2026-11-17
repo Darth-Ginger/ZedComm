@@ -10,6 +10,7 @@ local Switch = {
 local offFrames = { north = 467, west = 469, south = 471, east = 473 }
 local facings = { "north", "west", "south", "east" }
 local leadFrames = { [0] = 0, [1] = 1, [2] = 2, [4] = 3, [8] = 4 }
+local floorLeadPrefix = "zedcomm_switch_floor_01_"
 local southWall, eastWall = 2, 8 -- IsoGridSquare.getWallType() masks
 
 function Switch.mounts(square)
@@ -23,6 +24,17 @@ function Switch.mounts(square)
         if eligible[index] then mounts[#mounts + 1] = facing end
     end
     return mounts
+end
+
+function Switch.floorLead(mount, direction)
+    local lead = leadFrames[direction]
+    if lead == nil then return nil end
+    local facing = ((offFrames[mount] or offFrames.north) - offFrames.north) / 2
+    return floorLeadPrefix .. (facing * 5 + lead)
+end
+
+function Switch.isFloorLead(name)
+    return name and name:sub(1, #floorLeadPrefix) == floorLeadPrefix
 end
 
 function Switch.mount(square, preferred)
