@@ -1,6 +1,7 @@
 {
     "ZedCommMakeBasicAdapter": "Make ZedComm Basic Adapter",
     "ZedCommMakeAdvancedAdapter": "Make ZedComm Advanced Adapter",
+    "ZedCommMakeDoorContact": "Make ZedComm Door Contact",
     "ZedCommMakeSignalWire": "Make ZedComm Signal Wire",
     "ZedCommMakeSignalWireFromWireRoll": "Make ZedComm Signal Wire (whole Wire roll)",
     "ZedCommMakeNetworkSwitch": "Make ZedComm Network Switch",

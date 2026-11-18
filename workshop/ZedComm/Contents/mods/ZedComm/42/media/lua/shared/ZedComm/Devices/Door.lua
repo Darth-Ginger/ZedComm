@@ -12,6 +12,19 @@ function Door.isEligible(object)
         and IsoDoor.getDoubleDoorIndex(object) == -1 and IsoDoor.getGarageDoorIndex(object) == -1
 end
 
+function Door.visualMount(object, character)
+    local square = object:getSquare()
+    local from = character:getCurrentSquare()
+    if object:getNorth() then return from:getY() < square:getY() and "north" or "south" end
+    return from:getX() < square:getX() and "west" or "east"
+end
+
+function Door.reverseHinge(object)
+    local sprite = object:getOpenSprite()
+    local props = sprite and sprite:getProperties()
+    return props ~= nil and (props:has("attachedE") or props:has("attachedS"))
+end
+
 local Controller = {}
 Controller.__index = Controller
 

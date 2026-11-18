@@ -31,7 +31,7 @@ function Installation.install(character, registry, object, id, tier)
     local inventory = character:getInventory()
     for _, item in ipairs(adapters) do inventory:Remove(item) end
     data.zedcomm = { id = id, kind = "endpoint", definitionId = Door.ID, state = {
-        adapter = tier, circuit = Circuit.doorPreset(),
+        adapter = tier, circuit = Circuit.doorPreset(), doorMount = Door.visualMount(object, character),
         nativeLock = { locked = object:isLocked(), keyed = object:isLockedByKey() },
     } }
     local called, ok, errorMessage = pcall(registry.addPiece, registry, object)
@@ -41,7 +41,67 @@ function Installation.install(character, registry, object, id, tier)
         for _, item in ipairs(adapters) do inventory:AddItem(item) end
         return false, called and errorMessage or tostring(ok)
     end
+    return true, id, adapters
+end
+
+function Installation.contactMaterials(character)
+    if character:getPerkLevel(Perks.Electricity) < 1 then return nil, "Contact fitting requires Electrical 1." end
+    local inventory = character:getInventory()
+    local item = inventory:getFirstType(ZedComm.DoorContact.ITEM)
+    if not item or not inventory:getFirstType("Base.Screwdriver") then
+        return nil, "Bring a Door Contact and a screwdriver in your main inventory."
+    end
+    return item
+end
+
+function Installation.installContact(character, registry, door, id)
+    if not Door.isEligible(door) or door:getModData().zedcommContact then return false, "Choose a door without a contact sensor." end
+    local item, reason = Installation.contactMaterials(character)
+    if not item then return false, reason end
+    local square = door:getSquare()
+    local object = IsoObject.new(square, "zedcomm_door_floor_01_0", "ZedComm door contact")
+    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = ZedComm.DoorContact.ID }
+    character:getInventory():Remove(item)
+    door:getModData().zedcommContact = id
+    local called, ok, errorMessage = pcall(function()
+        square:AddTileObject(object)
+        return registry:addPiece(object)
+    end)
+    if not called or not ok then
+        if registry.network.pieces[id] then registry:removePiece(id) end
+        door:getModData().zedcommContact = nil
+        object:getModData().zedcomm = nil
+        pcall(square.transmitRemoveItemFromSquare, square, object)
+        character:getInventory():AddItem(item)
+        return false, called and errorMessage or tostring(ok)
+    end
     return true, id
+end
+
+function Installation.removeContact(character, registry, entry)
+    local item = instanceItem(ZedComm.DoorContact.ITEM)
+    local inventory = character:getInventory()
+    if not item or not inventory:hasRoomFor(character, item) then return false, "There is no room for the contact sensor." end
+    local door = ZedComm.DoorContact.host(entry.object)
+    local record = registry.network:record(entry.id)
+    local cable = entry.piece.ports.signal
+    pcall(entry.square.transmitRemoveItemFromSquare, entry.square, entry.object)
+    local objects = entry.square:getObjects()
+    for i = 0, objects:size() - 1 do
+        if objects:get(i) == entry.object then
+            if not registry.network.pieces[entry.id] then
+                entry.object:getModData().zedcomm.state = record.state
+                registry:addPiece(entry.object)
+                if cable then registry:link(cable, entry.id, "signal") end
+            end
+            return false, "Could not remove the contact sensor."
+        end
+    end
+    if registry.network.pieces[entry.id] then registry:removePiece(entry.id) end
+    if door then door:getModData().zedcommContact = nil end
+    entry.object:getModData().zedcomm = nil
+    inventory:AddItem(item)
+    return true
 end
 
 function Installation.remove(character, registry, entry)

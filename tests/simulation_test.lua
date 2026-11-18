@@ -38,6 +38,7 @@ local function boot(client, server)
     package.loaded["ZedComm/Devices/DebugByteSource"] = nil
     package.loaded["ZedComm/Devices/RelayLamp"] = nil
     package.loaded["ZedComm/Devices/Door"] = nil
+    package.loaded["ZedComm/Devices/DoorContact"] = nil
     local handlers = {}
     Events = { OnTick = { Add = function(fn) handlers[#handlers + 1] = fn end },
         OnContainerUpdate = { Add = function() end } }

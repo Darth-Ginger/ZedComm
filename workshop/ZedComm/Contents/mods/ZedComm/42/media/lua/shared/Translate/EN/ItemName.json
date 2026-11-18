@@ -26,5 +26,6 @@
     "ZedComm.XorModule": "ZedComm XOR Module",
     "ZedComm.NotModule": "ZedComm NOT Module",
     "ZedComm.DebugByteSource": "ZedComm Test Byte Source",
-    "ZedComm.NetworkSwitch": "ZedComm Network Switch"
+    "ZedComm.NetworkSwitch": "ZedComm Network Switch",
+    "ZedComm.DoorContact": "ZedComm Door Contact"
 }

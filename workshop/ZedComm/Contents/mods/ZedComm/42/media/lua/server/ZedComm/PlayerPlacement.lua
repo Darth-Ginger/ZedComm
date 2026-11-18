@@ -35,6 +35,8 @@ local items = {
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }
+local contactSpec = { name = "door contact", kind = "endpoint", definitionId = "ZedComm.DoorContact",
+    nativePickup = true, fixtureType = "Door Contact" }
 local doorSpec = { name = "networked door", kind = "endpoint", definitionId = Circuit.DOOR_ID,
     nativePickup = true, fixtureType = "Door" }
 Placement.WIRE_TYPE = items[2].itemType
@@ -138,7 +140,7 @@ end
 function Placement.doorCandidates(square)
     local out = {}
     for _, object in ipairs(squareObjects(square)) do
-        if ZedComm.Door.isEligible(object) and not tagOf(object) then out[#out + 1] = object end
+        if ZedComm.Door.isEligible(object) then out[#out + 1] = object end
     end
     return out
 end
@@ -148,7 +150,8 @@ function Placement.piecesAt(registry, square)
     for _, object in ipairs(squareObjects(square)) do
         local tag = tagOf(object)
         local spec = tag and (specFor(tag.placedItem) or (tag.definitionId == Relay.ID and relaySpec)
-            or (tag.definitionId == Circuit.DOOR_ID and doorSpec))
+            or (tag.definitionId == Circuit.DOOR_ID and doorSpec)
+            or (tag.definitionId == ZedComm.DoorContact.ID and contactSpec))
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
@@ -560,10 +563,31 @@ function Placement.perform(character, command)
     if command.kind == "install-advanced-adapter" and command.item then
         return installRelay(registry, command.square, command.object, character, command.item)
     end
+    if command.kind == "install-door-contact" then
+        if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
+        return ZedComm.DoorInstallation.installContact(character, registry, command.object, chooseId(registry, command.square))
+    end
     if command.kind == "install-door" then
         if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
-        return ZedComm.DoorInstallation.install(character, registry, command.object,
+        local contactItem
+        if command.contact then
+            local reason
+            contactItem, reason = ZedComm.DoorInstallation.contactMaterials(character)
+            if not contactItem then return false, reason end
+            if command.object:getModData().zedcommContact then return false, "Contact sensor is already fitted." end
+        end
+        local ok, id, adapters = ZedComm.DoorInstallation.install(character, registry, command.object,
             chooseId(registry, command.square), command.tier)
+        if not ok or not command.contact then return ok, id end
+        local fitted, result = ZedComm.DoorInstallation.installContact(character, registry, command.object, chooseId(registry, command.square))
+        if not fitted then
+            -- Return the original pair on rollback without capacity checks.
+            registry:removePiece(id)
+            command.object:getModData().zedcomm = nil
+            for _, adapter in ipairs(adapters) do character:getInventory():AddItem(adapter) end
+            return false, result
+        end
+        return true, id
     end
     if command.kind == "place" or command.kind == "lay" then
         return place(registry, character, command.square, command.item,
@@ -582,6 +606,10 @@ function Placement.perform(character, command)
         local cable = target.piece.ports[command.port]
         if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
         return registry:unlink(cable, target.id)
+    end
+    if command.kind == "remove-door-contact" and target.piece.definitionId == ZedComm.DoorContact.ID then
+        if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
+        return ZedComm.DoorInstallation.removeContact(character, registry, target)
     end
     if command.kind == "remove-door-adapters" and target.piece.definitionId == Circuit.DOOR_ID then
         if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end

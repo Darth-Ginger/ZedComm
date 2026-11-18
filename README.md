@@ -4,6 +4,8 @@ A Project Zomboid (Build 42) mod for modular wired electronics and simulated dig
 
 Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through Small Cabinets that hold a 6×6 circuit of logic, arithmetic and timing modules. The [recipe table](docs/recipes.md) lists the craftable parts. The latest recipe changes await in-game verification, and lamp conversion is available in debug mode. Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
 
+Doors also accept an independent crafted Contact source that reports actual open/closed state without an actuator board. Fit inputs only, contact only, or both with the associated materials.
+
 The networked door build awaits its first [gameplay smoke test](docs/networked-door-smoke-test.md). Its [control policy and installed API research](docs/research/networked-door.md) describe the shared 6x3 board and fail-open Lock behavior.
 
 Use the [contributor rules](AGENTS.md) when changing code, tests, or documentation.
@@ -48,8 +50,8 @@ That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `wo
 
 
 - The server has no Lua 5.1. Run the suite in a container: `docker run --rm -v <repo>:/src:ro -v <pz-reference>:<pz-reference>:ro -w /src alpine:3.20 sh -c "apk add -q lua5.1 bash && ZEDCOMM_REQUIRE_LUA=1 bash tests/run.sh"`.
-- Integration suites share fixtures in `tests/support/` and run independently. Without `PZ_LUA`, they use the two global-object stand-ins in `tests/support/pz`. The runner names `native_placement_test.lua` and `placement_cursor_test.lua` as skipped because they need the game's cursor classes. This mode runs 901 checks across 28 suites.
-- Set `PZ_LUA` to the installed game's `media/lua` before a full run. All 962 checks across 30 suites pass with Build 42.22.2 wrappers. For example, from Git Bash run `PZ_LUA='<ProjectZomboid>/media/lua' tests/run.sh`. Run one suite directly with `lua5.1 tests/cabinet_editor_test.lua`.
+- Integration suites share fixtures in `tests/support/` and run independently. Without `PZ_LUA`, they use the two global-object stand-ins in `tests/support/pz`. The runner names `native_placement_test.lua` and `placement_cursor_test.lua` as skipped because they need the game's cursor classes. This mode runs 937 checks across 30 suites.
+- Set `PZ_LUA` to the installed game's `media/lua` before a full run. All 998 checks across 32 suites pass with Build 42.22.2 wrappers. For example, from Git Bash run `PZ_LUA='<ProjectZomboid>/media/lua' tests/run.sh`. Run one suite directly with `lua5.1 tests/cabinet_editor_test.lua`.
 
 ## Building a release
 

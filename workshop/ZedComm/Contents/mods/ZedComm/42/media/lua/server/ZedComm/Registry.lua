@@ -280,6 +280,21 @@ function SZedCommSystem:loadIsoObject(isoObject)
 end
 
 function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
+    local contactId = isoObject:hasModData() and isoObject:getModData().zedcommContact
+    if contactId then
+        isoObject:getModData().zedcommContact = nil
+        if self.network.pieces[contactId] then self:removePiece(contactId) end
+        local square = isoObject:getSquare()
+        local objects = square:getObjects()
+        for i = objects:size() - 1, 0, -1 do
+            local object = objects:get(i)
+            local contactTag = tagOf(object)
+            if contactTag and contactTag.id == contactId then
+                object:getModData().zedcomm = nil
+                square:transmitRemoveItemFromSquare(object)
+            end
+        end
+    end
     local tag = tagOf(isoObject)
     if not tag then return end
     self:removePiece(tag.id)
@@ -289,7 +304,7 @@ end
 -- A square that is not loaded means unavailable, not destroyed.
 function SZedCommSystem:OnChunkLoaded(wx, wy)
     local globalObjects = self.system:getObjectsInChunk(wx, wy)
-    local stale = {}
+    local stale, orphans = {}, {}
     for i = 1, globalObjects:size() do
         local globalObject = globalObjects:get(i - 1)
         local square = getCell():getGridSquare(globalObject:getX(), globalObject:getY(), globalObject:getZ())
@@ -300,7 +315,11 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
                 local object = objects:get(j)
                 local tag = tagOf(object)
                 if tag then
-                    present[tag.id] = true
+                    if tag.definitionId == ZedComm.DoorContact.ID and not ZedComm.DoorContact.host(object) then
+                        orphans[#orphans + 1] = object
+                    else
+                        present[tag.id] = true
+                    end
                     syncFixture(self, object, tag)
                 end
             end
@@ -311,6 +330,9 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
         end
     end
     self.system:finishedWithList(globalObjects)
+    for _, object in ipairs(orphans) do
+        object:getSquare():transmitRemoveItemFromSquare(object)
+    end
     for i = 1, #stale do
         log("world object for " .. stale[i] .. " is gone; dropping its record")
         self:removePiece(stale[i])

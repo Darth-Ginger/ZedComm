@@ -288,6 +288,67 @@ def texture_page(name, atlas, metadata, count):
     return pack_string(name) + ints(count, 1) + metadata + ints(len(png)) + png
 
 
+def door_pages():
+    pages = []
+    floor = Image.new("RGBA", (2048, 1152))
+    floor_records = {}
+    bases = ((68, 194), (60, 194), (68, 198), (60, 198))
+    far_bases = ((116, 218), (12, 218), (116, 222), (12, 222))
+    for reverse in range(2):
+        tileset = "zedcomm_door_reverse_01" if reverse else "zedcomm_door_01"
+        atlas = Image.new("RGBA", (2048, 3456))
+        metadata = bytearray()
+        for facing in range(4):
+            hinge_x, hinge_y = (far_bases if reverse else bases)[facing]
+            mirror = facing in (1, 3)
+            for locked in range(2):
+                for lock in range(6):
+                    for opener in range(6):
+                        index = facing * 72 + locked * 36 + lock * 6 + opener
+                        body = Image.new("RGBA", (48, 48))
+                        pen = ImageDraw.Draw(body)
+                        pen.polygon(((5, 12), (30, 5), (41, 11), (16, 18)), fill="#a4a49a", outline="#303430")
+                        pen.polygon(((5, 12), (16, 18), (16, 35), (5, 29)), fill="#525951", outline="#303430")
+                        pen.polygon(((16, 18), (41, 11), (41, 28), (16, 35)), fill="#7d8477", outline="#303430")
+                        pen.rectangle((21, 24, 23, 26), fill="#ef9f39" if locked else "#45473b")
+                        if mirror: body = ImageOps.mirror(body)
+                        tile = Image.new("RGBA", (128, 256))
+                        ground = Image.new("RGBA", (128, 256))
+                        body_x = max(0, min(80, hinge_x - 24))
+                        body_y = hinge_y - 156
+                        for socket, mode in enumerate((lock, opener)):
+                            x = body_x + (47 - (27 + socket * 7) if mirror else 27 + socket * 7)
+                            y = body_y + 28 - socket * 2
+                            pen = ImageDraw.Draw(body)
+                            local_x = x - body_x
+                            pen.ellipse((local_x-2, y-body_y-2, local_x+2, y-body_y+2), fill="#b48a4d" if mode else "#202922")
+                            if mode:
+                                lane_x = hinge_x + (socket * 3 - 2)
+                                foot = (lane_x, hinge_y + 8)
+                                for width, color in LEAD_STROKES:
+                                    ImageDraw.Draw(tile).line(((x, y), (lane_x, y+8), (lane_x, hinge_y)), fill=color, width=width)
+                                    dx, dy = ((0, 0), *WIRE_DIRECTIONS)[mode-1]
+                                    ImageDraw.Draw(ground).line(((lane_x, hinge_y), foot, (64 + dx, 224 + dy)), fill=color, width=width)
+                        ImageDraw.Draw(body).text((7 if mirror else 24, 35), "L O", fill="#d0c7aa")
+                        tile.alpha_composite(body, (body_x, body_y))
+                        box = tile.getbbox()
+                        x, y, right, bottom = box
+                        ax, ay = index % 16 * 128, index // 16 * 192
+                        atlas.alpha_composite(tile.crop(box), (ax, ay))
+                        metadata += sprite_record(index, ax, ay, right-x, bottom-y, x, y, tileset)
+                        if locked == 0:
+                            slot = facing * 72 + reverse * 36 + lock * 6 + opener
+                            box = ground.getbbox() or (0, 192, 1, 193)
+                            x, y, right, bottom = box
+                            ax, ay = slot % 16 * 128, slot // 16 * 64
+                            floor.alpha_composite(ground.crop(box), (ax, ay))
+                            pages_slot = sprite_record(slot, ax, ay, right-x, bottom-y, x, y, "zedcomm_door_floor_01")
+                            floor_records[slot] = pages_slot
+        pages.append(texture_page(tileset + "0", atlas, metadata, 288))
+    floor_metadata = b"".join(floor_records[i] for i in range(288))
+    return b"".join(pages) + texture_page("zedcomm_door_floor_010", floor, floor_metadata, 288)
+
+
 def switch_page(textures):
     art = []
     for source in SWITCH_ART:
@@ -605,12 +666,12 @@ def main():
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 9) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
-        + weight_face
+        b"PZPK" + ints(1, 12) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        + weight_face + door_pages()
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 5) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 8) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
     switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
@@ -640,6 +701,12 @@ def main():
     tiles += f"{WEIGHT_FACE_SET}\n{WEIGHT_FACE_SET}.png\n".encode("ascii")
     tiles += ints(12, 6, 5, 62)
     tiles += (ints(1) + b"FloorOverlay\n\n") * 62
+    tiles += b"zedcomm_door_01\nzedcomm_door_01.png\n" + ints(16, 18, 6, 288)
+    tiles += ints(0) * 288
+    tiles += b"zedcomm_door_reverse_01\nzedcomm_door_reverse_01.png\n" + ints(16, 18, 7, 288)
+    tiles += ints(0) * 288
+    tiles += b"zedcomm_door_floor_01\nzedcomm_door_floor_01.png\n" + ints(16, 18, 8, 288)
+    tiles += (ints(1) + b"FloorOverlay\n\n") * 288
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 

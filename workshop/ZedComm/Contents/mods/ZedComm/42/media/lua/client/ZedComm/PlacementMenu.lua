@@ -54,7 +54,8 @@ function Action:new(character, command)
     local action = ISBaseTimedAction.new(self, character)
     action.command = command
     local duration = (command.kind == "upgrade-cabinet" or command.kind == "install-door"
-        or command.kind == "remove-door-adapters") and 120 or 25
+        or command.kind == "remove-door-adapters" or command.kind == "install-door-contact"
+        or command.kind == "remove-door-contact") and 120 or 25
     action.maxTime = character:isTimedActionInstant() and 1 or duration
     return action
 end
@@ -84,6 +85,13 @@ function Action:isValid()
         return ZedComm.Door.isEligible(command.object) and command.object:getSquare() == command.square
             and command.object:getModData().zedcomm == nil
             and ZedComm.DoorInstallation.materials(self.character, command.tier) ~= nil
+            and (not command.contact or (not command.object:getModData().zedcommContact
+                and ZedComm.DoorInstallation.contactMaterials(self.character) ~= nil))
+    end
+    if command.kind == "install-door-contact" then
+        return ZedComm.Door.isEligible(command.object) and command.object:getSquare() == command.square
+            and not command.object:getModData().zedcommContact
+            and ZedComm.DoorInstallation.contactMaterials(self.character) ~= nil
     end
     return true
 end
@@ -132,8 +140,13 @@ function Action:complete()
         say(self.character, "Relay wire disconnected. The native lamp switch works again.")
     elseif command.kind == "disconnect-port" then
         say(self.character, "Jack disconnected.")
+    elseif command.kind == "install-door-contact" then
+        say(self.character, "Door contact installed. Its output reports actual door position.")
+    elseif command.kind == "remove-door-contact" then
+        say(self.character, "Door contact returned to inventory.")
     elseif command.kind == "install-door" then
-        say(self.character, "Door adapters installed. Wire the Lock and Open jacks independently.")
+        say(self.character, command.contact and "Door inputs and contact installed. Wire each fixture independently."
+            or "Door adapters installed. Wire the Lock and Open jacks independently.")
     elseif command.kind == "remove-door-adapters" then
         say(self.character, "Door adapters and modules returned to inventory.")
     elseif command.kind == "upgrade-cabinet" then
@@ -890,6 +903,11 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         if entry.spec.nativePickup then
             if entry.piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
                 action("Remove door adapters", { kind = "remove-door-adapters", targetId = entry.id, object = entry.object }, group)
+            elseif entry.piece.definitionId == ZedComm.DoorContact.ID then
+                action("Remove door contact", { kind = "remove-door-contact", targetId = entry.id, object = entry.object }, group)
+                if entry.piece.ports.signal then
+                    action("Disconnect contact wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
+                end
             elseif entry.piece.ports.signal then
                 action("Disconnect relay wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
             end
@@ -900,11 +918,24 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     end
 
     for _, door in ipairs(placement.doorCandidates(square)) do
-        local group = fixtureMenu("Door")
-        for _, tier in ipairs({ "basic", "advanced" }) do
-            if ZedComm.DoorInstallation.materials(player, tier) then
-                action(tier == "basic" and "Install two Basic Adapters" or "Install two Advanced Adapters",
-                    { kind = "install-door", object = door, tier = tier }, group)
+        local data = door:getModData()
+        local contact = not data.zedcommContact and ZedComm.DoorInstallation.contactMaterials(player)
+        if not data.zedcomm or contact then
+            local group = fixtureActions[door] or fixtureMenu("Door")
+            if contact then
+                action("Install contact sensor only", { kind = "install-door-contact", object = door }, group)
+            end
+            if not data.zedcomm then
+                for _, tier in ipairs({ "basic", "advanced" }) do
+                    if ZedComm.DoorInstallation.materials(player, tier) then
+                        action(tier == "basic" and "Install two Basic Adapters" or "Install two Advanced Adapters",
+                            { kind = "install-door", object = door, tier = tier }, group)
+                        if contact then
+                            action(tier == "basic" and "Install Basic inputs and contact" or "Install Advanced inputs and contact",
+                                { kind = "install-door", object = door, tier = tier, contact = true }, group)
+                        end
+                    end
+                end
             end
         end
     end

@@ -1,5 +1,14 @@
 module ZedComm
 {
+    item DoorContact
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.2,
+        Icon = ZedCommAdvancedAdapter,
+    }
+
     item PressurePlate
     {
         DisplayCategory = ZedComm,
@@ -288,6 +297,26 @@ module ZedComm
         outputs
         {
             item 1 ZedComm.AdvancedAdapter,
+        }
+    }
+
+    craftRecipe ZedCommMakeDoorContact
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.DoorContact,
         }
     }
 
