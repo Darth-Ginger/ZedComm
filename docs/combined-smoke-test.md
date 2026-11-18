@@ -8,7 +8,7 @@ Use this guide for the staged singleplayer build. Run the checkpoints in one dis
 - Fully restart Project Zomboid in debug mode, enable **ZedComm** for the save, and load in.
 - Find five clear floor tiles in a row for Checkpoint 1. For later checks, use a site with a powered vanilla lamp with a bulb, a wall for the Network Switch, and enough clear space for two parallel runs. A nearby clear road makes vehicle testing easier.
 - Use the Lua command console for the item grants. Put modules in your main inventory, then find them in the editor's **Carried modules** groups. Click a group header to collapse or expand it. Scroll the pane if the list exceeds its height.
-- At each check-in, report PASS or the step and observed result. Include a screenshot for a placement or visual issue if it helps. Pause while still in the save at Checkpoints 1 and 5 for a console capture. Capture again at Checkpoint 6 after reload. The active log is `%USERPROFILE%/Zomboid/console.txt`.
+- At each check-in, report PASS or the step and observed result. Include a screenshot for a placement or visual issue if it helps. Pause while still in the save at Checkpoints 1 and 5 for a console capture. Capture again at Checkpoint 6 after reload. The active log is `%USERPROFILE%\Zomboid\console.txt`.
 - A connected `0` is a valid signal. An unavailable signal reads as dashes or **no signal**. **Unattached** means the display itself needs a cable.
 
 ## Advanced arithmetic rig
@@ -171,5 +171,5 @@ getPlayer():getInventory():AddItem("Base.Battery")
 ## Verification
 
 - Live singleplayer, Build 42.22.2, 2026-11-17. Darth-Ginger confirmed the remaining Checkpoint 6 checks work for the current scope.
-- Post-cleanup live check, 2026-11-17. Darth-Ginger reported no errors or major differences from the previously tested behavior. Post-reload console: `%USERPROFILE%/Zomboid/zedcomm-test-logs/checkpoint-6-console-20261117-142334-872.txt`.
+- Post-cleanup live check, 2026-11-17. Darth-Ginger reported no errors or major differences from the previously tested behavior. Post-reload console: `%USERPROFILE%\Zomboid\zedcomm-test-logs\checkpoint-6-console-20261117-142334-872.txt`.
 - Offline Lua 5.1. All 863 checks passed before and after the cleanup, using the installed Build 42 Lua wrappers with simulated game objects.
