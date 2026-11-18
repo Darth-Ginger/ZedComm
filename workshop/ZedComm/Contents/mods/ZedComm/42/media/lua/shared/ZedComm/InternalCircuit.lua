@@ -1,9 +1,10 @@
--- Shared board geometry, validation and packet evaluation for both hosts.
+-- Shared board geometry, validation and packet evaluation.
 require "ZedComm/SignalModules"
 local Packet = ZedComm.SignalModules.Packet
 local Sender = ZedComm.SignalModules.Sender
 local Circuit = {
     CABINET_ID = "ZedComm.SmallCabinet",
+    DOOR_ID = "ZedComm.Door",
     ADVANCED_CABINET_ITEM = "ZedComm.AdvancedSmallCabinet",
     BASIC_ADAPTER_ITEM = "ZedComm.BasicAdapter",
     ADVANCED_ADAPTER_ITEM = "ZedComm.AdvancedAdapter",
@@ -52,6 +53,15 @@ Circuit.kinds = kinds
 
 function Circuit.size(cabinet) return cabinet and 6 or 3 end
 
+function Circuit.dimensions(profile)
+    return Circuit.size(profile), profile == "door" and 3 or Circuit.size(profile)
+end
+
+function Circuit.profileFor(definitionId)
+    if definitionId == Circuit.DOOR_ID then return "door" end
+    if definitionId == Circuit.CABINET_ID then return true end
+end
+
 function Circuit.defaultRotation(kind)
     local spec = kinds[kind]
     if spec and spec.item and (spec.jack == "source" or spec.externalOutputs) then return 180 end
@@ -97,7 +107,9 @@ end
 function Circuit.jackLabel(id, direction, custom)
     local splitter, branch = id:match("^([^/]+)/spl%-(%d+)$")
     local label
-    if splitter then
+    if id == "lock" or id == "open" then
+        label = id == "lock" and "Lock IN" or "Open IN"
+    elseif splitter then
         local number = tonumber(splitter:match("%-(%d+)$")) or 1
         label = "SPL-" .. ((number - 1) * kinds.splitter.externalOutputs + tonumber(branch))
     else
@@ -108,6 +120,14 @@ function Circuit.jackLabel(id, direction, custom)
 end
 
 function Circuit.fixedParts(cabinet)
+    if cabinet == "door" then
+        return {
+            lock = { column = 1, row = 1, rotation = 0, kind = "input", label = "Lock IN" },
+            open = { column = 2, row = 3, rotation = 270, kind = "input", label = "Open IN" },
+            lockAction = { column = 6, row = 1, rotation = 0, kind = "output", label = "Lock", action = true },
+            openAction = { column = 4, row = 3, rotation = 90, kind = "output", label = "Open", action = true },
+        }
+    end
     return {
         input = { column = 1, row = 1, rotation = 0, kind = "input" },
         output = { column = Circuit.size(cabinet), row = 1, rotation = 0, kind = "output" },
@@ -117,21 +137,22 @@ end
 function Circuit.moduleAllowed(kind, cabinet)
     local spec = kinds[kind]
     return spec and spec.item ~= nil and (cabinet or spec.adapter == true)
+        and (cabinet ~= "door" or (not spec.jack and not spec.externalOutputs))
 end
 
 local function integer(value, low, high)
     return type(value) == "number" and value >= low and value <= high and math.floor(value) == value
 end
 
-local function occupy(cells, part, size)
+local function occupy(cells, part, columns, rows)
     local column, row = part.column, part.row
     local width, height = Circuit.footprint(part.rotation, part.kind)
-    if not integer(column, 1, size - width + 1) or not integer(row, 1, size - height + 1) then
+    if not integer(column, 1, columns - width + 1) or not integer(row, 1, rows - height + 1) then
         return false, "module outside board"
     end
     for y = row, row + height - 1 do
         for x = column, column + width - 1 do
-            local key = (y - 1) * size + x
+            local key = (y - 1) * columns + x
             if cells[key] then return false, "module overlaps another part" end
             cells[key] = true
         end
@@ -148,15 +169,15 @@ end
 
 local function collectParts(modules, cabinet)
     local parts, cells = Circuit.fixedParts(cabinet), {}
-    local size = Circuit.size(cabinet)
-    for _, part in pairs(parts) do occupy(cells, part, size) end
+    local size, rows = Circuit.dimensions(cabinet)
+    for _, part in pairs(parts) do occupy(cells, part, size, rows) end
     for id, part in pairs(modules) do
         if type(id) ~= "string" or id == "" or id:find("[#/]") or parts[id] or type(part) ~= "table"
             or not Circuit.moduleAllowed(part.kind, cabinet) or not rotations[part.rotation]
             or (part.kind == "threshold" and not integer(part.threshold, 0, 255)) then
             return nil, "invalid circuit module"
         end
-        local ok, reason = occupy(cells, part, size)
+        local ok, reason = occupy(cells, part, size, rows)
         if not ok then return nil, reason end
         local spec = kinds[part.kind]
         if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size) then
@@ -186,10 +207,10 @@ local function collectParts(modules, cabinet)
     return parts
 end
 
-local function collectDrivers(parts, links, size)
+local function collectDrivers(parts, links, limit)
     local drivers, count, last = {}, 0, 0
     for index, link in pairs(links) do
-        if not integer(index, 1, size * size) or type(link) ~= "table" then
+        if not integer(index, 1, limit) or type(link) ~= "table" then
             return nil, "invalid internal link"
         end
         count, last = count + 1, math.max(last, index)
@@ -291,20 +312,29 @@ function Circuit.compilePackets(layout, cabinet, adapter)
             if part.fullReading then return nil, "Full Reading requires an Advanced Cabinet" end
         end
     end
-    local drivers, linkError = collectDrivers(parts, layout.links, Circuit.size(cabinet))
+    local columns, rows = Circuit.dimensions(cabinet)
+    local drivers, linkError = collectDrivers(parts, layout.links, columns * rows)
     if not drivers then return nil, linkError end
+    if cabinet == "door" and basicCabinet then
+        for _ in pairs(layout.modules) do return nil, "Door logic requires Advanced Adapters" end
+        if #layout.links ~= 2 or not drivers.lockAction or drivers.lockAction["in"] ~= "lock"
+            or not drivers.openAction or drivers.openAction["in"] ~= "open" then
+            return nil, "Basic Door requires direct Lock and Open paths"
+        end
+    end
     local order = orderParts(parts, drivers)
     if not order then return nil, "internal circuit feedback" end
-    local directions, dependencies, ancestors, partOutputs = {}, {}, {}, {}
+    local directions, dependencies, ancestors, partOutputs, actions = {}, {}, {}, {}, {}
     local hasMains
     for _, id in ipairs(order) do
         local kind = parts[id].kind
         if kind == "mainsSource" then hasMains = true end
         local spec = kinds[kind]
         local jack = spec.jack
-        directions[id] = jack
+        local action = cabinet == "door" and jack == "source"
+        if action then actions[id] = true else directions[id] = jack end
         local inputs = {}
-        if jack == "sink" then inputs[id] = true end
+        if jack == "sink" or (cabinet == "door" and spec.source) then inputs[id] = true end
         for _, driver in pairs(drivers[id] or {}) do
             for input in pairs(ancestors[driver]) do inputs[input] = true end
         end
@@ -367,7 +397,7 @@ function Circuit.compilePackets(layout, cabinet, adapter)
                     local result = spec.transform and spec.transform(byte) or (byte >= part.threshold and 255 or 0)
                     value = Packet.basic(result)
                 end
-            elseif directions[id] == "source" and directions[ports["in"]] == "sink" then
+            elseif (directions[id] == "source" or actions[id]) and directions[ports["in"]] == "sink" then
                 local byte = Packet.basicValue(value)
                 value = byte ~= nil and Packet.basic(byte > 0 and 255 or 0) or nil
             end
@@ -383,7 +413,15 @@ function Circuit.compilePackets(layout, cabinet, adapter)
         return outputs, deadline
     end
 
-    return evaluate, nil, { directions = directions, dependencies = dependencies, hasMains = hasMains }
+    return evaluate, nil, { directions = directions, dependencies = dependencies, hasMains = hasMains,
+        profile = cabinet, actions = actions }
+end
+
+function Circuit.doorPreset()
+    return { modules = {}, links = {
+        { from = "lock", output = "out", to = "lockAction", input = "in" },
+        { from = "open", output = "out", to = "openAction", input = "in" },
+    } }
 end
 
 -- Numeric preview and byte-facing fixtures use the same compiled graph.

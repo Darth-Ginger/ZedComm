@@ -1,4 +1,4 @@
--- Singleplayer editor for Advanced Adapters and Small Cabinets.
+-- Singleplayer editor for fixture boards and Small Cabinets.
 if isClient() or isServer() then return end
 
 require "ISUI/ISPanel"
@@ -28,7 +28,7 @@ local textures = {}
 local panels = {}
 
 local function reachMessage(cabinet)
-    return "Step next to the " .. (cabinet and "cabinet" or "lamp") .. " to make changes."
+    return "Step next to the " .. (cabinet == "door" and "door" or cabinet and "cabinet" or "lamp") .. " to make changes."
 end
 
 -- `view` allows the two-tile looking range; anything that changes the board needs reach.
@@ -127,10 +127,10 @@ end
 
 function Editor.addOptions(add, registry, entry)
     local layout = entry.piece.state and entry.piece.state.circuit
-    local cabinet = entry.piece.definitionId == Circuit.CABINET_ID
+    local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= ZedComm.RelayLamp.ID) or type(layout) ~= "table"
         or type(layout.modules) ~= "table" then return end
-    add(cabinet and "Open Small Cabinet" or "Open Advanced Adapter", Editor.open, registry, entry)
+    add(cabinet == "door" and "Open Door Board" or cabinet and "Open Small Cabinet" or "Open Advanced Adapter", Editor.open, registry, entry)
     local ids = thresholdIds(layout)
     for i, id in ipairs(ids) do
         local name = #ids == 1 and "Set threshold" or ("Set threshold (" .. id .. ")")
@@ -202,7 +202,7 @@ local function partAt(parts, x, y)
 end
 
 function Editor:insideGrid(x, y)
-    return inside(x, y, gridX, gridY, self.gridWidth, self.gridWidth)
+    return inside(x, y, gridX, gridY, self.gridWidth, self.gridHeight)
 end
 
 local function contactAt(part, x, y)
@@ -225,6 +225,7 @@ function Editor:refresh()
     self.jackLabels = entry.piece.state.portLabels
     self.fixtureName = entry.piece.state.fixtureName
     self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square) and true or false
+    self.readOnly = self.cabinet == "door" and entry.piece.state.adapter ~= "advanced"
     if not self.reachable then self:endDrag() end
     if circuit ~= self.expected then
         local layout = readLayout(self.registry, self.target.id)
@@ -242,7 +243,7 @@ function Editor:refresh()
     for i = 0, inventory:size() - 1 do
         local item = inventory:get(i)
         local kind = kindByItem[item:getFullType()]
-        if kind and Circuit.moduleAllowed(kind, self.cabinet) then
+        if kind and not self.readOnly and Circuit.moduleAllowed(kind, self.cabinet) then
             local row = carried[kind]
             if row then
                 row.count = row.count + 1
@@ -278,6 +279,7 @@ end
 
 function Editor:inReach()
     if not self:refresh() then return false end
+    if self.readOnly then self.message = "Door logic requires two Advanced Adapters."; return false end
     if self.reachable then return true end
     self.terminal = nil
     self.message = reachMessage(self.cabinet)
@@ -382,7 +384,7 @@ end
 
 local function configurable(part, advanced)
     local spec = part and Circuit.kinds[part.kind]
-    return spec and (part.kind == "threshold" or part.kind == "cache" or spec.timed or spec.source
+    return spec and not part.action and (part.kind == "threshold" or part.kind == "cache" or spec.timed or spec.source
         or (advanced and (spec.full ~= nil or spec.jack == "source" or spec.externalOutputs ~= nil)))
 end
 
@@ -595,7 +597,7 @@ function Editor:onRightMouseUp(x, y)
     end
     if part then
         local spec = Circuit.kinds[part.kind]
-        local canRename = self.cabinet and spec.jack
+        local canRename = self.cabinet and spec.jack and not part.action
         local canConfigure = configurable(part, self.adapter == "advanced")
         local canRemove = self.layout.modules[id] ~= nil
         if not (canRename or canConfigure or canRemove) or not self:inReach() then return true end
@@ -672,7 +674,8 @@ function Editor:render()
     if not self:refresh() then self:close(); return end
     local cell = self.cell
     local mouseX, mouseY = self:getMouseX(), self:getMouseY()
-    local title = self.cabinet and (self.adapter == "advanced" and "Advanced Small Cabinet" or "Basic Small Cabinet")
+    local title = self.cabinet == "door" and (self.adapter == "advanced" and "Advanced Door Board" or "Basic Door Board")
+        or self.cabinet and (self.adapter == "advanced" and "Advanced Small Cabinet" or "Basic Small Cabinet")
         or "Advanced Adapter"
     self:setStencilRect(16, 8, self.carriedX + 100, 23)
     self:drawText(self.fixtureName and (title .. " (" .. self.fixtureName .. ")") or title,
@@ -681,8 +684,14 @@ function Editor:render()
     if not self.cabinet then
         self:drawText("Wire in  " .. tostring(self.input or "--"), 16, 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
         self:drawText("Lamp out  " .. tostring(self.output or "--"), 134, 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
+    elseif self.cabinet == "door" then
+        local state = ZedComm.DeviceRuntime.getDoorState(self.target.id)
+        if state then
+            self:drawText((state.open and "Open" or "Closed") .. " | " .. (state.locked and "Locked" or "Unlocked"),
+                16, 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
+        end
     end
-    for row = 0, self.gridSize - 1 do
+    for row = 0, self.gridRows - 1 do
         for column = 0, self.gridSize - 1 do
             self:drawRectBorder(gridX + column * cell, gridY + row * cell, cell, cell, 0.8, 0.34, 0.43, 0.35)
         end
@@ -694,18 +703,19 @@ function Editor:render()
             self:drawRectBorder(part.x + 1, part.y + 1, part.width - 2, part.height - 2, 1, 0.91, 0.76, 0.41)
         end
         local spec = Circuit.kinds[part.kind]
-        local label = part.kind == "threshold" and ("THR " .. part.threshold) or spec.label
+        local label = part.label or (part.kind == "threshold" and ("THR " .. part.threshold)) or spec.label
             or (id == "input" and "Fixed IN" or "Fixed OUT")
+        local labelY = part.label and part.height < part.width and 25 or 6
         if spec.source then label = part.kind == "batterySource" and "Battery" or "Mains" end
-        if self.cabinet and spec.jack then
+        if self.cabinet and spec.jack and not part.action then
             label = Circuit.jackLabel(id, spec.jack)
             local advanced = self.layout.outputModes and self.layout.outputModes[id] == "advanced"
             if advanced then label = label .. " Adv" end
             local reading, detail = jackReading(self, id)
             self:drawTextCentre(reading, part.x + part.width / 2,
-                part.y + 25, 1, 1, 0.91, 1, UIFont.Small)
+                part.y + (labelY == 25 and 41 or 25), 1, 1, 0.91, 1, UIFont.Small)
             local custom = self.jackLabels and self.jackLabels[id]
-            if custom then
+            if custom and part.height >= part.width then
                 self:setStencilRect(part.x + 6, part.y + 41, part.width - 12, 17)
                 self:drawText(custom, part.x + 6, part.y + 41, 0.85, 0.90, 0.85, 1, UIFont.Small)
                 self:clearStencilRect()
@@ -715,6 +725,11 @@ function Editor:render()
                     .. (advanced and " [Advanced]" or "") .. " | " .. detail
             end
             drawJack(self, part)
+        end
+        if part.action and inside(mouseX, mouseY, part.x, part.y, part.width, part.height) then
+            local state = ZedComm.DeviceRuntime.getDoorState(self.target.id)
+            local result = state and state.actions[id]
+            hoveredJack = part.label .. " | " .. (result and (result.reason or result.status) or "Manual control")
         end
         for branch = 1, spec.externalOutputs or 0 do
             local x, y = drawJack(self, part, branch)
@@ -726,10 +741,10 @@ function Editor:render()
                     .. (advanced and " [Advanced]" or "") .. " | " .. detail
             end
         end
-        self:drawRect(part.x + 5, part.y + 5, part.width - 10, 18, 0.85, 0.08, 0.11, 0.08)
+        self:drawRect(part.x + 5, part.y + labelY - 1, part.width - 10, 18, 0.85, 0.08, 0.11, 0.08)
         local textX = part.x + part.width / 2
         if spec.timed and part.width > part.height then textX = part.x + part.width / 4 end
-        self:drawTextCentre(label, textX, part.y + 6, 1, 1, 0.91, 1, UIFont.Small)
+        self:drawTextCentre(label, textX, part.y + labelY, 1, 1, 0.91, 1, UIFont.Small)
         if spec.full or part.kind == "cache" then
             local mode = spec.full and (part.fullReading and "Full" or "Byte")
                 or (part.always and "Always" or "Enabled")
@@ -770,11 +785,12 @@ function Editor:render()
     end
 
     local drag = self.drag
-    local hint = self.reachable and "Drag modules or select two contacts to link." or reachMessage(self.cabinet)
+    local hint = self.readOnly and "Basic Door has fixed Lock and Open paths."
+        or self.reachable and "Drag modules or select two contacts to link." or reachMessage(self.cabinet)
     if drag then
         local preview = self:previewAt(mouseX, mouseY)
         if preview then
-            self:setStencilRect(gridX, gridY, self.gridWidth, self.gridWidth)
+            self:setStencilRect(gridX, gridY, self.gridWidth, self.gridHeight)
             local x, y, w, h = preview.x + 2, preview.y + 2, preview.width - 4, preview.height - 4
             drawPart(self, drag.part.kind, drag.rotation, x, y, w, h, 0.78)
             local part = { kind = drag.part.kind, rotation = drag.rotation, cell = cell,
@@ -825,7 +841,7 @@ function Editor:render()
         self:drawRect(carriedX + 4, y + 2, 10, 10, 1, r, g, b)
         self:drawText(row[2], carriedX + 20, y, 0.85, 0.90, 0.85, 1, UIFont.Small)
     end
-    self:drawText((not drag and hoveredJack) or (self.reachable and self.message) or hint, 16, gridY + self.gridWidth + 16,
+    self:drawText((not drag and hoveredJack) or (self.reachable and self.message) or hint, 16, gridY + self.gridHeight + 16,
         0.90, 0.90, 0.80, 1, UIFont.Small)
     local reach = self.reachable and not drag
     local selected = self.layout.modules[self.selected]
@@ -864,22 +880,24 @@ end
 
 function Editor.open(player, registry, target)
     local entry = selectedHost(player, registry, target, true)
-    local cabinet = entry and entry.piece.definitionId == Circuit.CABINET_ID
+    local cabinet = entry and Circuit.profileFor(entry.piece.definitionId)
     local adapter = cabinet and entry.piece.state.adapter or nil
     if not entry or not entry.piece.state or not Circuit.compile(entry.piece.state.circuit, cabinet, adapter) then
-        player:Say("Choose a nearby Small Cabinet or lamp with an Advanced Adapter.")
+        player:Say("Choose a nearby circuit cabinet, networked door or lamp with an Advanced Adapter.")
         return
     end
     if panels[player] then panels[player]:close() end
     local cell, gridSize = cabinet and 60 or 78, Circuit.size(cabinet)
-    local gridWidth = gridSize * cell
+    local _, gridRows = Circuit.dimensions(cabinet)
+    local gridWidth, gridHeight = gridSize * cell, gridRows * cell
     local controlsY = carriedY + paletteRows * carriedStep
     local legendY = controlsY + (cabinet and 55 or 88)
-    local width, height = gridWidth + 218, math.max(gridWidth + 111, legendY + 50)
+    local width, height = gridWidth + 218, math.max(gridHeight + 111, legendY + 50)
     local panel = ISPanel.new(Editor, math.max(0, (getCore():getScreenWidth() - width) / 2),
         math.max(0, (getCore():getScreenHeight() - height) / 2), width, height)
     panel.player, panel.registry, panel.target = player, registry, target
     panel.cabinet, panel.cell, panel.gridSize, panel.gridWidth = cabinet, cell, gridSize, gridWidth
+    panel.gridRows, panel.gridHeight = gridRows, gridHeight
     panel.carriedX = gridX + gridWidth + 22
     panel.paletteOffset, panel.legendY = 0, legendY
     panel.collapsed = {}

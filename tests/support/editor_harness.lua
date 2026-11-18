@@ -31,7 +31,7 @@ return function()
     function ISPanel:setStencilRect() end
     function ISPanel:clearStencilRect() end
     function ISPanel:drawText() end
-    function ISPanel:drawTextCentre() end
+    function ISPanel:drawTextCentre(text) assert(text ~= nil, "drawTextCentre needs text") end
     function ISPanel:drawRect() end
     function ISPanel:drawRectBorder() end
     function ISPanel:drawTextureScaled() end

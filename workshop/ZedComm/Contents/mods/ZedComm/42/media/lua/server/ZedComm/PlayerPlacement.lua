@@ -3,6 +3,7 @@ if isClient() or isServer() then return end
 
 require "ZedComm/Network"
 require "ZedComm/NativeDevices"
+require "ZedComm/DoorInstallation"
 
 local Placement = {}
 local Network = ZedComm.Network
@@ -34,6 +35,10 @@ local items = {
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }
+local contactSpec = { name = "door contact", kind = "endpoint", definitionId = "ZedComm.DoorContact",
+    nativePickup = true, fixtureType = "Door Contact" }
+local doorSpec = { name = "networked door", kind = "endpoint", definitionId = Circuit.DOOR_ID,
+    nativePickup = true, fixtureType = "Door" }
 Placement.WIRE_TYPE = items[2].itemType
 
 local function specFor(itemType)
@@ -132,15 +137,25 @@ function Placement.relayCandidates(square)
     return out
 end
 
+function Placement.doorCandidates(square)
+    local out = {}
+    for _, object in ipairs(squareObjects(square)) do
+        if ZedComm.Door.isEligible(object) then out[#out + 1] = object end
+    end
+    return out
+end
+
 function Placement.piecesAt(registry, square)
     local out = {}
     for _, object in ipairs(squareObjects(square)) do
         local tag = tagOf(object)
-        local spec = tag and (specFor(tag.placedItem) or (tag.definitionId == Relay.ID and relaySpec))
+        local spec = tag and (specFor(tag.placedItem) or (tag.definitionId == Relay.ID and relaySpec)
+            or (tag.definitionId == Circuit.DOOR_ID and doorSpec)
+            or (tag.definitionId == ZedComm.DoorContact.ID and contactSpec))
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
-            if piece.board then
+            if piece.definitionId == Circuit.CABINET_ID then
                 local advanced = piece.state.adapter == "advanced"
                 spec = specFor(advanced and Circuit.ADVANCED_CABINET_ITEM or Circuit.CABINET_ID)
             end
@@ -390,7 +405,7 @@ local function installRelay(registry, square, lamp, character, adapterItem)
 end
 
 function Placement.canUpgradeCabinet(character, entry, adapter)
-    if not entry or not entry.piece.board then return false, "That cabinet is no longer available." end
+    if not entry or entry.piece.definitionId ~= Circuit.CABINET_ID then return false, "That cabinet is no longer available." end
     if entry.spec.adapter ~= "basic" then return false, "This cabinet already has an Advanced Adapter." end
     local inventory = character:getInventory()
     if not adapter or adapter:getFullType() ~= Circuit.ADVANCED_ADAPTER_ITEM
@@ -430,7 +445,7 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
         return false, "That device is no longer within reach."
     end
     local state = entry.piece.state
-    local cabinet = entry.piece.definitionId == Circuit.CABINET_ID
+    local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= Relay.ID) or not state
         or type(expected) ~= "table" or state.circuit ~= expected then
         return false, "The circuit changed. Reopen the editor."
@@ -548,6 +563,16 @@ function Placement.perform(character, command)
     if command.kind == "install-advanced-adapter" and command.item then
         return installRelay(registry, command.square, command.object, character, command.item)
     end
+    if command.kind == "install-door-contact" then
+        if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
+        return ZedComm.DoorInstallation.installContact(character, registry, command.object, chooseId(registry, command.square))
+    end
+    if command.kind == "install-door" then
+        if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
+        return ZedComm.DoorInstallation.fit(character, registry, command.object,
+            chooseId(registry, command.square), command.tier,
+            command.contact and chooseId(registry, command.square) or nil)
+    end
     if command.kind == "place" or command.kind == "lay" then
         return place(registry, character, command.square, command.item,
             Placement.resolve(registry, command.anchorId), command.anchorPort, command.kind == "lay", command.mount)
@@ -565,6 +590,14 @@ function Placement.perform(character, command)
         local cable = target.piece.ports[command.port]
         if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
         return registry:unlink(cable, target.id)
+    end
+    if command.kind == "remove-door-contact" and target.piece.definitionId == ZedComm.DoorContact.ID then
+        if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
+        return ZedComm.DoorInstallation.removeContact(character, registry, target)
+    end
+    if command.kind == "remove-door-adapters" and target.piece.definitionId == Circuit.DOOR_ID then
+        if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
+        return ZedComm.DoorInstallation.remove(character, registry, target)
     end
     if command.kind == "upgrade-cabinet" and target.piece.board then
         return upgradeCabinet(registry, character, target, command.item)

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+- Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 255, open sends 0, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
+
+- Networked doors have a placeholder attached maglock housing with four mounting faces and both hinge layouts, separate hinge-side risers, floor-overlay leads and an actual-lock light. Native door sprites are retained. Visual alignment awaits gameplay verification.
+
+- Single-panel map and player-built doors can be fitted with two matching adapters. Lock and Open are independent inputs. Lock ON waits for an already-open door to close, unavailable Lock unlocks, and unwired functions return native control. Basic has fixed paths. Advanced provides a 6x3 board using existing modules. Installation/removal are timed and return adapters and modules on removal. Native gameplay verification is pending in `docs/networked-door-smoke-test.md`.
+
 - Registry integration checks are split into independent persistence, runtime, placement, rendering, lamp, plate, debug-menu and editor suites with shared fixtures. The Lua runner reports total checks and names suites skipped without installed game Lua.
 
 - Debug-rig wires use the standard Signal Wire item tag and rendering path. Removed the route-sprite flag and cleanup for retired switch-floor attachments. Older development rigs and floor attachments are not migrated.

@@ -3,6 +3,7 @@ if isClient() or isServer() then return end
 
 require "ZedComm/WireShape"
 require "ZedComm/ModuleVisuals"
+require "ZedComm/DoorVisuals"
 require "ZedComm/Devices/RelayLamp"
 require "ZedComm/Devices/NetworkSwitch"
 local Shape = ZedComm.WireShape
@@ -111,6 +112,7 @@ end
 
 local function onTick()
     local network = currentNetwork()
+    ZedComm.DoorVisuals.update(network, getCell())
     if not network then
         lastNetwork, lastVersion = nil, nil
         layoutNetwork, layoutVersion, cableSprites = nil, nil, nil

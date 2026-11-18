@@ -34,6 +34,7 @@ RECIPES = [
     ("Adapters", "BasicAdapter", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True),
     ("Adapters", "AdvancedAdapter", 3, 100, {SCRAP: 3, WIRE: 2}, 1, True),
 
+    ("Wire and devices", "DoorContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True),
     ("Wire and devices", "SignalWire", None, 30, {WIRE: 1}, 5, False),
     ("Wire and devices", "NetworkSwitch", None, 60, {SCRAP: 1, WIRE: 1}, 1, True),
     ("Wire and devices", "PressurePlate", 1, 80, {SHEET: 1, BASIC: 1}, 1, True),

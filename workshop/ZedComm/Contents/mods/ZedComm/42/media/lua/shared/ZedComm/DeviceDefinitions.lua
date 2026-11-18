@@ -4,6 +4,8 @@
 -- match predicates must be pure and return a boolean. Multiple matches fail.
 -- Sources sample a byte, or a raw reading for their declared readingKind.
 -- Receivers name a receiver module and bind it to their fixture.
+-- Receiver boards bind an action controller with adapter(action), flush() and
+-- release(). Single-port fixtures bind one adapter directly.
 -- Callbacks stay in code, never in saved records. Runtime invocation is separate.
 
 ZedComm = ZedComm or {}
