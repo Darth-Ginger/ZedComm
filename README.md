@@ -45,6 +45,7 @@ Once, from the repo root in PowerShell (or `tools/link-dev.sh` in Git Bash):
 That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `workshop\ZedComm`. Enable ZedComm in the game's Mods menu; edits load on the next game or Lua reload, with no build step. `.\tools\link-dev.ps1 -Remove` deletes the link only.
 
 
+- The server clone `<repo>` is separate from the PC's test checkout. An edit made on the server reaches the game only after it is pulled or copied into that checkout. A save and reload in game did not pick up a server edit on 2026-11-16. Before a live check, do a full game restart and confirm the new code is loaded with a one-line `print(...)` in the debug console.
 - The server has no Lua 5.1. Run the suite in a container: `docker run --rm -v <repo>:/src:ro -v <pz-reference>:<pz-reference>:ro -w /src alpine:3.20 sh -c "apk add -q lua5.1 bash && ZEDCOMM_REQUIRE_LUA=1 bash tests/run.sh"`.
 - `tests/registry_test.lua` (the registry, runtime, placement, menu and editor checks) runs in CI against small stand-ins for two game classes in `tests/support/pz`, and skips its cursor checks there. Those need the game's Lua: set `PZ_LUA` to a copy of the game's `media/lua` and run the suite before an in-game check. Against the server's 42.21 reference copy it also needs a `Core` stub: `lua5.1 -e 'Core={getTileScale=function() return 1 end}' tests/registry_test.lua`, with `PZ_LUA` pointing at a newer copy when one exists.
 
