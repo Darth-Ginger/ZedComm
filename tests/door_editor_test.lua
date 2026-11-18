@@ -1,5 +1,9 @@
 local test = dofile("tests/support/editor_harness.lua")()
-local makeDoor = dofile("tests/support/door_fixture.lua")(test.worldObject)
+local makeDoor = dofile("tests/support/door_fixture.lua")(function(tile)
+    local object = IsoObject.new(tile, "zedcomm_devices_01_467")
+    tile.objects[#tile.objects + 1] = object
+    return object
+end)
 test.player.getPerkLevel = function() return 3 end
 local check, Circuit = test.check, ZedComm.InternalCircuit
 local tile = test.floorTile(200, 200)

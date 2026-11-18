@@ -60,7 +60,8 @@ function Installation.installContact(character, registry, door, id)
     if not item then return false, reason end
     local square = door:getSquare()
     local object = IsoObject.new(square, "zedcomm_door_floor_01_0", "ZedComm door contact")
-    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = ZedComm.DoorContact.ID }
+    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = ZedComm.DoorContact.ID,
+        state = { doorMount = Door.visualMount(door, character) } }
     character:getInventory():Remove(item)
     door:getModData().zedcommContact = id
     local called, ok, errorMessage = pcall(function()
@@ -76,6 +77,23 @@ function Installation.installContact(character, registry, door, id)
         return false, called and errorMessage or tostring(ok)
     end
     return true, id
+end
+
+function Installation.fit(character, registry, door, id, tier, contactId)
+    if contactId then
+        local item, reason = Installation.contactMaterials(character)
+        if not item then return false, reason end
+        if door:getModData().zedcommContact then return false, "Contact sensor is already fitted." end
+    end
+    local ok, result, adapters = Installation.install(character, registry, door, id, tier)
+    if not ok or not contactId then return ok, result end
+    local fitted, reason = Installation.installContact(character, registry, door, contactId)
+    if fitted then return true, id end
+    registry:removePiece(id)
+    door:getModData().zedcomm = nil
+    -- Rollback restores the consumed objects, including their inventory metadata.
+    for _, adapter in ipairs(adapters) do character:getInventory():AddItem(adapter) end
+    return false, reason
 end
 
 function Installation.removeContact(character, registry, entry)

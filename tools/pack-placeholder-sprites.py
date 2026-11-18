@@ -51,6 +51,12 @@ TILE_CENTER = (64, 224)
 LEAD_STROKES = ((5, "#3a2522"), (3, "#6e4037"), (1, "#946452"))
 
 
+def draw_lead(image, *points):
+    pen = ImageDraw.Draw(image)
+    for width, color in LEAD_STROKES:
+        pen.line(points, fill=color, width=width)
+
+
 def ints(*values):
     return pack(f"<{len(values)}i", *values)
 
@@ -288,18 +294,20 @@ def texture_page(name, atlas, metadata, count):
     return pack_string(name) + ints(count, 1) + metadata + ints(len(png)) + png
 
 
+DOOR_BASES = ((68, 194), (60, 194), (68, 198), (60, 198))
+DOOR_FAR_BASES = ((116, 218), (12, 218), (116, 222), (12, 222))
+
+
 def door_pages():
     pages = []
     floor = Image.new("RGBA", (2048, 1152))
     floor_records = {}
-    bases = ((68, 194), (60, 194), (68, 198), (60, 198))
-    far_bases = ((116, 218), (12, 218), (116, 222), (12, 222))
     for reverse in range(2):
         tileset = "zedcomm_door_reverse_01" if reverse else "zedcomm_door_01"
         atlas = Image.new("RGBA", (2048, 3456))
         metadata = bytearray()
         for facing in range(4):
-            hinge_x, hinge_y = (far_bases if reverse else bases)[facing]
+            hinge_x, hinge_y = (DOOR_FAR_BASES if reverse else DOOR_BASES)[facing]
             mirror = facing in (1, 3)
             for locked in range(2):
                 for lock in range(6):
@@ -325,10 +333,9 @@ def door_pages():
                             if mode:
                                 lane_x = hinge_x + (socket * 3 - 2)
                                 foot = (lane_x, hinge_y + 8)
-                                for width, color in LEAD_STROKES:
-                                    ImageDraw.Draw(tile).line(((x, y), (lane_x, y+8), (lane_x, hinge_y)), fill=color, width=width)
-                                    dx, dy = ((0, 0), *WIRE_DIRECTIONS)[mode-1]
-                                    ImageDraw.Draw(ground).line(((lane_x, hinge_y), foot, (64 + dx, 224 + dy)), fill=color, width=width)
+                                draw_lead(tile, (x,y), (lane_x,y+8), (lane_x,hinge_y))
+                                dx, dy = ((0, 0), *WIRE_DIRECTIONS)[mode-1]
+                                draw_lead(ground, (lane_x,hinge_y), foot, (64+dx,224+dy))
                         ImageDraw.Draw(body).text((7 if mirror else 24, 35), "L O", fill="#d0c7aa")
                         tile.alpha_composite(body, (body_x, body_y))
                         box = tile.getbbox()
@@ -349,6 +356,58 @@ def door_pages():
     return b"".join(pages) + texture_page("zedcomm_door_floor_010", floor, floor_metadata, 288)
 
 
+def contact_pages(textures):
+    body_atlas = Image.new("RGBA", (1536, 1536))
+    floor_atlas = Image.new("RGBA", (1536, 256))
+    body_records, floor_records = [], {}
+    icon = None
+    for facing in range(4):
+        mirror = facing in (1, 3)
+        for reverse in range(2):
+            hinge_x, hinge_y = (DOOR_FAR_BASES if reverse else DOOR_BASES)[facing]
+            for closed in range(2):
+                for mode in range(6):
+                    index = facing * 24 + reverse * 12 + closed * 6 + mode
+                    tile = Image.new("RGBA", (128, 256))
+                    ground = Image.new("RGBA", (128, 256))
+                    # The sensor sits below the actuator so both remain readable.
+                    x, y = hinge_x, hinge_y - 112
+                    towards_leaf = (-1 if mirror else 1) * (-1 if reverse else 1)
+                    draw = ImageDraw.Draw(tile)
+                    sensor = (x - 5, y, x + 4, y + 23)
+                    draw.rectangle(sensor, fill="#c2bda4", outline="#373d38")
+                    draw.line((x-2,y+4,x+1,y+4), fill="#737a6c", width=2)
+                    draw.line((x-2,y+19,x+1,y+19), fill="#737a6c", width=2)
+                    magnet_x = x + towards_leaf * (12 if closed else 22)
+                    draw.rectangle((magnet_x-3,y+3,magnet_x+3,y+20), fill="#959784", outline="#373d38")
+                    if mode:
+                        lane_x = hinge_x - 6
+                        draw_lead(tile, (x,y+23), (lane_x,y+28), (lane_x,hinge_y))
+                        dx, dy = ((0,0), *WIRE_DIRECTIONS)[mode-1]
+                        draw_lead(ground, (lane_x,hinge_y), (lane_x,hinge_y+8), (64+dx,224+dy))
+                    box = tile.getbbox()
+                    left, top, right, bottom = box
+                    ax, ay = index % 12 * 128, index // 12 * 192
+                    body_atlas.alpha_composite(tile.crop(box), (ax,ay))
+                    body_records.append(sprite_record(index, ax,ay,right-left,bottom-top,left,top,"zedcomm_contact_01"))
+                    if closed == 0:
+                        slot = facing * 12 + reverse * 6 + mode
+                        box = ground.getbbox() or (0,192,1,193)
+                        left,top,right,bottom = box
+                        ax,ay = slot % 12 * 128, slot // 12 * 64
+                        floor_atlas.alpha_composite(ground.crop(box),(ax,ay))
+                        floor_records[slot] = sprite_record(slot,ax,ay,right-left,bottom-top,left,top,"zedcomm_contact_floor_01")
+                    if index == 6:
+                        icon = tile.crop(tile.getbbox())
+    icon.thumbnail((48,48),Image.Resampling.NEAREST)
+    inventory = Image.new("RGBA",(64,64))
+    inventory.alpha_composite(icon,((64-icon.width)//2,(64-icon.height)//2))
+    inventory.save(textures / "Item_ZedCommDoorContact.png")
+    return (texture_page("zedcomm_contact_010", body_atlas, b"".join(body_records), 96)
+            + texture_page("zedcomm_contact_floor_010", floor_atlas,
+                           b"".join(floor_records[i] for i in range(48)), 48))
+
+
 def switch_page(textures):
     art = []
     for source in SWITCH_ART:
@@ -367,11 +426,6 @@ def switch_page(textures):
     floor = Image.new("RGBA", (1024, 192))
     floor_metadata = bytearray()
     directions = ((0, 0), *WIRE_DIRECTIONS)
-
-    def draw_lead(tile, *points):
-        draw = ImageDraw.Draw(tile)
-        for stroke, color in LEAD_STROKES:
-            draw.line(points, fill=color, width=stroke)
 
     for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
         back_edge = TILE_CENTER[1] - TILE_WIDTH // 4 + abs(center - TILE_CENTER[0]) // 2
@@ -666,12 +720,12 @@ def main():
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 12) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
-        + weight_face + door_pages()
+        b"PZPK" + ints(1, 14) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        + weight_face + door_pages() + contact_pages(textures)
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 8) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 10) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
     switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
@@ -707,6 +761,10 @@ def main():
     tiles += ints(0) * 288
     tiles += b"zedcomm_door_floor_01\nzedcomm_door_floor_01.png\n" + ints(16, 18, 8, 288)
     tiles += (ints(1) + b"FloorOverlay\n\n") * 288
+    tiles += b"zedcomm_contact_01\nzedcomm_contact_01.png\n" + ints(12, 8, 9, 96)
+    tiles += ints(0) * 96
+    tiles += b"zedcomm_contact_floor_01\nzedcomm_contact_floor_01.png\n" + ints(12, 4, 10, 48)
+    tiles += (ints(1) + b"FloorOverlay\n\n") * 48
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 

@@ -19,7 +19,7 @@ local ok, reason = ZedComm.DeviceDefinitions.register({
     match = function(object, context) return context.getDefinitionId(object) == Contact.ID end,
     sample = function(object)
         local door = Contact.host(object)
-        if door then return door:isOpen() and 255 or 0 end
+        if door then return door:isOpen() and 0 or 255 end
     end,
 })
 if not ok then error(Contact.ID .. ": " .. reason) end

@@ -6,7 +6,7 @@ module ZedComm
         Tags = zedcomm:endpoint;zedcomm:source,
         ItemType = base:normal,
         Weight = 0.2,
-        Icon = ZedCommAdvancedAdapter,
+        Icon = ZedCommDoorContact,
     }
 
     item PressurePlate

@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 0, open sends 255, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
+
+- Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 255, open sends 0, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
 
 - Networked doors have a placeholder attached maglock housing with four mounting faces and both hinge layouts, separate hinge-side risers, floor-overlay leads and an actual-lock light. Native door sprites are retained. Visual alignment awaits gameplay verification.
 

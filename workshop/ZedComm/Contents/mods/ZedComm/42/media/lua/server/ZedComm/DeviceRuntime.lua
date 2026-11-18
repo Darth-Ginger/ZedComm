@@ -1,5 +1,5 @@
 -- Bind loaded world objects to their device definitions, sample sources and
--- run fixture and cabinet circuits around each simulation pass.
+-- evaluate fixture and board circuits around each simulation pass.
 -- Display readings and availability live in memory and are rebuilt on load.
 require "ZedComm/NativeDevices"
 require "ZedComm/Simulation"
@@ -365,7 +365,7 @@ local function releaseReceiver(receiver)
     readings[receiver.object] = nil
 end
 
-local cabinets, cabinetInputs, pendingCabinets = {}, {}, {}
+local boards, boardInputs, pendingBoards = {}, {}, {}
 
 local function releaseBoard(host)
     if not host or not host.controller then return end
@@ -374,12 +374,12 @@ local function releaseBoard(host)
 end
 
 function Runtime.releaseBoard(id)
-    releaseBoard(cabinets[id])
-    cabinets[id], pendingCabinets[id] = nil, nil
+    releaseBoard(boards[id])
+    boards[id], pendingBoards[id] = nil, nil
 end
 
 function Runtime.getDoorState(id)
-    local host = cabinets[id]
+    local host = boards[id]
     if not host or not host.controller then return nil end
     local object, results = host.object, {}
     for action, result in pairs(host.controller.results) do
@@ -389,7 +389,7 @@ function Runtime.getDoorState(id)
 end
 
 function Runtime.getTimingRemaining(id, moduleId)
-    local host = cabinets[id] or receivers[id]
+    local host = boards[id] or receivers[id]
     if not host or not host.logic then return nil end
     local piece = network and network.pieces[id]
     if not piece or host.piece ~= piece then return nil end
@@ -409,7 +409,7 @@ local function updateCircuitClock(logic, board, object)
     return changed or (logic.deadline ~= nil and logic.deadline <= circuitTime)
 end
 
-local function prepareCabinet(cell, piece, previous)
+local function prepareBoard(cell, piece, previous)
     local object = findObject(cell, piece)
     if not object then
         for port, role in pairs(piece.board.directions) do
@@ -417,42 +417,42 @@ local function prepareCabinet(cell, piece, previous)
         end
         return nil
     end
-    local cabinet = previous and previous.piece == piece and previous.object == object and previous
+    local host = previous and previous.piece == piece and previous.object == object and previous
         or { piece = piece, object = object, inputs = {}, runs = {} }
-    if cabinet ~= previous then
+    if host ~= previous then
         releaseBoard(previous)
         if piece.board.profile == "door" then
             local definition = Definitions.get(piece.definitionId)
-            cabinet.controller = definition.bindFixture(object, context, piece.state.nativeLock)
-            cabinet.actions = {}
+            host.controller = definition.bindFixture(object, context, piece.state.nativeLock)
+            host.actions = {}
             for action in pairs(piece.board.actions) do
-                cabinet.actions[action] = assert(Modules.newReceiver(definition.receiverModule, cabinet.controller:adapter(action)))
+                host.actions[action] = assert(Modules.newReceiver(definition.receiverModule, host.controller:adapter(action)))
             end
         end
     end
-    if cabinet.board ~= piece.board then
-        cabinet.board = piece.board
-        cabinet.inputs, cabinet.runs = {}, {}
-        cabinet.logic = { timers = {} }
-        pendingCabinets[piece.id] = cabinet
+    if host.board ~= piece.board then
+        host.board = piece.board
+        host.inputs, host.runs = {}, {}
+        host.logic = { timers = {} }
+        pendingBoards[piece.id] = host
     end
-    if updateCircuitClock(cabinet.logic, piece.board, object) then pendingCabinets[piece.id] = cabinet end
+    if updateCircuitClock(host.logic, piece.board, object) then pendingBoards[piece.id] = host end
     for port, role in pairs(piece.board.directions) do
         if role == "sink" then
             local run = piece.ports[port] and network:networkOf(piece.id, port) or nil
-            if cabinet.runs[port] ~= run then
-                cabinet.runs[port], cabinet.inputs[port] = run, nil
-                pendingCabinets[piece.id] = cabinet
+            if host.runs[port] ~= run then
+                host.runs[port], host.inputs[port] = run, nil
+                pendingBoards[piece.id] = host
                 Simulation.markDirty(run)
             end
             if run then
-                local group = cabinetInputs[run] or {}
-                group[#group + 1] = { cabinet = cabinet, port = port }
-                cabinetInputs[run] = group
+                local group = boardInputs[run] or {}
+                group[#group + 1] = { host = host, port = port }
+                boardInputs[run] = group
             end
         end
     end
-    return cabinet
+    return host
 end
 
 function Runtime.prepare(registry)
@@ -463,22 +463,22 @@ function Runtime.prepare(registry)
     local current = registry and registry.network
     if current ~= network then
         for _, previous in pairs(receivers) do releaseReceiver(previous) end
-        for _, previous in pairs(cabinets) do releaseBoard(previous) end
+        for _, previous in pairs(boards) do releaseBoard(previous) end
         network = current
-        receivers, readings, cabinets = {}, {}, {}
+        receivers, readings, boards = {}, {}, {}
     end
-    byNetwork, cabinetInputs, pendingCabinets = {}, {}, {}
+    byNetwork, boardInputs, pendingBoards = {}, {}, {}
     if not network then return end
 
     local cell = getCell()
-    local attached, loadedCabinets = {}, {}
+    local attached, loadedBoards = {}, {}
     for id, piece in pairs(network.pieces) do
         if piece.board then
-            loadedCabinets[id] = prepareCabinet(cell, piece, cabinets[id])
+            loadedBoards[id] = prepareBoard(cell, piece, boards[id])
         elseif piece.definitionId and not piece.definitionUnavailable then
             local definition = Definitions.get(piece.definitionId)
             -- A definition callback takes or returns one value, so only
-            -- single-port definitions are bound. Cabinets are handled above.
+            -- single-port definitions are bound. Boards are handled above.
             local port = definition and #definition.ports == 1 and definition.ports[1]
             local object = port and piece.ports[port] ~= nil and findObject(cell, piece)
             local expectedRole = piece.role == "source" and "source" or "receiver"
@@ -534,23 +534,23 @@ function Runtime.prepare(registry)
     for id, previous in pairs(receivers) do
         if attached[id] ~= previous then releaseReceiver(previous) end
     end
-    for id, previous in pairs(cabinets) do
-        if loadedCabinets[id] ~= previous then releaseBoard(previous) end
+    for id, previous in pairs(boards) do
+        if loadedBoards[id] ~= previous then releaseBoard(previous) end
     end
-    receivers, cabinets = attached, loadedCabinets
+    receivers, boards = attached, loadedBoards
 end
 
 function Runtime.deliver(networkId, packet)
     local group = byNetwork[networkId]
-    local inputs = cabinetInputs[networkId]
+    local inputs = boardInputs[networkId]
     if not group and not inputs then return end
     local value = Modules.Packet.basicValue(packet)
     if inputs then
         for _, input in ipairs(inputs) do
-            local cabinet, port = input.cabinet, input.port
-            if not Modules.Packet.equal(cabinet.inputs[port], packet) then
-                cabinet.inputs[port] = Modules.Packet.copy(packet)
-                pendingCabinets[cabinet.piece.id] = cabinet
+            local host, port = input.host, input.port
+            if not Modules.Packet.equal(host.inputs[port], packet) then
+                host.inputs[port] = Modules.Packet.copy(packet)
+                pendingBoards[host.piece.id] = host
             end
         end
     end
@@ -579,18 +579,18 @@ end
 -- Publish only after all input runs for this pass have delivered. The
 -- simulation queues changed output runs for its next pass.
 function Runtime.finish()
-    for id, cabinet in pairs(pendingCabinets) do
-        local piece = cabinet.piece
-        local outputs, deadline = piece.evaluate(cabinet.inputs, cabinet.logic)
-        cabinet.outputs = outputs
-        cabinet.logic.deadline = deadline
+    for id, host in pairs(pendingBoards) do
+        local piece = host.piece
+        local outputs, deadline = piece.evaluate(host.inputs, host.logic)
+        host.outputs = outputs
+        host.logic.deadline = deadline
         for port, role in pairs(piece.board.directions) do
             if role == "source" then
                 network:setPacket(id, outputs[port], port)
             end
         end
     end
-    for _, host in pairs(cabinets) do
+    for _, host in pairs(boards) do
         if host.controller then
             for action, module in pairs(host.actions) do
                 local controlled = false
@@ -612,7 +612,7 @@ end
 -- Native door interactions may bypass the outside lock check. Reconcile after
 -- their no-argument update event so a held network lock applies from both sides.
 Events.OnContainerUpdate.Add(function()
-    for _, host in pairs(cabinets) do
+    for _, host in pairs(boards) do
         if host.controller then host.controller:flush() end
     end
 end)

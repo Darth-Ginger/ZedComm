@@ -569,25 +569,9 @@ function Placement.perform(character, command)
     end
     if command.kind == "install-door" then
         if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
-        local contactItem
-        if command.contact then
-            local reason
-            contactItem, reason = ZedComm.DoorInstallation.contactMaterials(character)
-            if not contactItem then return false, reason end
-            if command.object:getModData().zedcommContact then return false, "Contact sensor is already fitted." end
-        end
-        local ok, id, adapters = ZedComm.DoorInstallation.install(character, registry, command.object,
-            chooseId(registry, command.square), command.tier)
-        if not ok or not command.contact then return ok, id end
-        local fitted, result = ZedComm.DoorInstallation.installContact(character, registry, command.object, chooseId(registry, command.square))
-        if not fitted then
-            -- Return the original pair on rollback without capacity checks.
-            registry:removePiece(id)
-            command.object:getModData().zedcomm = nil
-            for _, adapter in ipairs(adapters) do character:getInventory():AddItem(adapter) end
-            return false, result
-        end
-        return true, id
+        return ZedComm.DoorInstallation.fit(character, registry, command.object,
+            chooseId(registry, command.square), command.tier,
+            command.contact and chooseId(registry, command.square) or nil)
     end
     if command.kind == "place" or command.kind == "lay" then
         return place(registry, character, command.square, command.item,

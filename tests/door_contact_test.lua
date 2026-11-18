@@ -28,25 +28,25 @@ local function reading()
     fire("OnTick")
     return runtime.getDisplay(test.placement.resolve(registry, display).object)
 end
-check(reading() == 0, "closed door sends a valid zero")
+check(reading() == 255, "closed door sends 255")
 door.open = true
-check(reading() == 255 and door.locked == false, "manual opening sends 255 without controlling door")
+check(reading() == 0 and door.locked == false, "manual opening sends a valid zero without controlling door")
 door.open, door.locked = false, true
-check(reading() == 0, "contact reports position independently of lock state")
+check(reading() == 255, "contact reports position independently of lock state")
 test.give("ZedComm.BasicAdapter"); test.give("ZedComm.BasicAdapter")
 local ok, receiver = test.runPlacement(tile, { kind = "install-door", object = door, tier = "basic" })
 assert(ok, receiver)
 check(door:getModData().zedcommContact == id and registry.network.pieces[id], "inputs can be fitted beside existing contact")
 assert(test.target(tile, receiver, "remove-door-adapters"))
 door.open = true
-check(reading() == 255 and registry.network.pieces[id], "removing inputs leaves contact and its run working")
+check(reading() == 0 and registry.network.pieces[id], "removing inputs leaves contact and its run working")
 test.loaded[test.key(400, 400, 0)] = nil
 check(reading() == nil, "unloaded contact publishes unavailable rather than a stale position")
 test.loaded[test.key(400, 400, 0)] = true
-check(reading() == 255, "reloaded contact samples actual native position")
+check(reading() == 0, "reloaded contact samples actual native position")
 local saved = test.save(test.java)
 test.registry, test.java = test.start(saved); registry = test.registry
-check(reading() == 255 and registry.network.pieces[id].ports.signal == wire, "contact identity and wire survive registry reload")
+check(reading() == 0 and registry.network.pieces[id].ports.signal == wire, "contact identity and wire survive registry reload")
 assert(registry:renameFixture(id, "Hall contact"))
 local normalRemove = tile.transmitRemoveItemFromSquare
 tile.transmitRemoveItemFromSquare = function(_, object)

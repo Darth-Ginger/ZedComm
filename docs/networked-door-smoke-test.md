@@ -1,6 +1,6 @@
 # Networked door smoke test
 
-Status is ready for first gameplay verification. Offline results are recorded in [door controls and API research](research/networked-door.md). Run on Build 42.22.2 in singleplayer with ZedComm enabled. Fully restart PZ after loading this build. Do not use a double door or garage door.
+Use [the compact results sheet](door-smoke-results.md) to record each check and console capture. Status is ready for first gameplay verification. Offline results are recorded in [door controls and API research](research/networked-door.md). Run on Build 42.22.2 in singleplayer with ZedComm enabled. Fully restart PZ after loading this build. Do not use a double door or garage door.
 
 ## Setup and grants
 
@@ -69,12 +69,10 @@ Expect both values to be `true`. If either is false, stop and check the Workshop
 5. Reload with the secret-door layout saved and repeat the condition changes. Confirm native manual control returns when Open IN is physically disconnected. The cabinet and the door remain separate boards and networks. The door emits no contact-sensor feedback packet.
 
 
-Housing faces follow the installer side of the native north/west door edge and persist in `doorMount`. Refit from the opposite side to change face. Both hinge layouts use the open sprite attachment metadata. Wires rise along the hinge jamb, with separate Lock/Open lanes. The floor section uses a tagged FloorOverlay helper so finished floors do not mask it. Verify all faces, both hinge layouts, opening/closing, save/reload, and removal without orphaned or duplicate leads.
-
 ## Checkpoint 4 - independent contact source
 
 1. Grant a contact with `getPlayer():getInventory():AddItem("ZedComm.DoorContact")`, or craft one under ZedComm using one Basic Adapter, one Electronics Scrap and one Electric Wire/roll-wire unit with a screwdriver and Electrical 1. Stand beside an unmodified single-panel door and select **ZedComm > Door > Install contact sensor only**. The native door must retain normal manual operation and have no actuator board.
-2. Select the **Door Contact** fixture's free end and wire it directly to a Numeric Display. Expect closed `0` and open `255`, including manual operation. Locking a closed door must leave the reading at `0`. Check its separate compact contact housing and connection tell. It uses placeholder module art.
+2. Select the **Door Contact** fixture's free end and wire it directly to a Numeric Display. Expect closed `255` and open `0`, including manual operation. Locking a closed door must leave the reading at `255`. Check its dedicated sensor/magnet housing, hinge-jamb riser and separate floor lead. The two pieces show closed/open position without replacing the native door sprite.
 3. Fit two actuator adapters to that same door. Keep the contact output on its own run. Open/close it through the receiver and verify that Contact follows actual position, not the requested value. An obstructed movement must leave Contact at the actual position. It needs no internal board links.
 4. Remove the actuator adapters. Contact and its run must keep working. Refit inputs, then remove Contact. Both actuator input connections and the saved board must remain intact. Full main inventory must refuse removal without losing the fixture or its wire.
 5. On a fresh door, bring the required matched adapter pair and a crafted contact. Verify **Install Basic inputs and contact** or **Install Advanced inputs and contact**, including interruption before completion. Successful fitting consumes the matching pair plus contact, retains the screwdriver and creates two independent named fixture menus.
