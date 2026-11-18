@@ -17,8 +17,36 @@ if [ -z "$lua" ]; then
     exit 0
 fi
 status=0
+checks=0
+failures=0
+suites=0
+failed_suites=0
+skipped=()
 for t in tests/*_test.lua; do
     echo "== $t"
-    "$lua" "$t" || status=1
+    if output=$("$lua" "$t" 2>&1); then
+        result=0
+    else
+        result=$?
+        status=1
+        failed_suites=$((failed_suites + 1))
+    fi
+    printf '%s\n' "$output"
+    if [[ "$output" == SKIP\ * ]] && [ "$result" -eq 0 ]; then
+        skipped+=("$t")
+        continue
+    fi
+    suites=$((suites + 1))
+    read -r suite_checks suite_failures < <(
+        printf '%s\n' "$output" | awk '/^[0-9]+ checks, [0-9]+ failed/ { checks += $1; failures += $3 }
+            END { print checks + 0, failures + 0 }'
+    )
+    checks=$((checks + suite_checks))
+    failures=$((failures + suite_failures))
 done
+printf 'Total %d checks, %d failed, %d suites run, %d suites failed, %d skipped\n' \
+    "$checks" "$failures" "$suites" "$failed_suites" "${#skipped[@]}"
+if [ "${#skipped[@]}" -gt 0 ]; then
+    printf 'Skipped %s\n' "${skipped[@]}"
+fi
 exit $status

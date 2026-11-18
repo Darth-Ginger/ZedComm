@@ -33,10 +33,6 @@ function Switch.floorLead(mount, direction)
     return floorLeadPrefix .. (facing * 5 + lead)
 end
 
-function Switch.isFloorLead(name)
-    return name and name:sub(1, #floorLeadPrefix) == floorLeadPrefix
-end
-
 function Switch.mount(square, preferred)
     local mounts = Switch.mounts(square)
     for _, facing in ipairs(mounts) do

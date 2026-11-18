@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Lua 5.1
         run: sudo apt-get update -q && sudo apt-get install -y -q lua5.1
-      - name: Simulation tests
+      - name: Lua test suites
         run: ZEDCOMM_REQUIRE_LUA=1 tests/run.sh
       - name: Recipes match tools/make-recipes.py
         run: python3 tools/make-recipes.py --check
