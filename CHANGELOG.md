@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Single-panel map and player-built doors can be fitted with two matching adapters. Lock and Open are independent inputs. Lock ON waits for an already-open door to close, unavailable Lock unlocks, and unwired functions return native control. Basic has fixed paths. Advanced provides a 6x3 board using existing modules. Installation/removal are timed and return adapters and modules on removal. Native gameplay verification is pending in `docs/networked-door-smoke-test.md`.
+
 - Registry integration checks are split into independent persistence, runtime, placement, rendering, lamp, plate, debug-menu and editor suites with shared fixtures. The Lua runner reports total checks and names suites skipped without installed game Lua.
 
 - Debug-rig wires use the standard Signal Wire item tag and rendering path. Removed the route-sprite flag and cleanup for retired switch-floor attachments. Older development rigs and floor attachments are not migrated.

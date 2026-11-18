@@ -1,5 +1,5 @@
 -- Bind loaded world objects to their device definitions, sample sources and
--- run lamp and cabinet circuits around each simulation pass.
+-- run fixture and cabinet circuits around each simulation pass.
 -- Display readings and availability live in memory and are rebuilt on load.
 require "ZedComm/NativeDevices"
 require "ZedComm/Simulation"
@@ -367,6 +367,27 @@ end
 
 local cabinets, cabinetInputs, pendingCabinets = {}, {}, {}
 
+local function releaseBoard(host)
+    if not host or not host.controller then return end
+    for _, module in pairs(host.actions) do module:detach() end
+    host.controller:release()
+end
+
+function Runtime.releaseBoard(id)
+    releaseBoard(cabinets[id])
+    cabinets[id], pendingCabinets[id] = nil, nil
+end
+
+function Runtime.getDoorState(id)
+    local host = cabinets[id]
+    if not host or not host.controller then return nil end
+    local object, results = host.object, {}
+    for action, result in pairs(host.controller.results) do
+        results[action] = { status = result.status, reason = result.reason }
+    end
+    return { open = object:isOpen(), locked = object:isLocked(), actions = results }
+end
+
 function Runtime.getTimingRemaining(id, moduleId)
     local host = cabinets[id] or receivers[id]
     if not host or not host.logic then return nil end
@@ -396,7 +417,19 @@ local function prepareCabinet(cell, piece, previous)
         end
         return nil
     end
-    local cabinet = previous and previous.piece == piece and previous or { piece = piece, inputs = {}, runs = {} }
+    local cabinet = previous and previous.piece == piece and previous.object == object and previous
+        or { piece = piece, object = object, inputs = {}, runs = {} }
+    if cabinet ~= previous then
+        releaseBoard(previous)
+        if piece.board.profile == "door" then
+            local definition = Definitions.get(piece.definitionId)
+            cabinet.controller = definition.bindFixture(object, context, piece.state.nativeLock)
+            cabinet.actions = {}
+            for action in pairs(piece.board.actions) do
+                cabinet.actions[action] = assert(Modules.newReceiver(definition.receiverModule, cabinet.controller:adapter(action)))
+            end
+        end
+    end
     if cabinet.board ~= piece.board then
         cabinet.board = piece.board
         cabinet.inputs, cabinet.runs = {}, {}
@@ -430,6 +463,7 @@ function Runtime.prepare(registry)
     local current = registry and registry.network
     if current ~= network then
         for _, previous in pairs(receivers) do releaseReceiver(previous) end
+        for _, previous in pairs(cabinets) do releaseBoard(previous) end
         network = current
         receivers, readings, cabinets = {}, {}, {}
     end
@@ -500,6 +534,9 @@ function Runtime.prepare(registry)
     for id, previous in pairs(receivers) do
         if attached[id] ~= previous then releaseReceiver(previous) end
     end
+    for id, previous in pairs(cabinets) do
+        if loadedCabinets[id] ~= previous then releaseBoard(previous) end
+    end
     receivers, cabinets = attached, loadedCabinets
 end
 
@@ -545,6 +582,7 @@ function Runtime.finish()
     for id, cabinet in pairs(pendingCabinets) do
         local piece = cabinet.piece
         local outputs, deadline = piece.evaluate(cabinet.inputs, cabinet.logic)
+        cabinet.outputs = outputs
         cabinet.logic.deadline = deadline
         for port, role in pairs(piece.board.directions) do
             if role == "source" then
@@ -552,7 +590,32 @@ function Runtime.finish()
             end
         end
     end
+    for _, host in pairs(cabinets) do
+        if host.controller then
+            for action, module in pairs(host.actions) do
+                local controlled = false
+                for input in pairs(host.piece.board.dependencies[action]) do
+                    if host.piece.ports[input] or not host.piece.board.directions[input] then controlled = true end
+                end
+                if controlled then
+                    module:receive(Modules.Packet.basicValue(host.outputs and host.outputs[action]))
+                else
+                    module:detach()
+                end
+            end
+            host.controller:flush()
+            for _, module in pairs(host.actions) do module:reconcile() end
+        end
+    end
 end
+
+-- Native door interactions may bypass the outside lock check. Reconcile after
+-- their no-argument update event so a held network lock applies from both sides.
+Events.OnContainerUpdate.Add(function()
+    for _, host in pairs(cabinets) do
+        if host.controller then host.controller:flush() end
+    end
+end)
 
 ZedComm.DeviceRuntime = Runtime
 return Runtime

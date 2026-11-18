@@ -29,14 +29,18 @@ local function boot(client, server)
     package.loaded["ZedComm/NativeDevices"] = nil
     package.loaded["ZedComm/DeviceDefinitions"] = nil
     package.loaded["ZedComm/SignalModules"] = nil
+    package.loaded["ZedComm/InternalCircuit"] = nil
+    package.loaded["ZedComm/Devices/NetworkSwitch"] = nil
     package.loaded["ZedComm/Devices/PressureSensor"] = nil
     package.loaded["ZedComm/Devices/OccupancyPlate"] = nil
     package.loaded["ZedComm/Devices/WeightPlate"] = nil
     package.loaded["ZedComm/Devices/NumericDisplay"] = nil
     package.loaded["ZedComm/Devices/DebugByteSource"] = nil
     package.loaded["ZedComm/Devices/RelayLamp"] = nil
+    package.loaded["ZedComm/Devices/Door"] = nil
     local handlers = {}
-    Events = { OnTick = { Add = function(fn) handlers[#handlers + 1] = fn end } }
+    Events = { OnTick = { Add = function(fn) handlers[#handlers + 1] = fn end },
+        OnContainerUpdate = { Add = function() end } }
     isClient = function() return client end
     isServer = function() return server end
     local printed = {}

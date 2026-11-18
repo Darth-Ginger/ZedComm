@@ -53,7 +53,8 @@ end
 function Action:new(character, command)
     local action = ISBaseTimedAction.new(self, character)
     action.command = command
-    local duration = command.kind == "upgrade-cabinet" and 120 or 25
+    local duration = (command.kind == "upgrade-cabinet" or command.kind == "install-door"
+        or command.kind == "remove-door-adapters") and 120 or 25
     action.maxTime = character:isTimedActionInstant() and 1 or duration
     return action
 end
@@ -78,6 +79,11 @@ function Action:isValid()
         local target = placement.resolve(registry, command.targetId)
         return target and target.object == command.object and target.square == command.square
             and placement.canUpgradeCabinet(self.character, target, command.item)
+    end
+    if command.kind == "install-door" then
+        return ZedComm.Door.isEligible(command.object) and command.object:getSquare() == command.square
+            and command.object:getModData().zedcomm == nil
+            and ZedComm.DoorInstallation.materials(self.character, command.tier) ~= nil
     end
     return true
 end
@@ -125,7 +131,11 @@ function Action:complete()
     elseif command.kind == "disconnect-relay" then
         say(self.character, "Relay wire disconnected. The native lamp switch works again.")
     elseif command.kind == "disconnect-port" then
-        say(self.character, "Cabinet jack disconnected.")
+        say(self.character, "Jack disconnected.")
+    elseif command.kind == "install-door" then
+        say(self.character, "Door adapters installed. Wire the Lock and Open jacks independently.")
+    elseif command.kind == "remove-door-adapters" then
+        say(self.character, "Door adapters and modules returned to inventory.")
     elseif command.kind == "upgrade-cabinet" then
         say(self.character, "Cabinet upgraded. Basic Adapter returned to inventory.")
     elseif command.kind == "set-network-switch" then
@@ -855,7 +865,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
         if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(addDevice, registry, entry) end
         if entry.piece.board then
-            if entry.spec.adapter == "basic" and adapter then
+            if entry.piece.definitionId == ZedComm.InternalCircuit.CABINET_ID and entry.spec.adapter == "basic" and adapter then
                 action("Upgrade cabinet with Advanced Adapter", {
                     kind = "upgrade-cabinet", targetId = entry.id, object = entry.object, item = adapter,
                 }, group)
@@ -864,12 +874,13 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             for port in pairs(entry.piece.ports) do ports[#ports + 1] = port end
             table.sort(ports)
             local editor = ZedComm.AdapterEditor
-            if editor then group[#group + 1] = { "Label cabinet jack", children = labels } end
+            local cabinet = entry.piece.definitionId == ZedComm.InternalCircuit.CABINET_ID
+            if editor then group[#group + 1] = { cabinet and "Label cabinet jack" or "Label door jack", children = labels } end
             for _, port in ipairs(ports) do
                 local label, cable = portLabel(entry, port), entry.piece.ports[port]
                 if editor then addTo(labels, label, editor.renameJack, registry, entry, port) end
                 if cable then
-                    action("Disconnect cabinet jack (" .. label .. ")", {
+                    action((cabinet and "Disconnect cabinet jack (" or "Disconnect door jack (") .. label .. ")", {
                         kind = "disconnect-port", targetId = entry.id, object = entry.object,
                         port = port, cableId = cable,
                     }, group)
@@ -877,12 +888,24 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             end
         end
         if entry.spec.nativePickup then
-            if entry.piece.ports.signal then
+            if entry.piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
+                action("Remove door adapters", { kind = "remove-door-adapters", targetId = entry.id, object = entry.object }, group)
+            elseif entry.piece.ports.signal then
                 action("Disconnect relay wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
             end
         else
             action(groupedWire and "Pick up" or "Pick up " .. name,
                 { kind = "pickup", targetId = entry.id, object = entry.object }, group)
+        end
+    end
+
+    for _, door in ipairs(placement.doorCandidates(square)) do
+        local group = fixtureMenu("Door")
+        for _, tier in ipairs({ "basic", "advanced" }) do
+            if ZedComm.DoorInstallation.materials(player, tier) then
+                action(tier == "basic" and "Install two Basic Adapters" or "Install two Advanced Adapters",
+                    { kind = "install-door", object = door, tier = tier }, group)
+            end
         end
     end
 

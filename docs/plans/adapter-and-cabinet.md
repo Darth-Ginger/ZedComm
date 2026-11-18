@@ -244,9 +244,9 @@ The 1×2 Splitter defaults to the right edge like the Output Extension. Mount it
 
 ### Secret-door example
 
-Use three input runs. A and B each feed a load threshold. C is a hidden basic plate under a crate. Invert C so removing the crate produces an ON condition. Combine the two thresholds and the inverted crate condition with AND. A missing condition clears the door output. The example assumes a door receiver that leaves the door locked when its signal is unavailable. Weight thresholds respond to any qualifying load. A player-only requirement would need a player-specific source.
+Use three input runs. A and B each feed a load threshold. C is a hidden basic plate under a crate. Invert C so removing the crate produces an ON condition. Combine the two thresholds and the inverted crate condition with AND. A missing condition clears the door output. Feed that condition to the door's Open input. The separate Lock input uses ON to lock, OFF or unavailable to unlock. Leave Lock unwired for an ordinary unlocked secret door. Weight thresholds respond to any qualifying load. A player-only requirement would need a player-specific source.
 
-Use a separate output run for each result. The door receives the Boolean unlock command. An advanced output can forward A's full weight through Cache, enabled by the unlock condition or set to Always for a continuous reading. Another output can send the crate-clear Boolean. Use one Output Extension per extra run.
+Use a separate output run for each result. The door receives the Boolean Open command. A separate Lock run can inhibit opening while requested. See [the door controls](../research/networked-door.md) for pending-lock and detach behavior. An advanced output can forward A's full weight through Cache, enabled by the unlock condition or set to Always for a continuous reading. Another output can send the crate-clear Boolean. Use one Output Extension per extra run.
 
 The Advanced Display is the first Advanced Receiver. Its face shows the byte fallback. **Read full signal** shows a raw byte or the full typed reading and unit. In an Advanced cabinet, select a fixed output or Output Extension and choose **Configure** to switch between Basic and Advanced transmission for that jack.
 
