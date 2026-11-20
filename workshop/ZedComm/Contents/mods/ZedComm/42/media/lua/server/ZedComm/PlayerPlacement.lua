@@ -106,6 +106,8 @@ local function tagOf(object)
     if type(tag) == "table" and type(tag.id) == "string" then return tag end
 end
 
+local cardinalOffsets = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
 local function distance(first, second)
     if first:getZ() ~= second:getZ() then return 2 end
     return math.abs(first:getX() - second:getX()) + math.abs(first:getY() - second:getY())
@@ -134,12 +136,30 @@ function Placement.canView(character, square)
     if steps <= 1 then return clearBetween(from, square) end
     if steps ~= 2 then return false end
     local cell = getCell()
-    for _, step in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+    for _, step in ipairs(cardinalOffsets) do
         local middle = cell:getGridSquare(from:getX() + step[1], from:getY() + step[2], from:getZ())
         if middle and distance(middle, square) == 1 and clearBetween(from, middle)
             and clearBetween(middle, square) then return true end
     end
     return false
+end
+
+function Placement.surfaceApproach(character, square)
+    local from = character:getCurrentSquare()
+    if not from or not loadedSquare(square) or from:getZ() ~= square:getZ() then return nil end
+    if Placement.canReach(character, square) then return from end
+    local cell = getCell()
+    local best, bestDistance
+    for _, step in ipairs(cardinalOffsets) do
+        local candidate = cell:getGridSquare(square:getX() + step[1], square:getY() + step[2], square:getZ())
+        if candidate and candidate:canStand() and clearBetween(candidate, square) then
+            local steps = distance(from, candidate)
+            if not bestDistance or steps < bestDistance then
+                best, bestDistance = candidate, steps
+            end
+        end
+    end
+    return best
 end
 
 local function squareObjects(square)

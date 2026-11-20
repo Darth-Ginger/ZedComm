@@ -82,12 +82,12 @@ local function addPlacedPieces(cursor, objects, placement, registry)
         if entry.piece.kind == "cable" then wireCount = wireCount + 1 end
     end
     for _, entry in ipairs(pieces) do
-        if not entry.spec.nativePickup and not ZedComm.InternalCircuit.cabinetPadlockId(entry.piece) then
+        if entry.piece.kind == "cable" then wireNumber = wireNumber + 1 end
+        if placement.canPickUp(registry, entry) then
             local name = entry.object:getName()
             local detail
             if entry.piece.kind == "cable" then
                 detail = registry:getRunName(entry.id) or "Loose wire"
-                wireNumber = wireNumber + 1
                 if wireCount > 1 then name = "Wire " .. wireNumber .. " of " .. wireCount end
             end
             local props = propsFor(entry.object:getSprite(), name, detail)

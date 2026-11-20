@@ -140,10 +140,17 @@ local function enqueuePlacement(player, command)
     ISTimedActionQueue.add(action)
 end
 
-local function queue(player, command, walk)
+local function queue(player, command, walk, surface)
     local run = command.run
     if run and (runs[player] ~= run or runBusy(player, run)) then return end
     local destination = command.walkSquare or command.square
+    if walk and surface then
+        destination = ZedComm.PlayerPlacement.surfaceApproach(player, command.square)
+        if not destination then
+            say(player, "No open floor next to the surface.")
+            return
+        end
+    end
     if walk and player:getCurrentSquare() ~= destination then
         if not ISWalkToTimedAction then
             say(player, "The walking action is unavailable.")
@@ -285,14 +292,16 @@ function Cursor:render(x, y, z)
 end
 
 local function placeFromCursor(player, run, item, square, anchorId, port)
+    local placement = ZedComm.PlayerPlacement
+    local spec = placement.getSpec(item:getFullType())
     local mount
-    if ZedComm.PlayerPlacement.isWallItem(item:getFullType()) then
-        mount = ZedComm.PlayerPlacement.wallMount(square, item, run.cursor.zedcommMount)
+    if spec.mount == "wall" then
+        mount = placement.wallMount(square, item, run.cursor.zedcommMount)
     end
     queue(player, {
         kind = anchorId and "lay" or "place", item = item, square = square,
         network = run.network, anchorId = anchorId, anchorPort = port, run = run, mount = mount,
-    }, true)
+    }, true, spec.mount == "surface")
 end
 
 function Cursor:tryBuild(x, y, z)
@@ -653,7 +662,7 @@ function Native.pickUp(cursor, entry, square)
     local run = { network = network, cursor = cursor, native = true }
     runs[player] = run
     queue(player, { kind = "pickup", targetId = entry.id, object = entry.object,
-        square = square, network = network, run = run }, true)
+        square = square, network = network, run = run }, true, entry.spec.mount == "surface")
 end
 
 function Native.previewPickup(cursor, object)

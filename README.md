@@ -6,7 +6,7 @@ Status: playable singleplayer prototype on Build 42. Pressure, occupancy and wei
 
 Small, Tabletop, Large, Wall and XL Cabinets come in Basic and Advanced tiers. Tabletop cabinets mount to a clear table or countertop. Wall cabinets mount to any eligible wall face. Large and XL floor cabinets have extra built-in jack pairs.
 
-With a vanilla padlock in your main inventory, use **ZedComm > Cabinet > Padlock cabinet**. A locked cabinet keeps running and its external jacks stay accessible. Use **Remove padlock** with a matching key to regain board access, upgrade or pick it up. The action returns the padlock and folds one key back into it, following the native item exchange.
+With a vanilla padlock in your main inventory, use **ZedComm > Cabinet > Padlock cabinet**. A locked cabinet keeps running and protects its existing jack connections. Use **Remove padlock** with a matching key to regain board access, upgrade or pick it up. The action returns the padlock and folds one key back into it, following the native item exchange.
 
 Doors also accept an independent crafted Contact source that reports actual open/closed state without an actuator board. Fit inputs only, contact only, or both with the associated materials.
 

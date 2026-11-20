@@ -10,7 +10,7 @@
 
 - Added 8×8 Large and 10×10 XL floor cabinets, a 6×6 Tabletop Cabinet and an 8×8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
 
-- Cabinets can use vanilla keyed padlocks. Padlocking secures the board and prevents pickup and upgrades while keeping external connections and signal processing active.
+- Cabinets can use vanilla keyed padlocks. Padlocking secures the board and prevents pickup, upgrades, and edits to its jack connections while keeping signals flowing.
 
 - Two Mod Options independently control fixture name labels and floating door status markers across saves.
 
