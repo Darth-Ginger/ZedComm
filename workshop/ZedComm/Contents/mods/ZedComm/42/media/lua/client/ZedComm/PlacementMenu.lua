@@ -3,6 +3,7 @@ if isClient() or isServer() then return end
 
 require "TimedActions/ISBaseTimedAction"
 require "TimedActions/ISTimedActionQueue"
+require "Vehicles/TimedActions/ISPathFindAction"
 
 local Action = ISBaseTimedAction:derive("ISZedCommPlacementAction")
 local Cursor = { Type = "ISZedCommPlacementCursor" }
@@ -144,21 +145,27 @@ local function queue(player, command, walk, surface)
     local run = command.run
     if run and (runs[player] ~= run or runBusy(player, run)) then return end
     local destination = command.walkSquare or command.square
-    if walk and surface then
-        destination = ZedComm.PlayerPlacement.surfaceApproach(player, command.square)
-        if not destination then
+    local walking
+    if walk and surface and not ZedComm.PlayerPlacement.canReach(player, command.square) then
+        local locations = ZedComm.PlayerPlacement.surfaceApproachLocations(command.square)
+        if #locations == 0 then
             say(player, "No open floor next to the surface.")
             return
         end
-    end
-    if walk and player:getCurrentSquare() ~= destination then
+        walking = ISPathFindAction:pathToNearest(player, locations)
+        function walking:isValid()
+            return runs[player] == run
+        end
+    elseif walk and not surface and player:getCurrentSquare() ~= destination then
         if not ISWalkToTimedAction then
             say(player, "The walking action is unavailable.")
             return
         end
-        local walking = ISWalkToTimedAction:new(player, destination, function()
+        walking = ISWalkToTimedAction:new(player, destination, function()
             return runs[player] ~= run
         end)
+    end
+    if walking then
         walking:setOnComplete(function()
             run.walk = nil
             enqueuePlacement(player, command)

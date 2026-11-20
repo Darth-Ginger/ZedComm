@@ -4,6 +4,7 @@ return function()
     package.loaded["TimedActions/ISInventoryTransferUtil"] = true
     package.loaded["TimedActions/ISBaseTimedAction"] = true
     package.loaded["TimedActions/ISTimedActionQueue"] = true
+    package.loaded["Vehicles/TimedActions/ISPathFindAction"] = true
     ISBaseTimedAction = {}
     function ISBaseTimedAction:derive()
         local class = {}

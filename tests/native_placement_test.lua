@@ -440,8 +440,19 @@ do
 
     local counter, approach, origin = floorTile(93, 60), floorTile(92, 60), floorTile(91, 60)
     counter.class = "IsoGridSquare"
+    local alternate = floorTile(93, 61)
     function origin:has() return false end
     function approach:canStand() return true end
+    function alternate:canStand() return true end
+    ISPathFindAction = {
+        pathToNearest = function(_, _, locations)
+            return {
+                locations = locations,
+                location = alternate,
+                setOnComplete = function(self, callback) self.onCompleteFunc = callback end,
+            }
+        end,
+    }
     function counter:isSolidTrans() return true end
     function counter:has(flag) return flag == "IsTableTop" and self.occupied end
     local furniture = testState.worldObject(counter)
@@ -482,9 +493,13 @@ do
     testState.queuedWalk, testState.queued = nil, nil
     click(counter)
     local walking = testState.queuedWalk
-    check(walking and walking.location == approach,
-        "native Place routes to the adjacent floor when the countertop cannot be occupied")
-    if walking and walking.location == approach then
+    local goals = {}
+    for i = 1, #(walking and walking.locations or {}), 3 do
+        goals[walking.locations[i] .. "," .. walking.locations[i + 1]] = true
+    end
+    check(walking and walking:isValid() and #walking.locations == 6 and goals["92.5,60.5"] and goals["93.5,61.5"],
+        "native Place offers both adjacent floor tiles to the pathfinder")
+    if walking and walking.location == alternate then
         local action = assert(arrive())
         counter.occupied = true
         check(not action:isValid() and not action:complete() and inventory:contains(cabinetItem),

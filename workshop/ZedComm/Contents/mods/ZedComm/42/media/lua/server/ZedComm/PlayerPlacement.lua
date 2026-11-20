@@ -80,15 +80,13 @@ function Placement.surfaceOffset(square, itemType)
     if height > 0 and height <= 64 then return height end
 end
 
-local wallFrames = { north = 3, west = 4, south = 5, east = 6 }
-
 function Placement.previewSprite(square, item, mount)
     local spec = specFor(item:getFullType())
     if not spec then return nil end
     if spec.mount ~= "wall" or not square then return spec.sprite end
     local facing = Placement.wallMount(square, item, mount)
     if spec.definitionId ~= Switch.ID then
-        return "zedcomm_cabinets_01_" .. (wallFrames[facing] or wallFrames.north)
+        return Circuit.wallCabinetSprite(facing) or spec.sprite
     end
     local saved = item:getModData().zedcommPlacement
     local state = type(saved) == "table" and saved.state
@@ -144,22 +142,21 @@ function Placement.canView(character, square)
     return false
 end
 
-function Placement.surfaceApproach(character, square)
-    local from = character:getCurrentSquare()
-    if not from or not loadedSquare(square) or from:getZ() ~= square:getZ() then return nil end
-    if Placement.canReach(character, square) then return from end
+function Placement.surfaceApproachLocations(square)
+    local locations = {}
+    if not loadedSquare(square) then return locations end
     local cell = getCell()
-    local best, bestDistance
+    local x, y, z = square:getX(), square:getY(), square:getZ()
     for _, step in ipairs(cardinalOffsets) do
-        local candidate = cell:getGridSquare(square:getX() + step[1], square:getY() + step[2], square:getZ())
+        local adjacentX, adjacentY = x + step[1], y + step[2]
+        local candidate = cell:getGridSquare(adjacentX, adjacentY, z)
         if candidate and candidate:canStand() and clearBetween(candidate, square) then
-            local steps = distance(from, candidate)
-            if not bestDistance or steps < bestDistance then
-                best, bestDistance = candidate, steps
-            end
+            locations[#locations + 1] = adjacentX + 0.5
+            locations[#locations + 1] = adjacentY + 0.5
+            locations[#locations + 1] = z
         end
     end
-    return best
+    return locations
 end
 
 local function squareObjects(square)
@@ -835,7 +832,6 @@ local commands = {
         acceptsTarget = relayTarget,
         duration = 120,
         message = "Lamp adapter removed.",
-        validate = function() return true end,
         execute = function(registry, character, _, target)
             return removeLampAdapter(character, registry, target)
         end,
@@ -972,13 +968,12 @@ function Placement.isValidCommand(character, command)
     local registry = commandRegistry(character, command)
     local descriptor = commands[command.kind]
     if not registry or not descriptor then return false end
-    if not descriptor.validate then return true end
     local target
     if descriptor.target then
         target = commandTarget(registry, command, descriptor)
         if not target then return false end
     end
-    return descriptor.validate(character, command, registry, target)
+    return not descriptor.validate or descriptor.validate(character, command, registry, target)
 end
 
 function Placement.perform(character, command)

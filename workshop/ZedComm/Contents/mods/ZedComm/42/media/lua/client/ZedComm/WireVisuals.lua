@@ -4,6 +4,7 @@ if isClient() or isServer() then return end
 require "ZedComm/WireShape"
 require "ZedComm/ModuleVisuals"
 require "ZedComm/DoorVisuals"
+require "ZedComm/InternalCircuit"
 require "ZedComm/Devices/RelayLamp"
 require "ZedComm/Devices/NetworkSwitch"
 local Shape = ZedComm.WireShape
@@ -11,7 +12,7 @@ local ModuleVisuals = ZedComm.ModuleVisuals
 local Relay = ZedComm.RelayLamp
 local Switch = ZedComm.NetworkSwitch
 local wallCabinet = "ZedComm.WallCabinet"
-local cabinetMountIndex = { north = 0, west = 1, south = 2, east = 3 }
+local Circuit = ZedComm.InternalCircuit
 local leadDirections = { 0, 1, 2, 4, 8 }
 local plateSprites = {
     ["ZedComm.PressureSensor"] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
@@ -65,8 +66,8 @@ end
 
 local function refreshCabinet(object, network, piece, directions)
     local mount = piece.state and piece.state.mount
-    local index = cabinetMountIndex[mount]
-    if not index then return nil end
+    local sprite = Circuit.wallCabinetSprite(mount)
+    if not sprite then return nil end
     local wired = false
     for port in pairs(piece.ports) do
         local direction = Shape.portDirection(network, piece, port)
@@ -75,8 +76,7 @@ local function refreshCabinet(object, network, piece, directions)
             wired = true
         end
     end
-    local frame = index + (wired and 7 or 3)
-    setWorldSprite(object, "zedcomm_cabinets_01_" .. frame)
+    setWorldSprite(object, wired and Circuit.wallCabinetSprite(mount, true) or sprite)
     return mount
 end
 

@@ -61,6 +61,14 @@ Circuit.cabinets = {
         cells = 8, pairs = 2, mount = "wall" },
 }
 
+local wallCabinetFrames = { north = 3, west = 4, south = 5, east = 6 }
+
+function Circuit.wallCabinetSprite(face, wired)
+    local frame = wallCabinetFrames[face]
+    if frame then return "zedcomm_cabinets_01_" .. (frame + (wired and 4 or 0)) end
+end
+
+
 function Circuit.size(profile)
     local cabinet = Circuit.cabinets[profile]
     return cabinet and cabinet.cells or (profile and 6 or 3)
