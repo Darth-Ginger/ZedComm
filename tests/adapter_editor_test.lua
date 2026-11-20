@@ -80,9 +80,11 @@ check(inventory:contains(part) and not circuit().modules["threshold-1"]
     and testState.panel.message == "module overlaps another part",
     "an overlapping placement consumes no module")
 grabCarried()
+inventory.full = true
 testState.panel:onMouseUp(133, 142)
+inventory.full = false
 check(not inventory:contains(part) and circuit().modules["threshold-1"].threshold == 50,
-    "placing the selected module commits the inventory and board together")
+    "installing a module at capacity consumes it and commits the board")
 fire("OnTick")
 check(not lamp.active, "an installed module with no links leaves the lamp off")
 click(85, 142)

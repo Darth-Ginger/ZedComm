@@ -1,65 +1,43 @@
 # ZedComm combined Build 42 smoke test
 
-Continue the current singleplayer save. Run A has enough evidence to move on. Check a box when you finish its steps and record any failure or skip under that run. **One reload remains.** Use the restart out of debug to verify B and C before starting D.
+Use the existing singleplayer test save and the updated local Workshop build. Reuse the staged door, window and cabinet rigs. Mark each check you run and record any failure or skip. Use one shared reload and one final console capture.
 
-## A - Door receiver and Contact
+## 1. Door and cabinet retest
 
-- [x] Tested the Advanced door board and reload, disposable door destruction, the secret-door circuit and reload, standalone Contact at `255` closed / `0` open, and standalone and combined fitting. Darth-Ginger accepted the derivative cases without another pass.
-- **Open findings** Inside-face fitting, wiring and board access fail on the closed map door. Native E opens a held-closed door from both sides and a held-locked door from inside. Door and Contact fixture visuals were missing. Fixture labels, cabinet double-click, and internal wire readability are follow-ups.
-- **Coverage limits** Manual locking was unavailable. Delayed close was not confirmed. Full-inventory stress and dedicated combined-fit reload were deferred.
+Bring a screwdriver, a vanilla padlock, loose Signal Wire and the existing rigs. Use two Test Byte Sources in debug or two Network Switches in normal play to drive the door's Lock and Open jacks independently. Leave the window from Run B fitted until after reload.
 
-## B - One window and two plates
+- [ ] **Door access and art.** At an existing wired door, close and unlock it with both inputs at `0`. From each face, open **ZedComm → Door → Open Door Board**, then disconnect or reconnect the Open jack from the inside using an accessible wire end on that side. Verify the maglock and each connected lead from both faces. Check that Lock and Door indicators stay legible and that the fixtures stay aligned while the door opens. Use one north-facing door and check the equivalent inside interaction once on a west-facing door. If a Door Contact is fitted, check its independent housing and lead without repeating the previously verified signal sequence.
+- [ ] **Door requests.** With the door shut, set Lock and Open to `255`. Confirm it stays shut and mouse interaction cannot open it from either side. Disconnect the source at the other end of the Lock run, leaving the Lock jack wired. Expect unlock and open with Open still `255`. Set Open to `0`. Expect closure and the mouse action to respect the held Close request. **Native E is a separate release blocker.** Keep it out of this pass until there is a supported interception path.
+- [ ] **Cabinet mounting.** Use native **Place** on a clear countertop while standing a few tiles away. Confirm the character walks to a reachable adjacent tile, the cabinet lands at ghost height, and native **Pickup** returns it. At the wall cabinet, confirm a connected jack has a continuous lead from the chosen wall face to the floor wire. Leave it wired for reload.
+- [ ] **Cabinet padlock.** Use a working cabinet-to-display circuit, ideally the wall cabinet, with one free jack and a matching key. Choose **Padlock cabinet**. Confirm the board stays closed and the display still responds. A free jack must reject new wiring, an attached jack must reject disconnect, and native **Pickup** must omit its directly attached wire. Leave the padlock on for reload.
 
-- [ ] **B1.** With a screwdriver, fit one Window Contact and wire it to a Numeric Display. Expect `255` closed and `0` open. Check housing and lead visibility once. Leave it wired.
-- [ ] **B2.** Wire a Basic Pressure Plate to a second display and set it to `155`. Put a crate on it, step clear, and expect `155`. Move the crate away for `0`, then put it back for reload.
-- [ ] **B3.** Wire a Basic Sender Weight Plate to a display. While standing clear, expect `1` for an empty standard crate, `0` when moved off, and `2` for a floor-standing shelf with pickup weight 20. You can reuse the Weight Plate hardware from Run A.
+**Run notes**
 
-If needed, grant only the missing parts.
+## 2. Shared reload
 
-```lua
-getPlayer():getInventory():AddItem("ZedComm.WindowContact")
-getPlayer():getInventory():AddItem("ZedComm.PressurePlate")
-getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
-getPlayer():getInventory():AddItems("ZedComm.NumericDisplay", 3)
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
-```
+- [ ] Exit fully and launch **without debug**, with crafting and building cheats off. Check the wall lead is present once and the padlocked cabinet still runs and blocks access. Put away or drop the matching keys and verify removal is refused. Retrieve one matching key, remove the padlock, and confirm the board and jack are usable again. If using the wall cabinet, pick it up and confirm the lead clears.
+- [ ] Open and close the previously fitted Window Contact host. Expect `0` open and `255` closed, with the same wire and visible housing. If the window is disposable, break the glass and expect the display's **no signal** indication. Remove the sensor independently and verify the cable end is free and the contact item returns.
 
-**Comments and recommendations**
+**Reload notes**
 
-**General notes**
+## 3. Normal-play crafting and lamp
 
-## C - Cabinet variants and shared restart
+Bring Electrical **5**, a screwdriver, one powered movable vanilla lamp with a bulb, Electronics Scrap, Electric Wire, one full roll of Wire, Sheet Metal and the required adapters. Use the current character with no recipe bypass or crafting cheat.
 
-- [ ] **C1.** Open one Large and one Advanced XL. Confirm **8×8 and two fixed IN/OUT pairs** for Large and **10×10 and three pairs** for XL. Link **IN 3 → OUT 3** in the XL. Wire a Test Byte Source to IN 3 and a display to OUT 3. Expect `0 → 255 → 0`. Leave it wired.
-- [ ] **C2.** Use native **Place** to select and preview a Tabletop Cabinet over a clear counter. Confirm that the cursor places it at the preview height from adjacent floor. Place a Wall Cabinet at a corner and wire a jack. Check that the lead drops from the selected wall face and meets the cable. Leave it wired for C4.
-- [ ] **C3.** In debug, stage Electrical **5**, one powered movable lamp with a bulb, a screwdriver, Electronics Scrap, Electric Wire, a full roll of Wire, and Sheet Metal. Keep granted ZedComm parts separate from crafted parts. Pause and say **go** for the console capture.
-- [ ] **C4.** After capture, exit PZ fully and restart **without debug**. Load the same save with cheats off. Confirm that the window still switches `255/0`, the crate still holds the plate at `155`, and XL IN 3 still drives OUT 3. Confirm that the Wall Cabinet lead draws once after reload and disappears after picking up the cabinet. Then continue to D.
+- [ ] In **Crafting → ZedComm**, craft one Window Contact, one Advanced XL Cabinet and both Signal Wire recipes. Window Contact needs Electrical **1**, a Basic Adapter, one Electronics Scrap and one Electric Wire or roll unit. Advanced XL needs Electrical **5**, an Advanced Adapter, four Sheet Metal and two Electronics Scrap. Both keep the screwdriver. Signal Wire makes **5** from one Electric Wire or roll unit, and **50** from one full roll. Record Electrical XP before, between and after the two crafts. Each award is **1 base XP**, subject to the same character multiplier.
+- [ ] Craft a Pressure Plate, Basic Small Cabinet, Threshold Module, Numeric Display and Signal Wire. Using the crafted parts, connect **Plate → Cabinet IN** and **Cabinet OUT → Display**. Link **IN → Threshold → OUT** inside, with Threshold at `1`. Expect `0 → 255 → 0` as you step on and off.
+- [ ] Fit one Advanced Adapter to the powered lamp. Verify fitting consumes the adapter. Use the plate from the crafting check to drive the lamp on and off. Pick up and replace the lamp with native **Moveables**, reconnect the wire and confirm it still follows the plate. Remove the adapter and verify it returns, the wire end is free, and manual control returns.
+- [ ] Pause and say **go** for the final console capture. Report any discrepancies and skipped checks.
 
-```lua
-local inv = getPlayer():getInventory()
-for _, name in ipairs({"LargeCabinet", "AdvancedXLCabinet", "TabletopCabinet", "WallCabinet"}) do inv:AddItem("ZedComm." .. name) end
-```
+**Run notes**
 
-**Comments and recommendations**
+## Prior runs
 
-**General notes**
+| Run | Recorded result |
+| --- | --- |
+| A | Advanced door board, destruction cleanup, secret-door sequence, reload, standalone Contact at `255/0`, and combined fitting passed. Inside-face access and fixture art failed. Native E opened against held requests. |
+| B | Window Contact and both plate checks passed. The window binding and loaded Basic Plate survived the shared reload. |
+| C | Large showed 8×8 with two fixed IN/OUT pairs. Advanced XL showed 10×10 with three pairs, and IN 3 drove OUT 3 through reload. Native tabletop placement and the wall lead still needed work. |
+| D | Representative recipes and a crafted circuit passed with debug enabled and crafting/building cheats off. The console identified an Advanced Small Cabinet in the rig. Exact wire XP was unrecorded and lamp fitting was carried forward. |
 
-## D - Normal-play crafting and lamp
-
-- [ ] **D1.** In Crafting → ZedComm, make one contact, both wire batch sizes (**5** and **50**), and one Advanced XL Cabinet. Check the wire recipes each award **1 base Electrical XP**, accounting for the character’s XP multiplier. Advanced XL requires Electrical **5**, an Advanced Adapter, four Sheet Metal, two Electronics Scrap, and a screwdriver.
-- [ ] **D2.** Craft a Pressure Plate, Basic Small Cabinet, Threshold Module, Numeric Display, and Signal Wire. Use only crafted parts in this rig. Connect **Plate → Cabinet IN** and **Cabinet OUT → Display**. Inside the board, link **IN → Threshold → OUT** and set Threshold to `1`. Step on and off the plate and expect `0 → 255 → 0`.
-
-### Non-debug lamp retrofit
-
-- [ ] **D3.** Fit one Advanced Adapter to a powered movable vanilla lamp. Check that the adapter is consumed and the wired lamp follows a plate or switch. Pick up and replace the lamp with native Moveables, reconnect it, and verify the adapter still works. Remove it and confirm the adapter returns, the wire end is free, and manual control returns.
-- [ ] **D4.** Pause and say **go** for the final console capture. Report recipe or fitting discrepancies and skipped cases.
-
-**Comments and recommendations**
-
-**General notes**
-
-## Verification
-
-This is a representative play test. Additional orientations, recipe variants, lamp types, and full-inventory stress tests are deferred. The relevant cards retain their original acceptance criteria.
-
-The prior full checklist and evidence were archived at `%USERPROFILE%/Zomboid/zedcomm-test-logs/combined-smoke-test-full-repo-2026-11-19.md`.
+The broader checklist lives in [the archived test notes](<%USERPROFILE%/Zomboid/zedcomm-test-logs/combined-smoke-test-full-repo-2026-11-19.md>). The complete recipe table is in [crafting recipes](recipes.md). Full-inventory checks run offline. Additional recipe and lamp variants remain outside the representative live pass.

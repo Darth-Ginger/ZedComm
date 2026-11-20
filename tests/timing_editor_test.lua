@@ -113,10 +113,17 @@ testState.panel:linkTerminal("output", "in")
 testState.panel.selected = batterySource
 local battery = give("Base.Battery")
 battery:setUsedDelta(0.45)
+inventory.full = true
 testState.panel.batteryButton.click()
 seconds(0)
 check(not inventory:contains(battery) and placedReading(displayId) == 255,
-    "installing a battery powers the source without mains")
+    "installing a battery at capacity powers the source without mains")
+testState.panel.batteryButton.click()
+seconds(0)
+check(not inventory:getFirstType("Base.Battery") and placedReading(displayId) == 255
+    and testState.panel.message == "There is no room for the battery.",
+    "a full inventory preserves the installed battery and its signal")
+inventory.full = false
 testState.panel.batteryButton.click()
 seconds(0)
 check(inventory:getFirstType("Base.Battery"):getCurrentUsesFloat() == 0.45
