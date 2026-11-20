@@ -13,11 +13,10 @@ end
 
 Contact.profiles = {
     [Contact.ID] = { name = "Door Contact", hostName = "Door", matchHost = Door.isEligible,
-        canFit = Door.isEligible, mount = Door.visualMount, prefix = "zedcomm_contact_01_",
+        canFit = Door.isEligible, prefix = "zedcomm_contact_01_",
         isClosed = function(door) return not door:isOpen() end },
     [Contact.WINDOW_ID] = { name = "Window Contact", hostName = "Window", matchHost = windowHost,
         canFit = function(window) return windowHost(window) and windowIntact(window) end,
-        mount = function(window, character) return Door.visualMount(window, character, window:isNorth()) end,
         prefix = "zedcomm_window_contact_01_",
         isClosed = function(window) return windowIntact(window) and not window:isOpen() end },
 }

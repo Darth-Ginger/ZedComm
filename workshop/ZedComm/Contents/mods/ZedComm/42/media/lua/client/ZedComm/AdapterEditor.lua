@@ -35,7 +35,7 @@ local function selectedHost(player, registry, target, view)
     local placement = ZedComm.PlayerPlacement
     local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
     if not entry or entry.object ~= target.object or Circuit.cabinetPadlockId(entry.piece) then return nil end
-    if view and placement.canView(player, entry.square) or placement.canReach(player, entry.square) then return entry end
+    if view and placement.canView(player, entry.square, entry.object) or placement.canReach(player, entry.square, entry.object) then return entry end
 end
 
 local function readLayout(registry, id)
@@ -227,7 +227,7 @@ function Editor:refresh()
     if not circuit then self:endDrag(); return false end
     self.jackLabels = entry.piece.state.portLabels
     self.fixtureName = entry.piece.state.fixtureName
-    self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square) and true or false
+    self.reachable = ZedComm.PlayerPlacement.canReach(self.player, entry.square, entry.object) and true or false
     self.readOnly = self.cabinet == "door" and entry.piece.state.adapter ~= "advanced"
     if not self.reachable then self:endDrag() end
     if circuit ~= self.expected then

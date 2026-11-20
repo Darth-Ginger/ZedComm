@@ -32,7 +32,7 @@ local items = {
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }
-local Contact = ZedComm.DoorContact
+local Door, Contact = ZedComm.Door, ZedComm.DoorContact
 local contactSpecs = {}
 for id, profile in pairs(Contact.profiles) do
     contactSpecs[id] = { name = profile.name:lower(), kind = "endpoint", definitionId = id,
@@ -120,16 +120,24 @@ local function clearBetween(first, second)
     return first == second or (not first:isBlockedTo(second) and not second:isBlockedTo(first))
 end
 
-function Placement.canReach(character, square)
-    local from = character:getCurrentSquare()
-    return loadedSquare(square) and from and distance(from, square) <= 1 and clearBetween(from, square)
+local function edgeFixture(object)
+    if Door.isEligible(object) or (object and instanceof(object, "IsoWindow")) then return object end
+    if object then return Contact.host(object) end
 end
 
--- Looking range for read-only UI such as the adapter editor: up to two tiles on the same
--- level, through an open path. Changes still need canReach.
-function Placement.canView(character, square)
+local function oppositeFace(square, object)
+    local fixture = edgeFixture(object)
+    if fixture and fixture:getSquare() == square then return Door.oppositeSquare(fixture) end
+end
+
+function Placement.canReach(character, square, object)
     local from = character:getCurrentSquare()
     if not loadedSquare(square) or not from then return false end
+    return (distance(from, square) <= 1 and clearBetween(from, square))
+        or from == oppositeFace(square, object)
+end
+
+local function withinView(from, square)
     local steps = distance(from, square)
     if steps <= 1 then return clearBetween(from, square) end
     if steps ~= 2 then return false end
@@ -140,6 +148,14 @@ function Placement.canView(character, square)
             and clearBetween(middle, square) then return true end
     end
     return false
+end
+
+function Placement.canView(character, square, object)
+    local from = character:getCurrentSquare()
+    if not loadedSquare(square) or not from then return false end
+    if withinView(from, square) then return true end
+    local opposite = oppositeFace(square, object)
+    return opposite ~= nil and withinView(from, opposite)
 end
 
 function Placement.surfaceApproachLocations(square)
@@ -182,24 +198,37 @@ function Placement.relayCandidates(square)
     return out
 end
 
-function Placement.doorCandidates(square)
+local function visitFaceOwners(square, visit)
+    local cell = getCell()
+    local x, y, z = square:getX(), square:getY(), square:getZ()
+    local east = cell:getGridSquare(x + 1, y, z)
+    local south = cell:getGridSquare(x, y + 1, z)
+    if east then visit(east) end
+    if south then visit(south) end
+end
+
+local function fixtureCandidates(square, matches)
     local out = {}
     for _, object in ipairs(squareObjects(square)) do
-        if ZedComm.Door.isEligible(object) then out[#out + 1] = object end
+        if matches(object) then out[#out + 1] = object end
     end
+    visitFaceOwners(square, function(owner)
+        for _, object in ipairs(squareObjects(owner)) do
+            if matches(object) and Door.oppositeSquare(object) == square then out[#out + 1] = object end
+        end
+    end)
     return out
+end
+
+function Placement.doorCandidates(square)
+    return fixtureCandidates(square, Door.isEligible)
 end
 
 function Placement.windowContactCandidates(square)
-    local out = {}
-    for _, object in ipairs(squareObjects(square)) do
-        if Contact.canFit(object, Contact.WINDOW_ID) then out[#out + 1] = object end
-    end
-    return out
+    return fixtureCandidates(square, function(object) return Contact.canFit(object, Contact.WINDOW_ID) end)
 end
 
-function Placement.piecesAt(registry, square)
-    local out = {}
+local function collectPieces(registry, square, out, face)
     for _, object in ipairs(squareObjects(square)) do
         local tag = tagOf(object)
         local spec = tag and (specFor(tag.placedItem) or (tag.definitionId == Relay.ID and relaySpec)
@@ -207,13 +236,27 @@ function Placement.piecesAt(registry, square)
             or contactSpecs[tag.definitionId])
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
-            and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
+            and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ()
+            and (not face or oppositeFace(square, object) == face) then
             local variants = cabinetSpecs[piece.definitionId]
             if variants then spec = variants[piece.state.adapter] or variants.basic end
             out[#out + 1] = { id = piece.id, piece = piece, object = object, square = square, spec = spec }
         end
     end
+end
+
+function Placement.piecesAt(registry, square)
+    local out = {}
+    collectPieces(registry, square, out)
     return out
+end
+
+function Placement.targetsAt(registry, square)
+    local targets = Placement.piecesAt(registry, square)
+    visitFaceOwners(square, function(owner)
+        collectPieces(registry, owner, targets, square)
+    end)
+    return targets
 end
 
 function Placement.resolve(registry, id)
@@ -254,12 +297,14 @@ function Placement.hasFreeEnd(entry, port)
     return false
 end
 
-local function linkDistance(first, second, secondKind)
+local function linkDistance(first, second, secondKind, secondObject)
     local steps = distance(first.square, second)
     if first.piece.kind == "cable" and secondKind == "cable" then
         return steps == 1 and clearBetween(first.square, second)
     end
-    return steps <= 1 and clearBetween(first.square, second)
+    if steps > 1 then return false end
+    return clearBetween(first.square, second) or second == oppositeFace(first.square, first.object)
+        or first.square == oppositeFace(second, secondObject)
 end
 
 function Placement.canJoin(network, first, firstPort, second, secondPort)
@@ -267,7 +312,7 @@ function Placement.canJoin(network, first, firstPort, second, secondPort)
         or first.id == second.id then return false end
     local a, b = first.piece.kind, second.piece.kind
     if a ~= "cable" and b ~= "cable" then return false end
-    if not linkDistance(first, second.square, b) then return false end
+    if not linkDistance(first, second.square, b, second.object) then return false end
     -- Free ends on the same chain cannot be joined into a loop.
     local firstNet = network:networkOf(first.id, firstPort or nil)
     local secondNet = network:networkOf(second.id, secondPort or nil)
@@ -611,7 +656,7 @@ end
 -- Apply an edit only to the exact host and circuit the editor opened.
 function Placement.editCircuit(character, registry, target, expected, layout, install, remove)
     local entry = Placement.getRegistry() == registry and Placement.resolve(registry, target.id)
-    if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square) then
+    if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square, entry.object) then
         return false, "That device is no longer within reach."
     end
     if Circuit.cabinetPadlockId(entry.piece) then return false, "The cabinet is padlocked." end
@@ -681,7 +726,7 @@ end
 
 function Placement.changeCircuitBattery(character, registry, target, expected, id)
     local entry = Placement.getRegistry() == registry and Placement.resolve(registry, target.id)
-    if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square)
+    if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square, entry.object)
         or not entry.piece.state or entry.piece.state.circuit ~= expected then
         return false, "The circuit changed or is out of reach."
     end
@@ -947,7 +992,7 @@ end
 local function commandRegistry(character, command)
     local registry = Placement.getRegistry()
     if not registry or registry.network ~= command.network then return nil, "This circuit is no longer loaded." end
-    if not Placement.canReach(character, command.square) then
+    if not Placement.canReach(character, command.square, command.object) then
         return nil, "Move onto or next to the target tile."
     end
     return registry

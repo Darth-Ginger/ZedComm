@@ -40,7 +40,7 @@ Events.OnPostUIDraw.Add(function()
             if entry then
                 local x, y = piece.x + 0.5, piece.y + 0.5
                 local show = visible(entry.square)
-                if door and entry.object:getNorth() then
+                if door and entry.object:isNorth() then
                     y = piece.y
                     show = show or visible(cell:getGridSquare(piece.x, piece.y - 1, pz))
                 elseif door then

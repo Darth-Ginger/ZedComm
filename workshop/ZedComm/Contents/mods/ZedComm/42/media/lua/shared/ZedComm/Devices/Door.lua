@@ -11,12 +11,11 @@ function Door.isEligible(object)
         and IsoDoor.getDoubleDoorIndex(object) == -1 and IsoDoor.getGarageDoorIndex(object) == -1
 end
 
-function Door.visualMount(object, character, north)
-    if north == nil then north = object:getNorth() end
+function Door.oppositeSquare(object)
     local square = object:getSquare()
-    local from = character:getCurrentSquare()
-    if north then return from:getY() < square:getY() and "north" or "south" end
-    return from:getX() < square:getX() and "west" or "east"
+    local north = object:isNorth()
+    local x, y = square:getX(), square:getY()
+    return getCell():getGridSquare(north and x or x - 1, north and y - 1 or y, square:getZ())
 end
 
 function Door.reverseHinge(object)

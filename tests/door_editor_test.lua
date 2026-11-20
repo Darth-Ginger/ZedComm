@@ -7,10 +7,12 @@ end)
 test.player.getPerkLevel = function() return 3 end
 local check, Circuit = test.check, ZedComm.InternalCircuit
 local tile = test.floorTile(200, 200)
+local otherFace = test.floorTile(200, 199)
+tile.blocked, otherFace.blocked = otherFace, tile
 local door = makeDoor(tile, "IsoThumpable")
 test.give("Base.Screwdriver")
 test.give(Circuit.ADVANCED_ADAPTER_ITEM); test.give(Circuit.ADVANCED_ADAPTER_ITEM)
-local options = test.optionsAt(tile)
+local options = test.optionsAt(otherFace)
 assert(options["Install two Advanced Adapters"])()
 check(test.queued and test.queued.maxTime == 1 and test.queued:isValid(), "door install uses the shared timed action")
 assert(test.queued:complete())
@@ -20,11 +22,12 @@ test.player.isTimedActionInstant = function() return false end
 local command = { kind = "remove-door-adapters" }
 check(test.queued:new(test.player, command).maxTime == 120, "door adapter work has a non-instant duration")
 test.player.isTimedActionInstant = function() return true end
-local root = test.menuAt(tile)
+local root = test.menuAt(otherFace)
 check(root.children.Door and root.children.Door.options["Open Door Board"], "door controls live in the fixture submenu")
-assert(test.optionsAt(tile)["Open Door Board"])()
+assert(test.optionsAt(otherFace)["Open Door Board"])()
 local panel = test.panel
 assert(panel:refresh())
+check(panel.reachable, "closed door board can be edited from the opposite face")
 check(panel.gridSize == 6 and panel.gridRows == 3 and panel.gridHeight == 180, "editor respects rectangular dimensions")
 check(not panel:insideGrid(100, 245) and panel:insideGrid(100, 243), "hit testing ends at the third row")
 check(panel.parts.lock.label == "Lock IN" and panel.parts.openAction.action
@@ -52,7 +55,7 @@ check(#piece().state.circuit.links == 6, "internal fan-out and separate actuator
 test.fire("OnTick")
 panel:render()
 check(panel.parts.lockAction.action and panel.parts.openAction.action, "rendering preserves local actuator identity")
-local labels = test.menuAt(tile).children.Door.children["Label door jack"]
+local labels = test.menuAt(otherFace).children.Door.children["Label door jack"]
 assert(labels.options["Lock IN"])()
 test.input = "Secure"; test.confirm()
 check(piece().state.portLabels.lock == "Secure", "physical door jacks use reusable labels")

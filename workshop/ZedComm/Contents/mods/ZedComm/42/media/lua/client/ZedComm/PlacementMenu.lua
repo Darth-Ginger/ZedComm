@@ -27,7 +27,7 @@ end
 
 local function reachableAnchor(player, run)
     local anchor = resolveAnchor(run)
-    if anchor and ZedComm.PlayerPlacement.canReach(player, anchor.square) then return anchor end
+    if anchor and ZedComm.PlayerPlacement.canReach(player, anchor.square, anchor.object) then return anchor end
 end
 
 local function stopRun(player)
@@ -128,7 +128,7 @@ end
 local function enqueuePlacement(player, command)
     local run = command.run
     if run and runs[player] ~= run then return end
-    if not ZedComm.PlayerPlacement.canReach(player, command.square) then
+    if not ZedComm.PlayerPlacement.canReach(player, command.square, command.object) then
         say(player, "Move onto or next to the target tile.")
         return
     end
@@ -178,7 +178,7 @@ local function queue(player, command, walk, surface)
 end
 
 local function orderedPieces(placement, registry, square)
-    local pieces = placement.piecesAt(registry, square)
+    local pieces = placement.targetsAt(registry, square)
     table.sort(pieces, function(a, b) return a.id < b.id end)
     return pieces
 end
@@ -343,7 +343,7 @@ end
 
 local function selectEnd(player, network, entry, port, label)
     local placement = ZedComm.PlayerPlacement
-    if not placement.canReach(player, entry.square) then
+    if not placement.canReach(player, entry.square, entry.object) then
         say(player, "Move onto or next to the free end.")
         return
     end
@@ -416,7 +416,7 @@ local function editSetting(player, registry, target, title, initial, apply)
         if button.internal ~= "OK" then return end
         local placement = ZedComm.PlayerPlacement
         local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
-        if not entry or entry.object ~= target.object or not placement.canReach(player, entry.square) then
+        if not entry or entry.object ~= target.object or not placement.canReach(player, entry.square, entry.object) then
             say(player, "That object is no longer within reach.")
             return
         end
@@ -449,7 +449,7 @@ end
 local function toggleFixtureOption(player, registry, target, option)
     local placement = ZedComm.PlayerPlacement
     local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
-    if not entry or entry.object ~= target.object or not placement.canReach(player, entry.square) then
+    if not entry or entry.object ~= target.object or not placement.canReach(player, entry.square, entry.object) then
         say(player, "That fixture is no longer within reach.")
         return
     end
@@ -548,8 +548,12 @@ local function extendOrConnect(cursor, run, item, square)
         local option = context:addOption("Connect to " .. target.label, player, function()
             if runs[player] ~= run then return end
             run.choice = nil
-            queue(player, { kind = "join", run = run, network = run.network, square = square,
-                walkSquare = approach, anchorId = run.id, anchorPort = run.port,
+            local destination = approach
+            if not placement.canReach(player, entry.square) and placement.canReach(player, entry.square, entry.object) then
+                destination = player:getCurrentSquare()
+            end
+            queue(player, { kind = "join", run = run, network = run.network, square = entry.square,
+                walkSquare = destination, anchorId = run.id, anchorPort = run.port,
                 targetId = entry.id, object = entry.object, port = port }, true)
         end)
         if entry.piece.kind == "cable" then
@@ -763,7 +767,8 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         list[#list + 1] = { label, callback, ... }
     end
     local function action(label, command, list, unavailable)
-        command.network, command.square = network, square
+        command.network = network
+        command.square = command.object and command.object:getSquare() or square
         list = list or options
         if unavailable then
             list[#list + 1] = { label .. " (" .. unavailable .. ")", disabled = true }

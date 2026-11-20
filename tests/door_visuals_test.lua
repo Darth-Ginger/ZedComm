@@ -13,6 +13,8 @@ FBORenderChunk.DIRTY_OBJECT_MODIFY = 256
 require "ZedComm/DoorVisuals"
 local visuals, check = ZedComm.DoorVisuals, test.check
 local tile = test.floorTile(300, 300)
+local northFace = test.floorTile(300, 299)
+local westFace = test.floorTile(299, 300)
 local door = makeDoor(tile)
 test.player.getPerkLevel = function() return 3 end
 test.give("Base.Screwdriver")
@@ -20,31 +22,32 @@ test.give("ZedComm.BasicAdapter"); test.give("ZedComm.BasicAdapter")
 local ok, id = test.runPlacement(tile, { kind = "install-door", object = door, tier = "basic" })
 assert(ok, id)
 local network = test.registry.network
-network.pieces[id].state.doorMount = nil
 local function name()
     local children = door:getAttachedAnimSprite()
     return children and children:get(0):getParentSprite():getName()
 end
-visuals.update(network, getCell())
-check(name() == "zedcomm_door_01_0", "unwired north door has a housing")
 local nativeSprite = door:getSprite()
+test.player.tile = northFace
+visuals.update(network, getCell())
+check(name() == "zedcomm_door_01_0", "north face has an unwired housing")
 door.locked = true
 visuals.update(network, getCell())
 check(name() == "zedcomm_door_01_36", "indicator follows actual locked state")
 door.open = true
 visuals.update(network, getCell())
 check(name() == "zedcomm_door_01_36" and door:getSprite() == nativeSprite, "opening retains frame housing without replacing native sprite")
-door.north = false
-visuals.update(network, getCell())
-check(name() == "zedcomm_door_01_108", "west door selects mirrored mounting")
-for mount, offset in pairs({ north = 0, west = 72, south = 144, east = 216 }) do
-    network.pieces[id].state.doorMount = mount
+for _, face in ipairs({
+    { north = true, square = tile, frame = 180, name = "south" },
+    { north = false, square = tile, frame = 252, name = "east" },
+    { north = false, square = westFace, frame = 108, name = "west" },
+}) do
+    door.north, test.player.tile = face.north, face.square
     visuals.update(network, getCell())
-    check(name() == "zedcomm_door_01_" .. (offset + 36), mount .. " mounting face has independent art")
+    check(name() == "zedcomm_door_01_" .. face.frame, face.name .. " face follows the viewer")
 end
-network.pieces[id].state.doorMount = nil
 local laid, wire = test.lay(tile, test.give("ZedComm.SignalWire"), id, "lock")
 assert(laid, wire)
+test.player.tile = westFace
 visuals.update(network, getCell())
 check(name() == "zedcomm_door_01_114", "same-tile Lock connection changes its socket independently")
 visuals.update(network, getCell())

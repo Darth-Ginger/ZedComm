@@ -33,7 +33,7 @@ function Installation.install(character, registry, object, id, tier)
     local inventory = character:getInventory()
     for _, item in ipairs(adapters) do inventory:Remove(item) end
     data.zedcomm = { id = id, kind = "endpoint", definitionId = Door.ID, state = {
-        adapter = tier, circuit = Circuit.doorPreset(), doorMount = Door.visualMount(object, character),
+        adapter = tier, circuit = Circuit.doorPreset(),
         nativeLock = { locked = object:isLocked(), keyed = object:isLockedByKey() },
     } }
     local called, ok, errorMessage = pcall(registry.addPiece, registry, object)
@@ -67,8 +67,7 @@ function Installation.installContact(character, registry, host, id, definitionId
     local square = host:getSquare()
     local profile = Contact.profiles[definitionId]
     local object = IsoObject.new(square, "zedcomm_door_floor_01_0", profile.name)
-    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = definitionId,
-        state = { doorMount = profile.mount(host, character) } }
+    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = definitionId }
     character:getInventory():Remove(item)
     host:getModData().zedcommContact = id
     local called, ok, errorMessage = pcall(function()

@@ -1,6 +1,8 @@
 local test = dofile("tests/support/editor_harness.lua")()
 local check, fire = test.check, test.fire
 local tile, outputTile = test.floorTile(420, 400), test.floorTile(421, 400)
+local far = test.floorTile(420, 399)
+tile.blocked, far.blocked = far, tile
 local window = IsoObject.new(tile, "zedcomm_devices_01_467")
 tile:AddTileObject(window)
 window.class = "IsoWindow"
@@ -21,7 +23,7 @@ end
 test.give("Base.Screwdriver")
 local item = test.give("ZedComm.WindowContact")
 local function install()
-    assert(test.optionsAt(tile, "Window")["Install window contact"])()
+    assert(test.optionsAt(far, "Window")["Install window contact"])()
     assert(test.queued:isValid() and test.queued:complete())
     return assert(window:getModData().zedcommContact)
 end
