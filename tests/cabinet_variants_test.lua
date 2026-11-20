@@ -46,7 +46,7 @@ getCore = originalCore
 
 local fixed = Circuit.fixedParts(piece(xl).board.profile)
 check(fixed["output-3"].column == 10 and fixed["output-3"].row == 7
-    and not Circuit.compile({ modules = { overlap = { kind = "not", column = 10, row = 7, rotation = 0 } }, links = {} },
+    and not Circuit.validate({ modules = { overlap = { kind = "not", column = 10, row = 7, rotation = 0 } }, links = {} },
         piece(xl).board.profile, "advanced"), "fixed jack footprints are reserved")
 local layout = { modules = {
     extension = { kind = "outputExtension", column = 10, row = 9, rotation = 180 },

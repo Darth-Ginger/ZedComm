@@ -233,7 +233,7 @@ function Editor:refresh()
     if circuit ~= self.expected then
         local layout = readLayout(self.registry, self.target.id)
         self.adapter = self.cabinet and entry.piece.state.adapter or nil
-        if not Circuit.compile(layout, self.cabinet, self.adapter) then return false end
+        if not Circuit.validate(layout, self.cabinet, self.adapter) then return false end
         self.expected, self.layout = circuit, layout
         self.parts = geometry(layout, self.cabinet, self.cell)
         self.terminal = nil
@@ -342,8 +342,8 @@ function Editor:previewAt(x, y)
     local part = drag.part
     if column ~= part.column or row ~= part.row or drag.rotation ~= part.rotation or not drag.preview then
         part.column, part.row, part.rotation = column, row, drag.rotation
-        local evaluate, reason = Circuit.compile(drag.layout, self.cabinet, self.adapter)
-        drag.preview = { valid = evaluate ~= nil, reason = reason,
+        local valid, reason = Circuit.validate(drag.layout, self.cabinet, self.adapter)
+        drag.preview = { valid = valid, reason = reason,
             x = gridX + (column - 1) * cell, y = gridY + (row - 1) * cell,
             width = width * cell, height = height * cell }
     end
@@ -889,7 +889,7 @@ function Editor.open(player, registry, target)
     local entry = selectedHost(player, registry, target, true)
     local cabinet = entry and Circuit.profileFor(entry.piece.definitionId)
     local adapter = cabinet and entry.piece.state.adapter or nil
-    if not entry or not entry.piece.state or not Circuit.compile(entry.piece.state.circuit, cabinet, adapter) then
+    if not entry or not entry.piece.state or not Circuit.validate(entry.piece.state.circuit, cabinet, adapter) then
         player:Say("Choose a nearby circuit cabinet, networked door or lamp with an Advanced Adapter.")
         return
     end

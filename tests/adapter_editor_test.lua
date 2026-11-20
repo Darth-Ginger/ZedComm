@@ -64,6 +64,7 @@ testState.mouseX, testState.mouseY = 72, 142
 testState.panel:render()
 check(not testState.panel.drag.preview.valid and testState.panel.drag.part.column == 1 and testState.panel.drag.part.row == 1,
     "the snapped preview rejects a footprint overlapping a fixed part")
+check(testState.panel.drag.preview.reason == "module overlaps another part", "the preview retains the rejection reason")
 testState.mouseX, testState.mouseY = 133, 86
 testState.panel:render()
 check(not testState.panel.drag.preview.valid and testState.panel.drag.part.row == 0,
@@ -75,7 +76,8 @@ check(testState.panel.drag.preview.valid and testState.panel.drag.part.column ==
     and inventory:contains(part) and not circuit().modules["threshold-1"],
     "moving the pointer previews a valid snapped location without consuming or installing the module")
 testState.panel:onMouseUp(72, 142)
-check(inventory:contains(part) and not circuit().modules["threshold-1"],
+check(inventory:contains(part) and not circuit().modules["threshold-1"]
+    and testState.panel.message == "module overlaps another part",
     "an overlapping placement consumes no module")
 grabCarried()
 testState.panel:onMouseUp(133, 142)

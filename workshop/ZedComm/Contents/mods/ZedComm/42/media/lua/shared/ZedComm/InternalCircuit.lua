@@ -316,7 +316,7 @@ local function timedValue(part, id, packet, environment)
     return Packet.basic(state.output or 0), state.due
 end
 
-function Circuit.compilePackets(layout, cabinet, adapter)
+local function validateLayout(layout, cabinet, adapter)
     if type(layout) ~= "table" or type(layout.modules) ~= "table" or type(layout.links) ~= "table" then
         return nil, "invalid internal circuit"
     end
@@ -347,30 +347,20 @@ function Circuit.compilePackets(layout, cabinet, adapter)
     end
     local order = orderParts(parts, drivers)
     if not order then return nil, "internal circuit feedback" end
-    local directions, dependencies, ancestors, partOutputs, actions = {}, {}, {}, {}, {}
-    local hasMains
+    local directions, partOutputs, actions = {}, {}, {}
     for _, id in ipairs(order) do
-        local kind = parts[id].kind
-        if kind == "mainsSource" then hasMains = true end
-        local spec = kinds[kind]
+        local spec = kinds[parts[id].kind]
         local jack = spec.jack
         local action = cabinet == "door" and jack == "source"
         if action then actions[id] = true else directions[id] = jack end
-        local inputs = {}
-        if jack == "sink" or (cabinet == "door" and spec.source) then inputs[id] = true end
-        for _, driver in pairs(drivers[id] or {}) do
-            for input in pairs(ancestors[driver]) do inputs[input] = true end
-        end
-        ancestors[id] = inputs
         if jack == "source" then
             partOutputs[id] = { id }
-            dependencies[id] = inputs
         elseif spec.externalOutputs then
             local ports = {}
             for branch = 1, spec.externalOutputs do
                 local port = Circuit.splitterPort(id, branch)
                 ports[branch] = port
-                directions[port], dependencies[port] = "source", inputs
+                directions[port] = "source"
             end
             partOutputs[id] = ports
         end
@@ -384,6 +374,35 @@ function Circuit.compilePackets(layout, cabinet, adapter)
             if directions[id] ~= "source" or mode ~= "advanced" then return nil, "invalid output mode" end
             modes[id] = mode
         end
+    end
+
+    return { parts = parts, drivers = drivers, order = order, directions = directions, partOutputs = partOutputs,
+        actions = actions, modes = modes, basicCabinet = basicCabinet }
+end
+
+function Circuit.validate(layout, cabinet, adapter)
+    local circuit, reason = validateLayout(layout, cabinet, adapter)
+    return circuit ~= nil, reason
+end
+
+function Circuit.compilePackets(layout, cabinet, adapter)
+    local circuit, reason = validateLayout(layout, cabinet, adapter)
+    if not circuit then return nil, reason end
+    local parts, drivers, order = circuit.parts, circuit.drivers, circuit.order
+    local directions, partOutputs, actions = circuit.directions, circuit.partOutputs, circuit.actions
+    local modes, basicCabinet = circuit.modes, circuit.basicCabinet
+    local dependencies, ancestors = {}, {}
+    local hasMains
+    for _, id in ipairs(order) do
+        local kind = parts[id].kind
+        if kind == "mainsSource" then hasMains = true end
+        local inputs = {}
+        if directions[id] == "sink" or (cabinet == "door" and kinds[kind].source) then inputs[id] = true end
+        for _, driver in pairs(drivers[id] or {}) do
+            for input in pairs(ancestors[driver]) do inputs[input] = true end
+        end
+        ancestors[id] = inputs
+        for _, port in ipairs(partOutputs[id] or {}) do dependencies[port] = inputs end
     end
 
     local function evaluate(inputs, environment)
@@ -447,21 +466,12 @@ function Circuit.doorPreset()
     } }
 end
 
--- Numeric preview and byte-facing fixtures use the same compiled graph.
-function Circuit.compile(layout, cabinet, adapter)
-    local evaluate, reason, board = Circuit.compilePackets(layout, cabinet, adapter)
+function Circuit.compile(layout)
+    local evaluate, reason, board = Circuit.compilePackets(layout)
     if not evaluate then return nil, reason end
-    if not cabinet then
-        return function(value, environment)
-            local outputs, deadline = evaluate({ input = Packet.basic(value) }, environment)
-            return Packet.basicValue(outputs.output), deadline
-        end, nil, board
-    end
-    return function(inputs)
-        local packets, outputs = {}, {}
-        for id, value in pairs(inputs) do packets[id] = Packet.basic(value) end
-        for id, packet in pairs(evaluate(packets)) do outputs[id] = Packet.basicValue(packet) end
-        return outputs
+    return function(value, environment)
+        local outputs, deadline = evaluate({ input = Packet.basic(value) }, environment)
+        return Packet.basicValue(outputs.output), deadline
     end, nil, board
 end
 
