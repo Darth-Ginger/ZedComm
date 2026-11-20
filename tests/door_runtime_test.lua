@@ -42,6 +42,17 @@ local function signals(lock, open)
     assert(Runtime.setTestByte(registry, openSource, open))
     fire("OnTick")
 end
+local nativeCalls = 0
+package.loaded["TimedActions/ISOpenCloseDoor"] = true
+ISOpenCloseDoor = {
+    isValid = function() return true end,
+    complete = function() nativeCalls = nativeCalls + 1; return true end,
+}
+dofile(test.LUA .. "client/ZedComm/DoorInteraction.lua")
+local interaction = { item = door }
+signals(0, 0)
+check(not ISOpenCloseDoor.isValid(interaction) and not ISOpenCloseDoor.complete(interaction)
+    and nativeCalls == 0, "held Open OFF blocks the vanilla action before its animation")
 signals(0, 255)
 check(door.open and not door.locked, "separate input runs drive native opener")
 signals(255, 255)
@@ -50,6 +61,8 @@ local status = Runtime.getDoorState(id)
 check(status.actions.lockAction.status == "unavailable", "inspection separates pending lock from actual state")
 signals(255, 0)
 check(not door.open and door.locked, "opener closure lets pending lock apply in the same pass")
+check(not ISOpenCloseDoor.isValid(interaction) and not ISOpenCloseDoor.complete(interaction)
+    and nativeCalls == 0, "held Lock blocks the vanilla action before its animation")
 local writes, toggles = door.lockWrites, door.toggles
 signals(255, 0)
 check(door.lockWrites == writes and door.toggles == toggles, "quiet held inputs produce no native writes")
@@ -76,6 +89,11 @@ check(door.locked, "restored source reapplies current lock request")
 assert(registry:unlink(lockWire, id))
 fire("OnTick")
 check(not door.locked, "physically unwired lock restores native control")
+assert(registry:unlink(openWire, id))
+fire("OnTick")
+check(ISOpenCloseDoor.isValid(interaction) and ISOpenCloseDoor.complete(interaction) and nativeCalls == 1,
+    "unwired door retains the vanilla action")
+assert(registry:link(openWire, id, "open"))
 door.locked, door.keyed = true, true
 signals(0, 255)
 check(not door.open, "opener does not bypass a mechanical lock while Lock jack is unwired")

@@ -1,7 +1,9 @@
 -- Retrofit transactions preserve the native door and unrelated mod data.
 require "ZedComm/Devices/Door"
+local Parts = require "ZedComm/CircuitParts"
 local Installation = {}
 local Circuit, Door = ZedComm.InternalCircuit, ZedComm.Door
+local Contact = require "ZedComm/Devices/DoorContact"
 
 function Installation.materials(character, tier)
     if tier ~= "basic" and tier ~= "advanced" then return nil, "Choose Basic or Advanced Adapters." end
@@ -44,33 +46,38 @@ function Installation.install(character, registry, object, id, tier)
     return true, id, adapters
 end
 
-function Installation.contactMaterials(character)
+function Installation.contactMaterials(character, definitionId)
+    definitionId = definitionId or Contact.ID
+    local profile = Contact.profiles[definitionId]
+    if not profile then return nil, "Choose a contact sensor." end
     if character:getPerkLevel(Perks.Electricity) < 1 then return nil, "Contact fitting requires Electrical 1." end
     local inventory = character:getInventory()
-    local item = inventory:getFirstType(ZedComm.DoorContact.ITEM)
+    local item = inventory:getFirstType(definitionId)
     if not item or not inventory:getFirstType("Base.Screwdriver") then
-        return nil, "Bring a Door Contact and a screwdriver in your main inventory."
+        return nil, "Bring a " .. profile.name .. " and a screwdriver in your main inventory."
     end
     return item
 end
 
-function Installation.installContact(character, registry, door, id)
-    if not Door.isEligible(door) or door:getModData().zedcommContact then return false, "Choose a door without a contact sensor." end
-    local item, reason = Installation.contactMaterials(character)
+function Installation.installContact(character, registry, host, id, definitionId)
+    definitionId = definitionId or Contact.ID
+    if not Contact.canFit(host, definitionId) then return false, "Choose an intact fixture without a contact sensor." end
+    local item, reason = Installation.contactMaterials(character, definitionId)
     if not item then return false, reason end
-    local square = door:getSquare()
-    local object = IsoObject.new(square, "zedcomm_door_floor_01_0", "ZedComm door contact")
-    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = ZedComm.DoorContact.ID,
-        state = { doorMount = Door.visualMount(door, character) } }
+    local square = host:getSquare()
+    local profile = Contact.profiles[definitionId]
+    local object = IsoObject.new(square, "zedcomm_door_floor_01_0", profile.name)
+    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = definitionId,
+        state = { doorMount = profile.mount(host, character) } }
     character:getInventory():Remove(item)
-    door:getModData().zedcommContact = id
+    host:getModData().zedcommContact = id
     local called, ok, errorMessage = pcall(function()
         square:AddTileObject(object)
         return registry:addPiece(object)
     end)
     if not called or not ok then
         if registry.network.pieces[id] then registry:removePiece(id) end
-        door:getModData().zedcommContact = nil
+        host:getModData().zedcommContact = nil
         object:getModData().zedcomm = nil
         pcall(square.transmitRemoveItemFromSquare, square, object)
         character:getInventory():AddItem(item)
@@ -97,10 +104,10 @@ function Installation.fit(character, registry, door, id, tier, contactId)
 end
 
 function Installation.removeContact(character, registry, entry)
-    local item = instanceItem(ZedComm.DoorContact.ITEM)
+    local item = instanceItem(entry.piece.definitionId)
     local inventory = character:getInventory()
     if not item or not inventory:hasRoomFor(character, item) then return false, "There is no room for the contact sensor." end
-    local door = ZedComm.DoorContact.host(entry.object)
+    local host = Contact.host(entry.object)
     local record = registry.network:record(entry.id)
     local cable = entry.piece.ports.signal
     pcall(entry.square.transmitRemoveItemFromSquare, entry.square, entry.object)
@@ -116,7 +123,7 @@ function Installation.removeContact(character, registry, entry)
         end
     end
     if registry.network.pieces[entry.id] then registry:removePiece(entry.id) end
-    if door then door:getModData().zedcommContact = nil end
+    if host then host:getModData().zedcommContact = nil end
     entry.object:getModData().zedcomm = nil
     inventory:AddItem(item)
     return true
@@ -124,31 +131,11 @@ end
 
 function Installation.remove(character, registry, entry)
     if not Door.isEligible(entry.object) then return false, "That door is no longer available." end
-    local state = entry.piece.state
-    local inventory, recovered = character:getInventory(), {}
-    local function recover(itemType, part)
-        local item = instanceItem(itemType)
-        if not item or not inventory:hasRoomFor(character, item) then return false end
-        if part and Circuit.kinds[part.kind].source then
-            item:getModData().zedcommCharge = part.charge
-            item:getModData().zedcommSourceLevel = part.level
-        end
-        inventory:AddItem(item)
-        recovered[#recovered + 1] = item
-        return true
-    end
-    local itemType = state.adapter == "advanced" and Circuit.ADVANCED_ADAPTER_ITEM or Circuit.BASIC_ADAPTER_ITEM
-    local room = recover(itemType) and recover(itemType)
-    for _, part in pairs(state.circuit.modules) do
-        if room then room = recover(Circuit.kinds[part.kind].item, part) end
-    end
-    if not room then
-        for _, item in ipairs(recovered) do inventory:Remove(item) end
-        return false, "There is no room for the adapters and modules."
-    end
+    local recovered = Parts.recover(character, entry.piece.state, 2)
+    if not recovered then return false, "There is no room for the adapters and modules." end
     local ok, reason = registry:removePiece(entry.id)
     if not ok then
-        for _, item in ipairs(recovered) do inventory:Remove(item) end
+        Parts.discard(character:getInventory(), recovered)
         return false, reason
     end
     ZedComm.DeviceRuntime.releaseBoard(entry.id)

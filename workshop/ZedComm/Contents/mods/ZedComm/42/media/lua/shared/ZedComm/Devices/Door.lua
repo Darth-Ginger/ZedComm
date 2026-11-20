@@ -1,4 +1,3 @@
--- Two independent actuators share one native single-panel door.
 require "ZedComm/DeviceDefinitions"
 require "ZedComm/InternalCircuit"
 require "ZedComm/SignalModules"
@@ -12,10 +11,11 @@ function Door.isEligible(object)
         and IsoDoor.getDoubleDoorIndex(object) == -1 and IsoDoor.getGarageDoorIndex(object) == -1
 end
 
-function Door.visualMount(object, character)
+function Door.visualMount(object, character, north)
+    if north == nil then north = object:getNorth() end
     local square = object:getSquare()
     local from = character:getCurrentSquare()
-    if object:getNorth() then return from:getY() < square:getY() and "north" or "south" end
+    if north then return from:getY() < square:getY() and "north" or "south" end
     return from:getX() < square:getX() and "west" or "east"
 end
 
@@ -52,11 +52,21 @@ end
 
 local function moveDoor(object, desired)
     if object:isOpen() == desired then return "applied" end
-    -- The full toggle updates polygon paths and cached rendering as well as
-    -- sprites. Silent toggling omits those Build 42 updates.
     if object:isBarricaded() or object:isObstructed() then return "unavailable", "Door is obstructed or barricaded." end
-    object:ToggleDoorActual(getSpecificPlayer(0))
+    if desired then
+        object:ToggleDoorActual(getSpecificPlayer(0))
+    else
+        object:ToggleDoorSilent()
+    end
     if object:isOpen() ~= desired then return "unavailable", "Door rejected the requested state." end
+    if not desired then
+        -- Silent toggles skip the native collision, path and render refreshes.
+        local square = object:getSquare()
+        square:RecalcAllWithNeighbours(true)
+        square:setSquareChanged()
+        object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
+        triggerEvent("OnContainerUpdate")
+    end
     return "applied"
 end
 
@@ -102,8 +112,7 @@ function Controller:flush()
         self.results.openAction = { status = status, reason = reason }
     end
     if lock then
-        -- A pending lock never closes an already-open door. Once applied,
-        -- native inside/key exceptions must not bypass a held network lock.
+        -- Closing here corrects a native bypass of an already-applied lock.
         if self.lockedApplied and object:isOpen() then moveDoor(object, false) end
         if object:isOpen() then
             self.results.lockAction = { status = "unavailable", reason = "Lock pending until the door closes." }

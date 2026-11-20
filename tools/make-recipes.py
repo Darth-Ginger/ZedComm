@@ -29,43 +29,53 @@ BASE_NAMES = {SCRAP: "Electronics Scrap", WIRE: "Electric Wire", SHEET: "Sheet M
 SCRIPT_TYPES = {WIRE: f"{WIRE};{ROLL}"}
 TABLE_NAMES = {WIRE: "Electric Wire or Wire"}
 
-# (section, item, Electrical level or None, time, ingredients, amount made, tool kept)
+# (section, item, Electrical level or None, time, ingredients, amount made, tool kept, Electrical XP)
 RECIPES = [
-    ("Adapters", "BasicAdapter", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Adapters", "AdvancedAdapter", 3, 100, {SCRAP: 3, WIRE: 2}, 1, True),
+    ("Adapters", "BasicAdapter", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Adapters", "AdvancedAdapter", 3, 100, {SCRAP: 3, WIRE: 2}, 1, True, 8),
 
-    ("Wire and devices", "DoorContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True),
-    ("Wire and devices", "SignalWire", None, 30, {WIRE: 1}, 5, False),
-    ("Wire and devices", "NetworkSwitch", None, 60, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Wire and devices", "PressurePlate", 1, 80, {SHEET: 1, BASIC: 1}, 1, True),
-    ("Wire and devices", "OccupancyPlate", 2, 80, {SHEET: 1, SCRAP: 1, BASIC: 1}, 1, True),
-    ("Wire and devices", "WeightPlate", 2, 100, {SHEET: 1, SCRAP: 2, BASIC: 1}, 1, True),
-    ("Wire and devices", "NumericDisplay", 2, 80, {SCRAP: 2, BASIC: 1}, 1, True),
-    ("Wire and devices", "AdvancedDisplay", 3, 100, {SCRAP: 3, ADVANCED: 1}, 1, True),
+    ("Wire and devices", "DoorContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Wire and devices", "WindowContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Wire and devices", "SignalWire", None, 30, {WIRE: 1}, 5, False, 1),
+    ("Wire and devices", "NetworkSwitch", None, 60, {SCRAP: 1, WIRE: 1}, 1, True, 2),
+    ("Wire and devices", "PressurePlate", 1, 80, {SHEET: 1, BASIC: 1}, 1, True, 4),
+    ("Wire and devices", "OccupancyPlate", 2, 80, {SHEET: 1, SCRAP: 1, BASIC: 1}, 1, True, 5),
+    ("Wire and devices", "WeightPlate", 2, 100, {SHEET: 1, SCRAP: 2, BASIC: 1}, 1, True, 6),
+    ("Wire and devices", "NumericDisplay", 2, 80, {SCRAP: 2, BASIC: 1}, 1, True, 5),
+    ("Wire and devices", "AdvancedDisplay", 3, 100, {SCRAP: 3, ADVANCED: 1}, 1, True, 8),
 
-    ("Cabinets", "SmallCabinet", 1, 80, {SHEET: 1, BASIC: 1}, 1, True),
-    ("Cabinets", "AdvancedSmallCabinet", 3, 80, {SHEET: 1, ADVANCED: 1}, 1, True),
+    ("Cabinets", "SmallCabinet", 1, 80, {SHEET: 1, BASIC: 1}, 1, True, 3),
+    ("Cabinets", "AdvancedSmallCabinet", 3, 80, {SHEET: 1, ADVANCED: 1}, 1, True, 4),
 
-    ("Connection modules", "InputExtension", 1, 40, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Connection modules", "OutputExtension", 1, 40, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Connection modules", "SplitterModule", 1, 50, {SCRAP: 1, WIRE: 2}, 1, True),
+    ("Cabinets", "LargeCabinet", 2, 110, {SHEET: 2, SCRAP: 1, BASIC: 1}, 1, True, 4),
+    ("Cabinets", "AdvancedLargeCabinet", 4, 110, {SHEET: 2, SCRAP: 1, ADVANCED: 1}, 1, True, 6),
+    ("Cabinets", "XLCabinet", 3, 145, {SHEET: 4, SCRAP: 2, BASIC: 1}, 1, True, 6),
+    ("Cabinets", "AdvancedXLCabinet", 5, 145, {SHEET: 4, SCRAP: 2, ADVANCED: 1}, 1, True, 8),
+    ("Cabinets", "TabletopCabinet", 1, 80, {SHEET: 1, BASIC: 1}, 1, True, 3),
+    ("Cabinets", "AdvancedTabletopCabinet", 3, 80, {SHEET: 1, ADVANCED: 1}, 1, True, 4),
+    ("Cabinets", "WallCabinet", 2, 110, {SHEET: 2, SCRAP: 1, BASIC: 1}, 1, True, 4),
+    ("Cabinets", "AdvancedWallCabinet", 4, 110, {SHEET: 2, SCRAP: 1, ADVANCED: 1}, 1, True, 6),
 
-    ("Logic modules", "ThresholdModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Logic modules", "NotModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Logic modules", "AndModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Logic modules", "OrModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True),
-    ("Logic modules", "XorModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True),
+    ("Connection modules", "InputExtension", 1, 40, {SCRAP: 1, WIRE: 1}, 1, True, 2),
+    ("Connection modules", "OutputExtension", 1, 40, {SCRAP: 1, WIRE: 1}, 1, True, 2),
+    ("Connection modules", "SplitterModule", 1, 50, {SCRAP: 1, WIRE: 2}, 1, True, 3),
 
-    ("Arithmetic modules", "AdderModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True),
-    ("Arithmetic modules", "SubtractorModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True),
-    ("Arithmetic modules", "MultiplierModule", 3, 60, {SCRAP: 3, WIRE: 1}, 1, True),
+    ("Logic modules", "ThresholdModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Logic modules", "NotModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Logic modules", "AndModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Logic modules", "OrModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Logic modules", "XorModule", 2, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
 
-    ("Memory and timing modules", "CacheModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True),
-    ("Memory and timing modules", "TimerModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True),
-    ("Memory and timing modules", "WaitModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True),
+    ("Arithmetic modules", "AdderModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True, 5),
+    ("Arithmetic modules", "SubtractorModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True, 5),
+    ("Arithmetic modules", "MultiplierModule", 3, 60, {SCRAP: 3, WIRE: 1}, 1, True, 6),
 
-    ("Source modules", "MainsSourceModule", 2, 60, {SCRAP: 1, WIRE: 2}, 1, True),
-    ("Source modules", "BatterySourceModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True),
+    ("Memory and timing modules", "CacheModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True, 5),
+    ("Memory and timing modules", "TimerModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True, 4),
+    ("Memory and timing modules", "WaitModule", 2, 60, {SCRAP: 2, WIRE: 1}, 1, True, 4),
+
+    ("Source modules", "MainsSourceModule", 2, 60, {SCRAP: 1, WIRE: 2}, 1, True, 4),
+    ("Source modules", "BatterySourceModule", 1, 50, {SCRAP: 1, WIRE: 1}, 1, True, 4),
 ]
 
 # The Basic cabinet item is SmallCabinet; its recipe keeps the clearer name.
@@ -84,7 +94,7 @@ def all_recipes():
         out.append((recipe_id(item), "", row))
         if item == "SignalWire":
             # Cutting a whole roll takes longer, but less than ten single cuts.
-            roll = row[:3] + (row[3] * 5, {ROLL: ROLL_UNITS}, row[5] * ROLL_UNITS, row[6])
+            roll = row[:3] + (row[3] * 5, {ROLL: ROLL_UNITS}, row[5] * ROLL_UNITS) + row[6:]
             out.append((recipe_id(item) + "FromWireRoll", " (whole Wire roll)", roll))
     return out
 
@@ -93,11 +103,13 @@ def display_name(names, full_type):
     return BASE_NAMES.get(full_type) or names[full_type].replace("ZedComm ", "", 1)
 
 
-def script_block(identifier, item, level, time, inputs, made, tool):
+def script_block(identifier, item, level, time, inputs, made, tool, xp):
     lines = [f"    craftRecipe {identifier}", "    {",
              "        timedAction = MakingElectrical,", f"        time = {time},"]
     if level:
         lines.append(f"        SkillRequired = Electricity:{level},")
+    if xp:
+        lines.append(f"        xpAward = Electricity:{xp},")
     lines += ["        Tags = InHandCraft;Electrical,", "        category = ZedComm,",
               "        inputs", "        {"]
     if tool:
@@ -127,19 +139,19 @@ def build(names):
     table = ["# ZedComm crafting recipes", "",
              "Every recipe is in the crafting menu under ZedComm. Recipes marked with a screwdriver "
              "need one in the inventory and do not use it up. Electrical is the skill level required; "
-             "a dash means none.", "",
+             "a dash means none. XP is the base Electrical award per craft.", "",
              f"Wire means the roll of wire, which holds {ROLL_UNITS} units; amounts of it are in units. "
              "One unit can be used wherever a recipe asks for one Electric Wire.", "",
              "This file is written by `tools/make-recipes.py`. Change recipes there, not here.", ""]
     section = None
-    for _identifier, _suffix, (group, item, level, _time, inputs, made, tool) in recipes:
+    for _identifier, _suffix, (group, item, level, _time, inputs, made, tool, xp) in recipes:
         if group != section:
             section = group
-            table += [f"## {group}", "", "| Makes | Electrical | Ingredients | Screwdriver |",
-                      "| --- | --- | --- | --- |"]
+            table += [f"## {group}", "", "| Makes | Electrical | XP | Ingredients | Screwdriver |",
+                      "| --- | --- | ---: | --- | --- |"]
         name = display_name(names, "ZedComm." + item)
         makes = f"{made} × {name}" if made > 1 else name
-        table.append(f"| {makes} | {level or '-'} | {listed(inputs)} | {'Yes' if tool else 'No'} |")
+        table.append(f"| {makes} | {level or '-'} | {xp} | {listed(inputs)} | {'Yes' if tool else 'No'} |")
     text = "\n".join(table)
     for heading in sorted({row[0] for _i, _s, row in recipes}):
         text = text.replace(f"|\n## {heading}", f"|\n\n## {heading}")

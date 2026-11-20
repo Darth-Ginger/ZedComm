@@ -15,6 +15,14 @@
     "ZedComm.ThresholdModule": "ZedComm Threshold Module",
     "ZedComm.SmallCabinet": "ZedComm Basic Small Cabinet",
     "ZedComm.AdvancedSmallCabinet": "ZedComm Advanced Small Cabinet",
+    "ZedComm.LargeCabinet": "ZedComm Basic Large Cabinet",
+    "ZedComm.AdvancedLargeCabinet": "ZedComm Advanced Large Cabinet",
+    "ZedComm.XLCabinet": "ZedComm Basic XL Cabinet",
+    "ZedComm.AdvancedXLCabinet": "ZedComm Advanced XL Cabinet",
+    "ZedComm.TabletopCabinet": "ZedComm Basic Tabletop Cabinet",
+    "ZedComm.AdvancedTabletopCabinet": "ZedComm Advanced Tabletop Cabinet",
+    "ZedComm.WallCabinet": "ZedComm Basic Wall Cabinet",
+    "ZedComm.AdvancedWallCabinet": "ZedComm Advanced Wall Cabinet",
     "ZedComm.SplitterModule": "ZedComm Splitter Module",
     "ZedComm.InputExtension": "ZedComm Input Extension",
     "ZedComm.OutputExtension": "ZedComm Output Extension",
@@ -27,5 +35,6 @@
     "ZedComm.NotModule": "ZedComm NOT Module",
     "ZedComm.DebugByteSource": "ZedComm Test Byte Source",
     "ZedComm.NetworkSwitch": "ZedComm Network Switch",
-    "ZedComm.DoorContact": "ZedComm Door Contact"
+    "ZedComm.DoorContact": "ZedComm Door Contact",
+    "ZedComm.WindowContact": "ZedComm Window Contact"
 }

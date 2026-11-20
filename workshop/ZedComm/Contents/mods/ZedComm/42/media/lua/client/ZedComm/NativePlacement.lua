@@ -52,7 +52,8 @@ local function addInventoryItems(cursor, objects, placement, actions)
             if not seen[key] then
                 seen[key] = true
                 local detail = key == wireType and runLabel
-                if spec.definitionId == ZedComm.NetworkSwitch.ID then detail = "Hold left-click and drag toward a wall" end
+                if spec.mount == "wall" then detail = "Hold left-click and drag toward a wall" end
+                if spec.mount == "surface" then detail = "Place on an empty table or countertop" end
                 addCandidate(groups, item, spec, key, detail)
             end
         end
@@ -81,7 +82,7 @@ local function addPlacedPieces(cursor, objects, placement, registry)
         if entry.piece.kind == "cable" then wireCount = wireCount + 1 end
     end
     for _, entry in ipairs(pieces) do
-        if not entry.spec.nativePickup then
+        if not entry.spec.nativePickup and not ZedComm.InternalCircuit.cabinetPadlockId(entry.piece) then
             local name = entry.object:getName()
             local detail
             if entry.piece.kind == "cable" then
@@ -175,7 +176,8 @@ local function install()
         self.currentMoveProps, self.origMoveProps = props, props
         self.origSpriteName = props.spriteName
         self.cacheInvObjectSprite = nil
-        self.yOffset, self.nSprite = 0, 1
+        self.yOffset = not pickup and placement.surfaceOffset(square, selected.object:getFullType()) or 0
+        self.nSprite = 1
         self.isWallLike = false
         self:setInfoPanel(square, selected.object, props)
         return true
@@ -205,12 +207,12 @@ local function install()
     function class:setCursorFacing(facing)
         local square = self.currentSquare
         local selected = self.zedcommKey and selectedAt(self, square)
-        if not selected or not selected.zedcommKey or selected.object:getFullType() ~= ZedComm.NetworkSwitch.ID then
+        if not selected or not selected.zedcommKey or not placement.isWallItem(selected.object:getFullType()) then
             return setCursorFacing(self, facing)
         end
         local wall = wallsByFacing[facing]
         if wall and ZedComm.NetworkSwitch.mount(square, wall) == wall
-            and placement.switchMount(square, selected.object, self.zedcommMount) ~= wall then
+            and placement.wallMount(square, selected.object, self.zedcommMount) ~= wall then
             self.zedcommMount = wall
             getSoundManager():playUISound("UIObjectMenuObjectRotateOutline")
         end
@@ -221,8 +223,8 @@ local function install()
         if not joypad and getCore():isKey(KeybindId.ROTATE_BUILDING, key)
             and (isKeyDown(Keyboard.KEY_LSHIFT) or isKeyDown(Keyboard.KEY_RSHIFT)) then
             local selected = selectedAt(self, self.currentSquare)
-            if selected and selected.zedcommKey and selected.object:getFullType() == ZedComm.NetworkSwitch.ID then
-                local current = placement.switchMount(self.currentSquare, selected.object, self.zedcommMount)
+            if selected and selected.zedcommKey and placement.isWallItem(selected.object:getFullType()) then
+                local current = placement.wallMount(self.currentSquare, selected.object, self.zedcommMount)
                 self.zedcommMount = ZedComm.NetworkSwitch.nextMount(self.currentSquare, current)
                 return
             end

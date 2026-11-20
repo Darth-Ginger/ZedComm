@@ -5,6 +5,7 @@ require "ZedComm/Network"
 require "ZedComm/NativeDevices"
 require "ZedComm/DoorInstallation"
 
+local Parts = require "ZedComm/CircuitParts"
 local Placement = {}
 local Network = ZedComm.Network
 local definitions = ZedComm.DeviceDefinitions
@@ -24,46 +25,74 @@ local items = {
         kind = "endpoint", definitionId = "ZedComm.OccupancyPlate", fixtureType = "Plate" },
     { itemType = "ZedComm.WeightPlate", name = "weight plate", sprite = "zedcomm_devices_01_425",
         kind = "endpoint", definitionId = "ZedComm.WeightPlate", fixtureType = "Plate" },
-    { itemType = Circuit.CABINET_ID, name = "basic small cabinet", sprite = "zedcomm_devices_01_466",
-        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "basic", fixtureType = "Cabinet" },
-    { itemType = Circuit.ADVANCED_CABINET_ITEM, name = "advanced small cabinet", sprite = "zedcomm_devices_01_466",
-        kind = "endpoint", definitionId = Circuit.CABINET_ID, adapter = "advanced", fixtureType = "Cabinet" },
     { itemType = "ZedComm.DebugByteSource", name = "test byte source", sprite = "zedcomm_devices_01_431",
         kind = "endpoint", definitionId = "ZedComm.DebugByteSource", fixtureType = "Source" },
     { itemType = Switch.ID, name = "network switch", sprite = Switch.OFF_NORTH,
-        kind = "endpoint", definitionId = Switch.ID, fixtureType = "Switch" },
+        kind = "endpoint", definitionId = Switch.ID, fixtureType = "Switch", mount = "wall" },
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }
-local contactSpec = { name = "door contact", kind = "endpoint", definitionId = "ZedComm.DoorContact",
-    nativePickup = true, fixtureType = "Door Contact" }
+local Contact = ZedComm.DoorContact
+local contactSpecs = {}
+for id, profile in pairs(Contact.profiles) do
+    contactSpecs[id] = { name = profile.name:lower(), kind = "endpoint", definitionId = id,
+        nativePickup = true, fixtureType = profile.name }
+end
 local doorSpec = { name = "networked door", kind = "endpoint", definitionId = Circuit.DOOR_ID,
     nativePickup = true, fixtureType = "Door" }
 Placement.WIRE_TYPE = items[2].itemType
 
-local function specFor(itemType)
-    for i = 1, #items do
-        if items[i].itemType == itemType then return items[i] end
+local specs, cabinetSpecs = {}, {}
+for _, spec in ipairs(items) do specs[spec.itemType] = spec end
+for id, profile in pairs(Circuit.cabinets) do
+    local advancedItem = "ZedComm.Advanced" .. id:sub(#"ZedComm." + 1)
+    local variants = {}
+    for tier, itemType in pairs({ basic = id, advanced = advancedItem }) do
+        local spec = { itemType = itemType, name = tier .. " " .. profile.name:lower(), sprite = profile.sprite,
+            kind = "endpoint", definitionId = id, adapter = tier, fixtureType = "Cabinet", mount = profile.mount }
+        specs[itemType], variants[tier] = spec, spec
     end
+    cabinetSpecs[id] = variants
 end
+
+local function specFor(itemType) return specs[itemType] end
 
 function Placement.getSpec(itemType)
     return specFor(itemType)
 end
 
-function Placement.switchMount(square, item, preferred)
+function Placement.isWallItem(itemType)
+    local spec = specFor(itemType)
+    return spec and spec.mount == "wall"
+end
+
+function Placement.wallMount(square, item, preferred)
     local saved = item:getModData().zedcommPlacement
     local state = type(saved) == "table" and saved.state
     return Switch.mount(square, preferred or (type(state) == "table" and state.mount))
 end
 
+function Placement.surfaceOffset(square, itemType)
+    local spec = specFor(itemType)
+    if not spec or spec.mount ~= "surface" or not square or not ISMoveableSpriteProps
+        or square:has("IsTableTop") then return nil end
+    local height = ISMoveableSpriteProps:getTotalTableHeight(square)
+    if height > 0 and height <= 64 then return height end
+end
+
+local wallFrames = { north = 3, west = 4, south = 5, east = 6 }
+
 function Placement.previewSprite(square, item, mount)
     local spec = specFor(item:getFullType())
     if not spec then return nil end
-    if spec.definitionId ~= Switch.ID or not square then return spec.sprite end
+    if spec.mount ~= "wall" or not square then return spec.sprite end
+    local facing = Placement.wallMount(square, item, mount)
+    if spec.definitionId ~= Switch.ID then
+        return "zedcomm_cabinets_01_" .. (wallFrames[facing] or wallFrames.north)
+    end
     local saved = item:getModData().zedcommPlacement
     local state = type(saved) == "table" and saved.state
-    return Switch.sprite(Placement.switchMount(square, item, mount), type(state) == "table" and state.on == true)
+    return Switch.sprite(facing, type(state) == "table" and state.on == true)
 end
 
 function Placement.getRegistry()
@@ -130,9 +159,8 @@ end
 
 function Placement.relayCandidates(square)
     local out = {}
-    if not getDebug() then return out end
     for _, object in ipairs(squareObjects(square)) do
-        if Relay.isEligible(object) and not tagOf(object) then out[#out + 1] = object end
+        if Relay.isEligible(object) and object:getModData().zedcomm == nil then out[#out + 1] = object end
     end
     return out
 end
@@ -145,20 +173,26 @@ function Placement.doorCandidates(square)
     return out
 end
 
+function Placement.windowContactCandidates(square)
+    local out = {}
+    for _, object in ipairs(squareObjects(square)) do
+        if Contact.canFit(object, Contact.WINDOW_ID) then out[#out + 1] = object end
+    end
+    return out
+end
+
 function Placement.piecesAt(registry, square)
     local out = {}
     for _, object in ipairs(squareObjects(square)) do
         local tag = tagOf(object)
         local spec = tag and (specFor(tag.placedItem) or (tag.definitionId == Relay.ID and relaySpec)
             or (tag.definitionId == Circuit.DOOR_ID and doorSpec)
-            or (tag.definitionId == ZedComm.DoorContact.ID and contactSpec))
+            or contactSpecs[tag.definitionId])
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
-            if piece.definitionId == Circuit.CABINET_ID then
-                local advanced = piece.state.adapter == "advanced"
-                spec = specFor(advanced and Circuit.ADVANCED_CABINET_ITEM or Circuit.CABINET_ID)
-            end
+            local variants = cabinetSpecs[piece.definitionId]
+            if variants then spec = variants[piece.state.adapter] or variants.basic end
             out[#out + 1] = { id = piece.id, piece = piece, object = object, square = square, spec = spec }
         end
     end
@@ -228,11 +262,16 @@ local function link(registry, first, firstPort, second, secondPort)
 end
 
 local function tileAvailable(square, spec)
-    if not square:TreatAsSolidFloor() or square:isSolid() or square:isSolidTrans() then
+    if not square:TreatAsSolidFloor()
+        or (spec.mount ~= "surface" and (square:isSolid() or square:isSolidTrans())) then
         return false, "Choose a clear floor tile."
     end
-    if spec.definitionId == Switch.ID and not Switch.mount(square) then
-        return false, "Choose a tile next to a wall for the switch."
+    local height
+    if spec.mount == "surface" then
+        height = Placement.surfaceOffset(square, spec.itemType)
+        if not height then return false, "Choose an empty table or countertop." end
+    elseif spec.mount == "wall" and not Switch.mount(square) then
+        return false, "Choose a tile next to an eligible wall."
     end
     if spec.kind == "endpoint" then
         for _, object in ipairs(squareObjects(square)) do
@@ -240,7 +279,7 @@ local function tileAvailable(square, spec)
             if tag and tag.kind == "endpoint" then return false, "There is already a device here." end
         end
     end
-    return true
+    return true, nil, height
 end
 
 function Placement.canPlace(square, itemType)
@@ -291,19 +330,19 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
         return false, "That item is no longer in your main inventory."
     end
     if laying and spec.kind ~= "cable" then return false, "Choose a wire to extend this run." end
-    local valid, why = tileAvailable(square, spec)
+    local valid, why, height = tileAvailable(square, spec)
     if not valid then return false, why end
     if laying and not canExtend(anchor, anchorPort, square) then
         return false, "Select a free end on this tile or a neighboring tile."
     end
-    if spec.definitionId == Switch.ID then
-        local facing = Placement.switchMount(square, item, mount)
+    if spec.mount == "wall" then
+        local facing = Placement.wallMount(square, item, mount)
         if mount and mount ~= facing then return false, "That wall is no longer available." end
         mount = facing
     end
     local sprite = Placement.previewSprite(square, item, mount)
     if not getSprite(sprite) then return false, "The ZedComm sprite is missing." end
-    if spec.definitionId and spec.definitionId ~= Circuit.CABINET_ID and not definitions.get(spec.definitionId) then
+    if spec.definitionId and not cabinetSpecs[spec.definitionId] and not definitions.get(spec.definitionId) then
         return false, "The device definition is missing."
     end
     local retained = retainedState(item, spec)
@@ -311,10 +350,14 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     if not id then return false, "A device with this identity is already placed." end
 
     local object = IsoObject.new(square, sprite, item:getName())
+    if height then object:setRenderYOffset(height) end
     local state = retained and retained.state
     if spec.adapter then
-        state = { adapter = spec.adapter, circuit = state and state.circuit or { modules = {}, links = {} },
-            portLabels = state and state.portLabels, fixtureName = state and state.fixtureName }
+        local cabinetState = {}
+        for key, value in pairs(state or {}) do cabinetState[key] = value end
+        cabinetState.circuit = cabinetState.circuit or { modules = {}, links = {} }
+        cabinetState.adapter, cabinetState.mount = spec.adapter, mount
+        state = cabinetState
     end
     if spec.definitionId == Switch.ID then
         state = { on = type(state) == "table" and state.on == true, mount = mount,
@@ -347,6 +390,7 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
 end
 
 local function pickUp(registry, character, entry)
+    if Circuit.cabinetPadlockId(entry.piece) then return false, "Remove the cabinet padlock first." end
     local record = registry.network:record(entry.id)
     local inventory = character:getInventory()
     local item = instanceItem(entry.spec.itemType)
@@ -370,42 +414,126 @@ local function pickUp(registry, character, entry)
     return true
 end
 
-local function installRelay(registry, square, lamp, character, adapterItem)
-    if not getDebug() or not Relay.isEligible(lamp) or not onSquare(lamp, square) then
-        return false, "Choose a placed, modifiable lamp in debug singleplayer."
+function Placement.canFitLampAdapter(character, advanced)
+    local required = advanced and 3 or 1
+    if character:getPerkLevel(Perks.Electricity) < required then
+        return false, "Requires Electrical " .. required
     end
+    return true
+end
+
+local function fitLampAdapter(registry, square, lamp, character, item)
+    if not Relay.isEligible(lamp) or not onSquare(lamp, square) then
+        return false, "Choose a placed, modifiable lamp."
+    end
+    local inventory = character:getInventory()
+    local itemType = item and item:getFullType()
+    local advanced = itemType == Circuit.ADVANCED_ADAPTER_ITEM
+    if (not advanced and itemType ~= Circuit.BASIC_ADAPTER_ITEM)
+        or item:getContainer() ~= inventory or not inventory:contains(item) then
+        return false, "Bring the matching adapter in your main inventory."
+    end
+    local skilled, reason = Placement.canFitLampAdapter(character, advanced)
+    if not skilled then return false, reason .. "." end
     local data = lamp:getModData()
     if data.zedcomm ~= nil then return false, "This fixture already has a ZedComm device." end
     for _, object in ipairs(squareObjects(square)) do
         local tag = tagOf(object)
         if tag and tag.kind == "endpoint" then return false, "There is already a device on this tile." end
     end
+
     local id = chooseId(registry, square)
-    local state = { module = { id = Relay.MODULE, config = {} } }
-    local inventory
-    if adapterItem then
-        inventory = character:getInventory()
-        if adapterItem:getFullType() ~= "ZedComm.AdvancedAdapter"
-            or adapterItem:getContainer() ~= inventory or not inventory:contains(adapterItem) then
-            return false, "The Advanced Adapter is no longer in your main inventory."
-        end
-        state.circuit = { modules = {}, links = {} }
-        inventory:Remove(adapterItem)
-    end
+    local state = { adapter = advanced and "advanced" or "basic", module = { id = Relay.MODULE, config = {} } }
+    if advanced then state.circuit = { modules = {}, links = {} } end
+    inventory:Remove(item)
     data.zedcomm = { id = id, kind = "endpoint", definitionId = Relay.ID, state = state }
-    local called, ok, reason = pcall(registry.addPiece, registry, lamp)
+    local called, ok, failure = pcall(registry.addPiece, registry, lamp)
     if not called or not ok then
         if registry.network.pieces[id] then registry:removePiece(id) end
         data.zedcomm = nil
-        if inventory then inventory:AddItem(adapterItem) end
-        return false, called and reason or tostring(ok)
+        inventory:AddItem(item)
+        return false, called and failure or tostring(ok)
     end
     Relay.writeInstallation(data, id, state)
     return true, id
 end
 
+local function removeLampAdapter(character, registry, entry)
+    local state = entry.piece.state
+    local inventory = character:getInventory()
+    local recovered = Parts.recover(character, state, state.adapter and 1 or 0)
+    if not recovered then return false, "There is no room for the adapter and modules." end
+
+    local ok, reason = registry:removePiece(entry.id)
+    if not ok then
+        Parts.discard(inventory, recovered)
+        return false, reason
+    end
+    local data = entry.object:getModData()
+    data.zedcomm = nil
+    if type(data.movableData) == "table" then data.movableData.zedcommRelay = nil end
+    ZedComm.DeviceRuntime.releaseLamp(entry.id)
+    if ZedComm.ModuleVisuals then ZedComm.ModuleVisuals.clear(entry.object) end
+    return true
+end
+
+local function changeCabinetPadlock(registry, character, entry, command)
+    if not cabinetSpecs[entry.piece.definitionId] or not entry.piece.board then
+        return false, "That cabinet is no longer available."
+    end
+    local inventory = character:getInventory()
+    local lockedKey = Circuit.cabinetPadlockId(entry.piece)
+    local item, replacementType, replacementCount, keyId
+    if command.kind == "padlock-cabinet" then
+        if lockedKey then return false, "The cabinet is already padlocked." end
+        item = command.item
+        if not item or item:getFullType() ~= "Base.Padlock"
+            or item:getContainer() ~= inventory or not inventory:contains(item) then
+            return false, "Bring a padlock in your main inventory."
+        end
+        keyId = item:getKeyId()
+        replacementType, replacementCount = "Base.KeyPadlock", item:getNumberOfKey()
+    else
+        if lockedKey == nil or lockedKey ~= command.keyId then return false, "The cabinet padlock changed." end
+        item = inventory:haveThisKeyId(lockedKey)
+        if not item then return false, "Bring the matching padlock key." end
+        keyId = lockedKey
+        replacementType, replacementCount = "Base.Padlock", 1
+    end
+    local replacements = {}
+    for i = 1, replacementCount do
+        local replacement = instanceItem(replacementType)
+        if not replacement then return false, "Could not create the padlock or its key." end
+        replacement:setKeyId(keyId)
+        if lockedKey then replacement:setNumberOfKey(1) end
+        replacements[i] = replacement
+    end
+    local container = item:getContainer()
+    container:Remove(item)
+    local added = 0
+    local ok, reason = false, nil
+    for _, replacement in ipairs(replacements) do
+        if not inventory:hasRoomFor(character, replacement) then
+            reason = "There is no room for the padlock or its keys."
+            break
+        end
+        inventory:AddItem(replacement)
+        added = added + 1
+    end
+    if not reason then
+        local newKeyId = not lockedKey and keyId or nil
+        ok, reason = registry:setCabinetPadlock(entry.id, newKeyId)
+    end
+    if not ok then
+        for i = 1, added do inventory:Remove(replacements[i]) end
+        container:AddItem(item)
+    end
+    return ok, reason
+end
+
 function Placement.canUpgradeCabinet(character, entry, adapter)
-    if not entry or entry.piece.definitionId ~= Circuit.CABINET_ID then return false, "That cabinet is no longer available." end
+    if not entry or not cabinetSpecs[entry.piece.definitionId] then return false, "That cabinet is no longer available." end
+    if Circuit.cabinetPadlockId(entry.piece) then return false, "Remove the cabinet padlock first." end
     if entry.spec.adapter ~= "basic" then return false, "This cabinet already has an Advanced Adapter." end
     local inventory = character:getInventory()
     if not adapter or adapter:getFullType() ~= Circuit.ADVANCED_ADAPTER_ITEM
@@ -444,6 +572,7 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
     if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square) then
         return false, "That device is no longer within reach."
     end
+    if Circuit.cabinetPadlockId(entry.piece) then return false, "The cabinet is padlocked." end
     local state = entry.piece.state
     local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= Relay.ID) or not state
@@ -514,6 +643,7 @@ function Placement.changeCircuitBattery(character, registry, target, expected, i
         or not entry.piece.state or entry.piece.state.circuit ~= expected then
         return false, "The circuit changed or is out of reach."
     end
+    if Circuit.cabinetPadlockId(entry.piece) then return false, "The cabinet is padlocked." end
     local layout = registry.network:record(target.id).state.circuit
     local part = layout.modules[id]
     if not part or part.kind ~= "batterySource" then return false, "Select a Battery Source." end
@@ -557,15 +687,14 @@ function Placement.perform(character, command)
     if not Placement.canReach(character, command.square) then
         return false, "Move onto or next to the target tile."
     end
-    if command.kind == "install-relay" then
-        return installRelay(registry, command.square, command.object)
+    if command.kind == "fit-lamp-adapter" then
+        return fitLampAdapter(registry, command.square, command.object, character, command.item)
     end
-    if command.kind == "install-advanced-adapter" and command.item then
-        return installRelay(registry, command.square, command.object, character, command.item)
-    end
-    if command.kind == "install-door-contact" then
-        if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
-        return ZedComm.DoorInstallation.installContact(character, registry, command.object, chooseId(registry, command.square))
+    if command.kind == "install-door-contact" or command.kind == "install-window-contact" then
+        if not onSquare(command.object, command.square) then return false, "That fixture is no longer on the tile." end
+        local contactId = command.kind == "install-window-contact" and Contact.WINDOW_ID or Contact.ID
+        return ZedComm.DoorInstallation.installContact(character, registry, command.object,
+            chooseId(registry, command.square), contactId)
     end
     if command.kind == "install-door" then
         if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
@@ -581,9 +710,12 @@ function Placement.perform(character, command)
     if not target or target.square ~= command.square or target.object ~= command.object then
         return false, "That device or wire is no longer on the tile."
     end
+    if command.kind == "remove-lamp-adapter" and target.piece.definitionId == Relay.ID then
+        return removeLampAdapter(character, registry, target)
+    end
     if command.kind == "disconnect-relay" and target.spec.nativePickup then
         local cable = target.piece.ports.signal
-        if not cable then return false, "The relay lamp has no connected wire." end
+        if not cable then return false, "This fixture has no connected wire." end
         return registry:unlink(cable, target.id)
     end
     if command.kind == "disconnect-port" and target.piece.board then
@@ -591,13 +723,16 @@ function Placement.perform(character, command)
         if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
         return registry:unlink(cable, target.id)
     end
-    if command.kind == "remove-door-contact" and target.piece.definitionId == ZedComm.DoorContact.ID then
+    if command.kind == "remove-door-contact" and contactSpecs[target.piece.definitionId] then
         if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
         return ZedComm.DoorInstallation.removeContact(character, registry, target)
     end
     if command.kind == "remove-door-adapters" and target.piece.definitionId == Circuit.DOOR_ID then
         if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
         return ZedComm.DoorInstallation.remove(character, registry, target)
+    end
+    if command.kind == "padlock-cabinet" or command.kind == "remove-cabinet-padlock" then
+        return changeCabinetPadlock(registry, character, target, command)
     end
     if command.kind == "upgrade-cabinet" and target.piece.board then
         return upgradeCabinet(registry, character, target, command.item)

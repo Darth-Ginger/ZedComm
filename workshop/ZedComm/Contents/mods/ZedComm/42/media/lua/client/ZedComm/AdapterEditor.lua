@@ -1,4 +1,3 @@
--- Singleplayer editor for fixture boards and Small Cabinets.
 if isClient() or isServer() then return end
 
 require "ISUI/ISPanel"
@@ -35,7 +34,7 @@ end
 local function selectedHost(player, registry, target, view)
     local placement = ZedComm.PlayerPlacement
     local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
-    if not entry or entry.object ~= target.object then return nil end
+    if not entry or entry.object ~= target.object or Circuit.cabinetPadlockId(entry.piece) then return nil end
     if view and placement.canView(player, entry.square) or placement.canReach(player, entry.square) then return entry end
 end
 
@@ -126,11 +125,14 @@ function Editor.renameJack(player, registry, target, id)
 end
 
 function Editor.addOptions(add, registry, entry)
+    if Circuit.cabinetPadlockId(entry.piece) then return end
     local layout = entry.piece.state and entry.piece.state.circuit
     local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= ZedComm.RelayLamp.ID) or type(layout) ~= "table"
         or type(layout.modules) ~= "table" then return end
-    add(cabinet == "door" and "Open Door Board" or cabinet and "Open Small Cabinet" or "Open Advanced Adapter", Editor.open, registry, entry)
+    local profile = Circuit.cabinets[entry.piece.definitionId]
+    local label = profile and ("Open " .. profile.name) or cabinet == "door" and "Open Door Board" or "Open Advanced Adapter"
+    add(label, Editor.open, registry, entry)
     local ids = thresholdIds(layout)
     for i, id in ipairs(ids) do
         local name = #ids == 1 and "Set threshold" or ("Set threshold (" .. id .. ")")
@@ -143,6 +145,7 @@ local function geometry(layout, cabinet, cell)
     for id, module in pairs(layout.modules) do
         local part = {}
         for field, value in pairs(module) do part[field] = value end
+        part.moveable = true
         parts[id] = part
     end
     for _, part in pairs(parts) do
@@ -537,7 +540,7 @@ function Editor:onMouseDown(x, y)
         self.gridPress = true
         if self:inReach() then
             local id, part = partAt(self.parts, x, y)
-            if part and Circuit.kinds[part.kind].item and not contactAt(part, x, y) then
+            if part and part.moveable and not contactAt(part, x, y) then
                 self.gridPress = nil
                 self:beginDrag(id, nil, math.floor(x - part.x), math.floor(y - part.y))
             end
@@ -599,7 +602,7 @@ function Editor:onRightMouseUp(x, y)
         local spec = Circuit.kinds[part.kind]
         local canRename = self.cabinet and spec.jack and not part.action
         local canConfigure = configurable(part, self.adapter == "advanced")
-        local canRemove = self.layout.modules[id] ~= nil
+        local canRemove = self.parts[id].moveable
         if not (canRename or canConfigure or canRemove) or not self:inReach() then return true end
 
         local context = ISContextMenu.get(self.player:getPlayerNum(), getMouseX(), getMouseY())
@@ -675,7 +678,7 @@ function Editor:render()
     local cell = self.cell
     local mouseX, mouseY = self:getMouseX(), self:getMouseY()
     local title = self.cabinet == "door" and (self.adapter == "advanced" and "Advanced Door Board" or "Basic Door Board")
-        or self.cabinet and (self.adapter == "advanced" and "Advanced Small Cabinet" or "Basic Small Cabinet")
+        or self.cabinetName and ((self.adapter == "advanced" and "Advanced " or "Basic ") .. self.cabinetName)
         or "Advanced Adapter"
     self:setStencilRect(16, 8, self.carriedX + 100, 23)
     self:drawText(self.fixtureName and (title .. " (" .. self.fixtureName .. ")") or title,
@@ -879,6 +882,10 @@ function Editor:close()
 end
 
 function Editor.open(player, registry, target)
+    if Circuit.cabinetPadlockId(target.piece) then
+        player:Say("The cabinet is padlocked.")
+        return
+    end
     local entry = selectedHost(player, registry, target, true)
     local cabinet = entry and Circuit.profileFor(entry.piece.definitionId)
     local adapter = cabinet and entry.piece.state.adapter or nil
@@ -887,8 +894,10 @@ function Editor.open(player, registry, target)
         return
     end
     if panels[player] then panels[player]:close() end
-    local cell, gridSize = cabinet and 60 or 78, Circuit.size(cabinet)
-    local _, gridRows = Circuit.dimensions(cabinet)
+    local gridSize, gridRows = Circuit.dimensions(cabinet)
+    local core = getCore()
+    local cell = math.max(28, math.floor(math.min(cabinet and 60 or 78,
+        (core:getScreenWidth() - 218) / gridSize, (core:getScreenHeight() - 111) / gridRows)))
     local gridWidth, gridHeight = gridSize * cell, gridRows * cell
     local controlsY = carriedY + paletteRows * carriedStep
     local legendY = controlsY + (cabinet and 55 or 88)
@@ -898,6 +907,8 @@ function Editor.open(player, registry, target)
     panel.player, panel.registry, panel.target = player, registry, target
     panel.cabinet, panel.cell, panel.gridSize, panel.gridWidth = cabinet, cell, gridSize, gridWidth
     panel.gridRows, panel.gridHeight = gridRows, gridHeight
+    local profile = Circuit.cabinets[entry.piece.definitionId]
+    panel.cabinetName = profile and profile.name
     panel.carriedX = gridX + gridWidth + 22
     panel.paletteOffset, panel.legendY = 0, legendY
     panel.collapsed = {}

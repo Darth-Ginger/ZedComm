@@ -30,6 +30,14 @@ return function(worldObject)
             if not door.rejectToggle then door.open = not door.open end
             if triggerEvent then triggerEvent("OnContainerUpdate") end
         end
+        function door.ToggleDoorSilent()
+            door.toggles = door.toggles + 1
+            door.silentCloses = (door.silentCloses or 0) + 1
+            if not door.rejectToggle then door.open = not door.open end
+        end
+        square.RecalcAllWithNeighbours = square.RecalcAllWithNeighbours or function() end
+        square.setSquareChanged = square.setSquareChanged or function() end
+        door.invalidateRenderChunkLevel = door.invalidateRenderChunkLevel or function() end
         return door
     end
 end

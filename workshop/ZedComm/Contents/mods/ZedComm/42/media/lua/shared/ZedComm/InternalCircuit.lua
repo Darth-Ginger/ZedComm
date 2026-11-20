@@ -51,7 +51,20 @@ local kinds = {
 }
 Circuit.kinds = kinds
 
-function Circuit.size(cabinet) return cabinet and 6 or 3 end
+Circuit.cabinets = {
+    [Circuit.CABINET_ID] = { name = "Small Cabinet", sprite = "zedcomm_devices_01_466", cells = 6, pairs = 1 },
+    ["ZedComm.LargeCabinet"] = { name = "Large Cabinet", sprite = "zedcomm_cabinets_01_0", cells = 8, pairs = 2 },
+    ["ZedComm.XLCabinet"] = { name = "XL Cabinet", sprite = "zedcomm_cabinets_01_1", cells = 10, pairs = 3 },
+    ["ZedComm.TabletopCabinet"] = { name = "Tabletop Cabinet", sprite = "zedcomm_cabinets_01_2",
+        cells = 6, pairs = 1, mount = "surface" },
+    ["ZedComm.WallCabinet"] = { name = "Wall Cabinet", sprite = "zedcomm_cabinets_01_3",
+        cells = 8, pairs = 2, mount = "wall" },
+}
+
+function Circuit.size(profile)
+    local cabinet = Circuit.cabinets[profile]
+    return cabinet and cabinet.cells or (profile and 6 or 3)
+end
 
 function Circuit.dimensions(profile)
     return Circuit.size(profile), profile == "door" and 3 or Circuit.size(profile)
@@ -59,7 +72,11 @@ end
 
 function Circuit.profileFor(definitionId)
     if definitionId == Circuit.DOOR_ID then return "door" end
-    if definitionId == Circuit.CABINET_ID then return true end
+    if Circuit.cabinets[definitionId] then return definitionId end
+end
+
+function Circuit.cabinetPadlockId(piece)
+    return Circuit.cabinets[piece.definitionId] and piece.state and piece.state.padlockKeyId or nil
 end
 
 function Circuit.defaultRotation(kind)
@@ -122,16 +139,22 @@ end
 function Circuit.fixedParts(cabinet)
     if cabinet == "door" then
         return {
-            lock = { column = 1, row = 1, rotation = 0, kind = "input", label = "Lock IN" },
-            open = { column = 2, row = 3, rotation = 270, kind = "input", label = "Open IN" },
-            lockAction = { column = 6, row = 1, rotation = 0, kind = "output", label = "Lock", action = true },
-            openAction = { column = 4, row = 3, rotation = 90, kind = "output", label = "Open", action = true },
+            lock = { column = 1, row = 1, rotation = 0, kind = "input", label = "Lock IN", moveable = false },
+            open = { column = 2, row = 3, rotation = 270, kind = "input", label = "Open IN", moveable = false },
+            lockAction = { column = 6, row = 1, rotation = 0, kind = "output", label = "Lock", action = true, moveable = false },
+            openAction = { column = 4, row = 3, rotation = 90, kind = "output", label = "Open", action = true, moveable = false },
         }
     end
-    return {
-        input = { column = 1, row = 1, rotation = 0, kind = "input" },
-        output = { column = Circuit.size(cabinet), row = 1, rotation = 0, kind = "output" },
-    }
+    local profile = Circuit.cabinets[cabinet]
+    local count, columns = profile and profile.pairs or 1, Circuit.size(cabinet)
+    local parts = {}
+    for index = 1, count do
+        local suffix = index == 1 and "" or "-" .. index
+        local row = 1 + (index - 1) * 3
+        parts["input" .. suffix] = { column = 1, row = row, rotation = 0, kind = "input", moveable = false }
+        parts["output" .. suffix] = { column = columns, row = row, rotation = 0, kind = "output", moveable = false }
+    end
+    return parts
 end
 
 function Circuit.moduleAllowed(kind, cabinet)
@@ -160,11 +183,11 @@ local function occupy(cells, part, columns, rows)
     return true
 end
 
-local function mountFacesEdge(part, size)
+local function mountFacesEdge(part, columns, rows)
     if part.rotation == 0 then return part.column == 1 end
     if part.rotation == 90 then return part.row == 1 end
-    if part.rotation == 180 then return part.column == size end
-    return part.row == size
+    if part.rotation == 180 then return part.column == columns end
+    return part.row == rows
 end
 
 local function collectParts(modules, cabinet)
@@ -180,7 +203,7 @@ local function collectParts(modules, cabinet)
         local ok, reason = occupy(cells, part, size, rows)
         if not ok then return nil, reason end
         local spec = kinds[part.kind]
-        if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size) then
+        if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size, rows) then
             return nil, spec.externalOutputs and "Splitter must mount on an edge with its jacks facing out"
                 or "extension jack must face out from an edge"
         end

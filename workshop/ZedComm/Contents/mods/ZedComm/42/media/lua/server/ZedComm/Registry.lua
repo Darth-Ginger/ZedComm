@@ -164,7 +164,7 @@ function SZedCommSystem:addPiece(isoObject)
     if tag.kind == "cable" then
         ok, err = self.network:addCable(tag.id, x, y, z)
     elseif tag.kind == "endpoint" then
-        if tag.definitionId == ZedComm.InternalCircuit.CABINET_ID then
+        if ZedComm.InternalCircuit.cabinets[tag.definitionId] then
             ok, err = self.network:addEndpoint(tag.id, x, y, z, "cabinet", nil, tag.definitionId, tag.state)
         elseif tag.definitionId ~= nil then
             local def = Definitions.get(tag.definitionId)
@@ -234,14 +234,28 @@ function SZedCommSystem:renameRun(cableId, name)
     return self.runLabels:rename(cableId, name)
 end
 
+local function syncFixtureState(self, id)
+    local piece = self.network.pieces[id]
+    self:syncPiece(id, piece.x, piece.y, piece.z)
+    syncLoadedFixture(self, piece)
+end
+
 function SZedCommSystem:renameFixture(id, name)
     local ok, result = self.network:renameFixture(id, name)
-    if ok then
-        local piece = self.network.pieces[id]
-        self:syncPiece(id, piece.x, piece.y, piece.z)
-        syncLoadedFixture(self, piece)
-    end
+    if ok then syncFixtureState(self, id) end
     return ok, result
+end
+
+function SZedCommSystem:setFixtureOption(id, option, enabled)
+    local ok, reason = self.network:setFixtureOption(id, option, enabled)
+    if ok then syncFixtureState(self, id) end
+    return ok, reason
+end
+
+function SZedCommSystem:setCabinetPadlock(id, keyId)
+    local ok, reason = self.network:setCabinetPadlock(id, keyId)
+    if ok then syncFixtureState(self, id) end
+    return ok, reason
 end
 
 function SZedCommSystem:renameCabinetPort(id, port, name)
@@ -315,7 +329,7 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
                 local object = objects:get(j)
                 local tag = tagOf(object)
                 if tag then
-                    if tag.definitionId == ZedComm.DoorContact.ID and not ZedComm.DoorContact.host(object) then
+                    if ZedComm.DoorContact.profiles[tag.definitionId] and not ZedComm.DoorContact.host(object) then
                         orphans[#orphans + 1] = object
                     else
                         present[tag.id] = true

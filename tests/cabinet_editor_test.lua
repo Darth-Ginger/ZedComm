@@ -69,7 +69,8 @@ function lamp.addAttachedAnimSprite() end
 function lamp.canSwitchLight() return true end
 function lamp.isActivated() return lamp.active end
 function lamp.setActive(_, active) lamp.active = active end
-assert(optionsAt(lampTile)["Install test relay"])()
+give("ZedComm.BasicAdapter")
+assert(optionsAt(lampTile)["Fit Basic Adapter"])()
 assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
 local lampId = lamp:getModData().zedcomm.id
 

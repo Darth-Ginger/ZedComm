@@ -32,7 +32,7 @@ function lamp.isActivated() return lamp.active end
 function lamp.setActive(_, active) lamp.active = active end
 local adapter, part = give("ZedComm.AdvancedAdapter"), give("ZedComm.ThresholdModule")
 testState.queued = nil
-assert(optionsAt(lampTile)["Install Advanced Adapter"])()
+assert(optionsAt(lampTile)["Fit Advanced Adapter"])()
 assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
 local id = lamp:getModData().zedcomm.id
 local function circuit() return testState.registry.network:record(id).state.circuit end

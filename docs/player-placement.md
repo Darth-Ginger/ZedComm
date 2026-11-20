@@ -53,7 +53,9 @@ Right-click an installed part in the cabinet or Advanced Adapter editor and choo
 
 ## Wall switches
 
-In native **Place**, select the Network Switch, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. A connected cable follows the wall down to the floor.
+Use native **Place** or the ZedComm placement menu to place a floor cabinet, a Tabletop Cabinet on a clear table or countertop, or a Wall Cabinet against a wall. From an adjacent floor tile, wire to a free jack on a raised cabinet.
+
+In native **Place**, select the Network Switch or Wall Cabinet, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. A connected cable follows the wall down to the floor.
 
 ## Multiple wires on one tile
 
@@ -77,6 +79,12 @@ The occupancy variant uses the same native placement, pickup, and wire tools. It
 ## Weight plate
 
 The weight variant uses the same placement, pickup, and wiring tools. It sends an estimated load from on-foot actors and an overlapping vehicle. See [weight plate calibration and smoke test](weight-plate.md).
+
+## Retrofit a vanilla lamp
+
+1. Carry a Basic Adapter at Electrical 1 or an Advanced Adapter at Electrical 3 in your main inventory. Right-click a modifiable vanilla lamp and choose **ZedComm → Lamp → Fit Basic Adapter** or **Fit Advanced Adapter**. The timed action uses the adapter when it finishes.
+2. Connect the signal wire to the lamp's free end. While wired, the signal controls the lamp. An Advanced Adapter also provides a 3×3 circuit editor. Native pickup carries the installation with the lamp. Reconnect the wire after placing the lamp again.
+3. Choose **ZedComm → Lamp → Remove lamp adapter** to take out the adapter and any installed modules. Leave room in your main inventory for the recovered parts. The wire remains on the floor and the native switch works again. To change tiers, remove the fitted adapter, fit the new one, and reconnect the wire. Older test fittings without a recorded adapter can be removed without returning an adapter.
 
 ## In-game check
 

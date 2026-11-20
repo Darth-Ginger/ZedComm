@@ -44,10 +44,14 @@ do
     dofile(LUA .. "client/ZedComm/DisplayReadout.lua")
     local srcTile, wireTile, displayTile = floorTile(130, 125), floorTile(131, 125), floorTile(132, 125)
     local sourceId = "face-test-source"
-    local source = worldObject(srcTile, {
+    local source = IsoObject.new(srcTile, "zedcomm_devices_01_431")
+    source:getModData().zedcomm = {
         id = sourceId, kind = "endpoint", definitionId = "ZedComm.DebugByteSource",
-    })
+    }
+    srcTile:AddTileObject(source)
     fire("OnObjectAdded", source)
+    fire("OnTick")
+    check(source.sprite == "zedcomm_display_01_1", "unwired test source displays configured zero")
     local placed, displayId = runPlacement(displayTile, { kind = "place", item = give("ZedComm.NumericDisplay") })
     assert(placed, displayId)
     local display = placement.resolve(testState.registry, displayId).object
@@ -91,6 +95,7 @@ do
     assert(testState.registry:unlink(wireId, sourceId))
     check(placedReading(displayId) == nil and display.sprite == "zedcomm_display_01_0" and faceOf(display) == "16",
         "attached signal loss swaps the reading for dashes with the indicator off")
+    check(source.sprite == "zedcomm_display_01_256", "an unwired source still shows 255")
     assert(testState.registry:link(wireId, sourceId))
     check(placedReading(displayId) == 255 and display.sprite == "zedcomm_display_01_256",
         "restoring the source redraws its held byte")

@@ -16,6 +16,7 @@ local network
 local receivers = {}
 local byNetwork = {}
 local readings = {}
+local testSources = {}
 local circuitTime = 0
 
 local function tagOf(object)
@@ -233,7 +234,9 @@ function Runtime.setTestByte(registry, id, input)
     if not value or value < 0 or value > 255 or math.floor(value) ~= value then
         return false, "Enter a whole decimal value from 0 to 255."
     end
-    return registry:setDeviceState(id, { byte = value })
+    local state = registry.network:record(id).state or {}
+    state.byte = value
+    return registry:setDeviceState(id, state)
 end
 
 function Runtime.getSenderModule(piece, definition)
@@ -309,7 +312,18 @@ local function reportError(piece, message)
     piece.runtimeError = message
 end
 
+function Runtime.getTestSourceValue(object)
+    return testSources[object]
+end
+
+function Runtime.forEachTestSource(visit)
+    for object, value in pairs(testSources) do visit(object, value) end
+end
+
 local function sampleSource(piece, definition, object)
+    if object and piece.definitionId == "ZedComm.DebugByteSource" then
+        testSources[object] = piece.state and piece.state.byte or 0
+    end
     local packet, reason
     if object and definition then
         local moduleId
@@ -365,6 +379,11 @@ local function releaseReceiver(receiver)
     readings[receiver.object] = nil
 end
 
+function Runtime.releaseLamp(id)
+    if receivers[id] then releaseReceiver(receivers[id]) end
+    receivers[id] = nil
+end
+
 local boards, boardInputs, pendingBoards = {}, {}, {}
 
 local function releaseBoard(host)
@@ -376,6 +395,15 @@ end
 function Runtime.releaseBoard(id)
     releaseBoard(boards[id])
     boards[id], pendingBoards[id] = nil, nil
+end
+
+function Runtime.blocksManualDoorOpening(object)
+    local tag = object and tagOf(object)
+    local host = tag and boards[tag.id]
+    if not host or host.object ~= object or not host.controller
+        or not ZedComm.Door.isEligible(object) or object:isOpen() then return false end
+    local requests = host.controller.requests
+    return requests.lockAction == true or requests.openAction == false
 end
 
 function Runtime.getDoorState(id)
@@ -456,6 +484,7 @@ local function prepareBoard(cell, piece, previous)
 end
 
 function Runtime.prepare(registry)
+    testSources = {}
     local time = getGameTime and getGameTime()
     if time and time.getRealworldSecondsSinceLastUpdate then
         circuitTime = circuitTime + math.max(0, time:getRealworldSecondsSinceLastUpdate())

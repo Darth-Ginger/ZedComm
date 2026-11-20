@@ -352,7 +352,7 @@ end
 function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     if type(id) ~= "string" or string.find(id, "#", 1, true) then return false, "bad id" end
     if not checkPosition(x, y, z) then return false, "bad position" end
-    if role ~= "source" and role ~= "sink" and (role ~= "cabinet" or definitionId ~= Circuit.CABINET_ID) then
+    if role ~= "source" and role ~= "sink" and (role ~= "cabinet" or not Circuit.cabinets[definitionId]) then
         return false, "bad role"
     end
     local existing = self.pieces[id]
@@ -566,9 +566,36 @@ function Network:renameFixture(id, name)
     return true, piece.state.fixtureName
 end
 
+function Network:setFixtureOption(id, option, enabled)
+    local piece = self.pieces[id]
+    if not piece or piece.kind ~= "endpoint" or not piece.definitionId or piece.definitionUnavailable then
+        return false, "That fixture is no longer available."
+    end
+    if type(enabled) ~= "boolean" or (option ~= "showFixtureName"
+        and (option ~= "configureOnDoubleClick" or piece.definitionId ~= "ZedComm.DebugByteSource")) then
+        return false, "That option is unavailable for this fixture."
+    end
+    piece.state = piece.state or {}
+    piece.state[option] = enabled or nil
+    return true
+end
+
+function Network:setCabinetPadlock(id, keyId)
+    local piece = self.pieces[id]
+    if not piece or not Circuit.cabinets[piece.definitionId] or not piece.board then
+        return false, "That cabinet is no longer available."
+    end
+    if keyId ~= nil and (type(keyId) ~= "number" or keyId < 0 or keyId > 2147483647 or keyId ~= math.floor(keyId)) then
+        return false, "Invalid padlock key."
+    end
+    piece.state.padlockKeyId = keyId
+    return true
+end
+
 function Network:renameCabinetPort(id, port, name)
     local piece = self.pieces[id]
     if not piece or not piece.board or not piece.board.directions[port] then return false, "That cabinet jack is gone." end
+    if Circuit.cabinetPadlockId(piece) then return false, "The cabinet is padlocked." end
     local label, reason = cleanLabel(name)
     if not label then return false, reason end
     local labels = piece.state.portLabels or {}

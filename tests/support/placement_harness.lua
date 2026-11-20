@@ -141,7 +141,9 @@ return function()
         function item:setUsedDelta(charge) self.charge = charge end
         return item
     end
-    local player = { tile = nil }
+    Perks = { Electricity = 1 }
+    local player = { tile = nil, electrical = 3 }
+    function player:getPerkLevel(perk) return perk == Perks.Electricity and self.electrical or 0 end
     function player.getInventory() return inventory end
     function player.getPlayerNum() return 0 end
     function player.isBuildButtonDown() return false end

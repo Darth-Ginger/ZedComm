@@ -11,11 +11,17 @@ local function actuatorSprite(name)
 end
 
 local function contactSprite(name)
-    return name ~= nil and name:match("^zedcomm_contact_01_%d+$")
+    return name ~= nil and (name:match("^zedcomm_contact_01_%d+$")
+        or name:match("^zedcomm_window_contact_01_%d+$"))
 end
 
 local function mountOf(object, piece)
-    local mount = piece.state and piece.state.doorMount or (object:getNorth() and "north" or "west")
+    local mount = piece.state and piece.state.doorMount
+    if not mount then
+        local north
+        if instanceof(object, "IsoWindow") then north = object:isNorth() else north = object:getNorth() end
+        mount = north and "north" or "west"
+    end
     return mounts[mount]
 end
 
@@ -72,23 +78,25 @@ end
 function Visuals.update(network, cell)
     local seen = {}
     for id, piece in pairs(network and network.pieces or {}) do
-        local contact = piece.definitionId == ZedComm.DoorContact.ID
+        local contact = ZedComm.DoorContact.profiles[piece.definitionId]
         if contact or piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
             local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
             local object = findObject(square, id)
             local door = object
             if contact and object then door = ZedComm.DoorContact.host(object) end
-            if door and ZedComm.Door.isEligible(door) then
+            if door and (contact or ZedComm.Door.isEligible(door)) then
                 local entry = entries[id]
                 if entry and entry.door ~= door then setAttachment(entry, nil); removeLead(entry); entry = nil end
                 entry = entry or { door = door, matches = contact and contactSprite or actuatorSprite }
-                local reverse = ZedComm.Door.reverseHinge(door) and 1 or 0
+                local isWindow = piece.definitionId == ZedComm.DoorContact.WINDOW_ID
+                local reverse = not isWindow and ZedComm.Door.reverseHinge(door) and 1 or 0
                 local name, floorName
                 if contact then
                     local direction = directions[ZedComm.WireShape.portDirection(network, piece, "signal")] or 0
                     local frame = mountOf(door, piece) * 12 + reverse * 6 + direction
-                    name = "zedcomm_contact_01_" .. (mountOf(door, piece) * 24 + reverse * 12
-                        + (door:isOpen() and 0 or 6) + direction)
+                    local framesPerFace = isWindow and 12 or 24
+                    name = contact.prefix .. (mountOf(door, piece) * framesPerFace + reverse * 12
+                        + (contact.isClosed(door) and 6 or 0) + direction)
                     if direction > 0 then floorName = "zedcomm_contact_floor_01_" .. frame end
                 else
                     local frame = Visuals.frame(door, network, piece)

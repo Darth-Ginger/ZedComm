@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Vanilla lamp fitting is available in normal singleplayer. It uses one matching adapter and requires Electrical 1 for Basic or 3 for Advanced. Removal returns the installed parts, leaves the cable with a free end, and restores the native switch.
+
+- Added a craftable Window Contact with its own sash art and inventory icon. A fitted intact window sends 255 closed or 0 open over one output.
+
+- Electrical assembly recipes grant 2 to 8 Electrical XP per craft. Cutting signal wire grants 1 Electrical XP per craft.
+
+- Added 8×8 Large and 10×10 XL floor cabinets, a 6×6 Tabletop Cabinet and an 8×8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
+
+- Cabinets can use vanilla keyed padlocks. Padlocking secures the board and prevents pickup and upgrades while keeping external connections and signal processing active.
+
+- Two Mod Options independently control fixture name labels and floating door status markers across saves.
+
 
 - Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 255, open sends 0, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
 

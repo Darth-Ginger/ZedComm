@@ -2,11 +2,19 @@
 
 A Project Zomboid (Build 42) mod for modular wired electronics and simulated digital signals: redstone-style on/off signaling, with a path toward counters, addressed communication and player-built networks.
 
-Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through Small Cabinets that hold a 6×6 circuit of logic, arithmetic and timing modules. The [recipe table](docs/recipes.md) lists the craftable parts. The latest recipe changes await in-game verification, and lamp conversion is available in debug mode. Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
+Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through network cabinets that hold circuits up to 10×10 of logic, arithmetic and timing modules. The [recipe table](docs/recipes.md) lists the craftable parts. The latest recipe changes await in-game verification. In singleplayer, fit a Basic Adapter to a modifiable lamp at Electrical 1 or an Advanced Adapter at Electrical 3. See the [lamp setup and removal steps](docs/player-placement.md#retrofit-a-vanilla-lamp). Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
+
+Small, Tabletop, Large, Wall and XL Cabinets come in Basic and Advanced tiers. Tabletop cabinets mount to a clear table or countertop. Wall cabinets mount to any eligible wall face. Large and XL floor cabinets have extra built-in jack pairs.
+
+With a vanilla padlock in your main inventory, use **ZedComm > Cabinet > Padlock cabinet**. A locked cabinet keeps running and its external jacks stay accessible. Use **Remove padlock** with a matching key to regain board access, upgrade or pick it up. The action returns the padlock and folds one key back into it, following the native item exchange.
 
 Doors also accept an independent crafted Contact source that reports actual open/closed state without an actuator board. Fit inputs only, contact only, or both with the associated materials.
 
-The networked door build awaits its first [gameplay smoke test](docs/networked-door-smoke-test.md). Its [control policy and installed API research](docs/research/networked-door.md) describe the shared 6x3 board and fail-open Lock behavior.
+A **Window Contact** fits to an intact native window at Electrical 1 with a screwdriver. Wire its source jack to a display or receiver. Closed sends 255, open sends 0, and a broken or missing window sends no signal.
+
+The networked door build is undergoing its [gameplay smoke test](docs/networked-door-smoke-test.md). Its [control policy and installed API research](docs/research/networked-door.md) describe the shared 6x3 board and fail-open Lock behavior.
+
+Under **Options > Mods > ZedComm**, **Show fixture name labels** and **Show door status markers** independently control the two world overlays. Both default to on. Fixtures keep their individual label settings. Door boards and mounted maglock hardware stay visible.
 
 Use the [contributor rules](AGENTS.md) when changing code, tests, or documentation.
 

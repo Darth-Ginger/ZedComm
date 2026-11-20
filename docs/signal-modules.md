@@ -23,7 +23,7 @@ The lamp adapter owns guarded switching. The Noisemaker adapter owns playback co
 
 1. **Shared primitives.** `SignalModules.lua` and `tests/signal_modules_test.lua`. Implemented and ready for review.
 2. **Runtime integration.** Implemented and ready for review. The existing pressure plate, debug source and numeric display use the modules in-game. Offline tests cover the attachment lifecycle, durable module configuration and legacy callbacks.
-3. **Playable lamp retrofit.** Separate task. Validate the actual lamp API, install a test relay, and verify normal power, wire authority, detach, and persistence. The next PC window can combine the shared-tile wire check, mixed-byte display regression, and lamp check after that prototype is ready.
+3. **Playable lamp retrofit.** Separate task. Validate the lamp API, fit an adapter, and verify power, wire control, detachment, and persistence. The next PC window can combine the shared-tile wire check, mixed-byte display regression, and lamp check after that prototype is ready.
 
 ## Chunk 2 — runtime and durable installation
 

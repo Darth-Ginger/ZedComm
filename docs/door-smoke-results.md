@@ -6,6 +6,8 @@ Use [the full setup, grants and procedure](networked-door-smoke-test.md). Restar
 
 ## Checkpoint 1 - independent controls and mounting
 
+Live observation on `4dd32ec`: a barricade prevented the door from opening under network control. Door class and behavior after clearance were unrecorded. The board reported state from behind a north-facing door, where the leaf obscured the housing. Both-side interaction and the updated indicators remain open for retest.
+
 | Check | Expected | Map door | Built door | Observation |
 | --- | --- | --- | --- | --- |
 | Fitting and interruption | Interrupted fitting keeps materials. Successful Basic fitting consumes two adapters, retains screwdriver. | | | |

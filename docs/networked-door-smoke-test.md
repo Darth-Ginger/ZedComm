@@ -1,10 +1,10 @@
 # Networked door smoke test
 
-Use [the compact results sheet](door-smoke-results.md) to record each check and console capture. Status is ready for first gameplay verification. Offline results are recorded in [door controls and API research](research/networked-door.md). Run on Build 42.22.2 in singleplayer with ZedComm enabled. Fully restart PZ after loading this build. Do not use a double door or garage door.
+Use [the compact results sheet](door-smoke-results.md) to record each check and console capture. Offline results are recorded in [door controls and API research](research/networked-door.md). Run on Build 42.22.2 in singleplayer with ZedComm enabled. Fully restart PZ after loading this build. Do not use a double door or garage door.
 
 ## Setup and grants
 
-Choose a single-panel map door with clear access on both sides. Also build an ordinary single-panel wooden door for the second native class. Use disposable test doors for destruction. Keep the existing cabinet test save if it has suitable doors.
+Choose a single-panel map door with clear access on both sides. Also build an ordinary single-panel wooden door for the second native class. Use disposable test doors for destruction. In the fresh-save combined run, build these rigs on the new save. Keep one working door outside the destruction tests for the concealed pressure plate check.
 
 Use the debug character/skills editor to set Electrical to 3. Basic installation requires Electrical 1 and Advanced requires Electrical 3. Both require a screwdriver and two matching adapters in the main inventory. Instant timed actions may be enabled for setup, then disabled for the interruption check.
 
@@ -16,6 +16,8 @@ getPlayer():getInventory():AddItems("ZedComm.BasicAdapter", 4)
 getPlayer():getInventory():AddItems("ZedComm.AdvancedAdapter", 4)
 getPlayer():getInventory():AddItems("ZedComm.SignalWire", 30)
 getPlayer():getInventory():AddItems("ZedComm.DebugByteSource", 2)
+getPlayer():getInventory():AddItems("ZedComm.DoorContact", 3)
+getPlayer():getInventory():AddItem("ZedComm.NumericDisplay")
 getPlayer():getInventory():AddItems("ZedComm.WaitModule", 1)
 getPlayer():getInventory():AddItems("ZedComm.NotModule", 2)
 getPlayer():getInventory():AddItems("ZedComm.AndModule", 3)
@@ -48,6 +50,16 @@ Expect both values to be `true`. If either is false, stop and check the Workshop
 
 **Pause for console capture before reloading.** Report the door classes, both-side result and any blocked-action result. Keep the rig in place.
 
+## Checkpoint 1 retest - interaction and visibility
+
+1. On the Basic rig from Checkpoint 1, set each Test Byte Source to a different byte. Confirm the source face shows its configured value even when unwired. Change one to `255` and then `0`.
+2. Rename a source and a fitted door. Use **Show name label** in each fixture's submenu, then **Hide name label** on one. After reload, verify both settings persist.
+3. In **Options > Mods > ZedComm**, toggle **Show fixture name labels** and **Show door status markers** independently and apply. Turn both off, then on. Check that both settings persist across a game restart and that only fixtures with individual labels enabled regain their labels.
+4. Enable **Enable double-click configuration** on a Test Byte Source. Double-click it while nearby and verify the menu can set its byte or rename it. Disable the option and verify a double-click no longer opens the menu.
+5. With the door closed, set Lock to `255` and Open to `255`. Try opening by mouse from both sides. Repeat with Lock and Open both `0` to test the held Close request. In both cases the mouse action should be blocked before it animates. Check the native context key separately and record any flicker or sound.
+6. With Lock at `0`, drive Open from `255` to `0`. Verify silent closure and check the sprite, lighting and passage. From both sides of a north-facing door, verify the maglock marker shows the actual lock and door state.
+7. If the barricade is still in place, keep Open at `255` and remove the barricade. Verify the held request opens the door after clearance.
+
 ## Checkpoint 2 - shared Advanced board
 
 1. Unwire or set both sources to `0`. Bring two Advanced Adapters and the screwdriver. Remove the Basic door adapters through its Door submenu. Expect two Basic Adapters returned and the native door retained. Fit two Advanced Adapters, then reconnect the Lock and Open runs to their matching inputs.
@@ -79,3 +91,19 @@ Expect both values to be `true`. If either is false, stop and check the Workshop
 6. Rename Contact and its run. Save/reload and confirm names, the separate connection and actual readings. Destroy a disposable fitted door and verify both source and receiver disappear while their wires remain as free ends. Repeat on a player-built door.
 
 Pause for console capture at the end of this checkpoint. Native contact placement, save/reload and destruction remain unverified until these results are recorded.
+
+
+## Window Contact follow-up
+
+```lua
+getPlayer():getInventory():AddItem("ZedComm.WindowContact")
+getPlayer():getInventory():AddItem("Base.Screwdriver")
+getPlayer():getInventory():AddItem("ZedComm.NumericDisplay")
+getPlayer():getInventory():AddItems("ZedComm.SignalWire", 6)
+```
+
+1. At Electrical 1, stand next to an intact single native window. Choose **ZedComm > Window > Install window contact**. Interrupt once, then finish. The contact item is consumed on completion and the screwdriver is kept. The window should still work normally.
+2. Wire **Window Contact** to the Numeric Display. Open and close the window. Expect valid `0` when open and `255` when closed. Check alignment and wire routing from both sides on north- and west-aligned windows.
+3. Reload with the working circuit in place. Verify that the contact and its run persist and that the display reflects the loaded sash position.
+4. Smash a fitted window. Expect the display to show no signal. Use **Remove window contact** to recover the sensor and free the wire end. A smashed or glassless window must refuse new fitting.
+5. Remove the native host on a disposable second fixture. Verify that the registry clears the contact and leaves the wire run disconnected.
