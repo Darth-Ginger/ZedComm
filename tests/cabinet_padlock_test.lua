@@ -51,6 +51,46 @@ check(test.panel == nil and not test.optionsAt(tile, "Cabinet (Padlocked)")["Ope
     "locking closes an open board and hides its edit menu")
 check(not target(tile, id, "pickup") and not target(tile, id, "upgrade-cabinet", { item = advanced })
     and inventory:contains(advanced), "padlock blocks pickup and upgrade")
+local lockedMenu = test.optionsAt(tile, "Cabinet (Padlocked)")
+local wireMenu = test.optionsAt(inTile)
+local disconnected, disconnectReason = target(tile, id, "disconnect-port", { port = "input", cableId = inWire })
+local pickedUp, pickupReason = target(inTile, inWire, "pickup")
+check(not disconnected and disconnectReason == "The cabinet is padlocked."
+    and not pickedUp and pickupReason == "The wire is connected to a padlocked cabinet."
+    and piece().ports.input == inWire,
+    "padlock refuses direct jack disconnection and pickup of the attached wire")
+local disconnectOffered = false
+for label in pairs(lockedMenu) do
+    if label:match("^Disconnect cabinet jack") then disconnectOffered = true end
+end
+check(not disconnectOffered and not wireMenu["Pick up wire"],
+    "locked jack and attached wire hide their removal actions")
+
+local spareCabinetTile, spareWireTile, outerTile =
+    test.floorTile(170, 128), test.floorTile(171, 128), test.floorTile(172, 128)
+local spareCabinet = place(spareCabinetTile, "ZedComm.SmallCabinet")
+local looseWire = place(spareWireTile, "ZedComm.SignalWire")
+local spareWire = test.give("ZedComm.SignalWire")
+assert(test.registry:setCabinetPadlock(spareCabinet, 77))
+local function lockedFailure(ok, reason)
+    return not ok and reason == "The cabinet is padlocked."
+end
+check(lockedFailure(test.join(spareCabinetTile, looseWire, false, spareCabinet, "input"))
+    and lockedFailure(test.join(spareWireTile, spareCabinet, "input", looseWire, false))
+    and lockedFailure(test.lay(spareWireTile, spareWire, spareCabinet, "input"))
+    and inventory:contains(spareWire)
+    and test.registry.network.pieces[spareCabinet].ports.input == false,
+    "a locked free jack cannot attach from either side or consume a new wire")
+check(#test.placement.freePorts(assert(test.placement.resolve(test.registry, spareCabinet))) == 0,
+    "placement choices omit locked free jacks")
+assert(test.registry:setCabinetPadlock(spareCabinet, nil))
+assert(test.join(spareCabinetTile, looseWire, false, spareCabinet, "input"))
+local repaired, outerWire = test.lay(outerTile, spareWire, looseWire, false)
+assert(repaired, outerWire)
+assert(test.registry:setCabinetPadlock(spareCabinet, 77))
+check(target(outerTile, outerWire, "pickup") and test.registry.network.pieces[spareCabinet].ports.input == looseWire,
+    "pickup farther along the run remains available")
+
 local layout = piece().state.circuit
 check(not test.placement.editCircuit(test.player, test.registry, entry(), layout, layout)
     and not test.placement.changeCircuitBattery(test.player, test.registry, entry(), layout, "battery")
@@ -86,4 +126,10 @@ check(recovered and recovered:getKeyId() == 42 and recovered:getNumberOfKey() ==
     and not inventory:contains(used) and inventory:haveThisKeyId(42)
     and piece().state.padlockKeyId == nil and test.optionsAt(tile)["Open Small Cabinet"],
     "removal returns the keyed padlock, uses one key and restores access")
+check(target(tile, id, "disconnect-port", { port = "input", cableId = inWire }) and piece().ports.input == false
+    and test.join(tile, inWire, false, id, "input"), "unlocking makes the jack editable again")
+assert(test.registry:setCabinetPadlock(id, 42))
+inTile:transmitRemoveItemFromSquare(assert(test.placement.resolve(test.registry, inWire)).object)
+check(test.registry.network.pieces[inWire] == nil and piece().ports.input == false
+    and piece().state.padlockKeyId == 42, "forced world removal detaches the wire while the cabinet stays locked")
 test.finish()

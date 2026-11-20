@@ -39,6 +39,8 @@ When runs join, a custom name takes precedence over a default. If both names are
 
 Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Cabinet → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
 
+Padlocking a cabinet secures its board and external jacks while it continues sending and receiving signals. Remove the padlock before attaching or disconnecting at a cabinet jack or picking up the wire segment directly attached to it. Segments farther along the run can still be picked up.
+
 Double-click a nearby cabinet to open its editor. On an Advanced cabinet, a jack carrying an Advanced weight packet shows kilograms. Hover over it to see the exact weight and fallback byte. A jack carrying a Basic packet shows the byte.
 
 Use the placed device's rename action, such as **ZedComm → Plate → Rename Plate**, **Rename Cabinet**, or **Rename Display**. The name appears in wiring choices and on the cabinet or adapter title. It follows the fixture through pickup and reload. Leave the field blank to reset it. Jack labels and cable run names can be edited independently.

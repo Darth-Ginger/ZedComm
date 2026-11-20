@@ -402,6 +402,33 @@ for i, plateSpec in ipairs({ { "ZedComm.OccupancyPlate", 419 }, { "ZedComm.Weigh
     getCell():setDrag(nil, 0)
 end
 
+do
+    local cabinetTile, wireTile = floorTile(72, 60), floorTile(73, 60)
+    local placed, cabinetId = runPlacement(cabinetTile, { kind = "place", item = give("ZedComm.SmallCabinet") })
+    assert(placed, cabinetId)
+    local connected, wireId = lay(wireTile, give("ZedComm.SignalWire"), cabinetId, "input")
+    assert(connected, wireId)
+
+    native:setMoveableMode("pickup")
+    native:clearCache()
+    getCell():setDrag(native, 0)
+    local lead = selectNative(wireTile, function(entry) return entry.zedcommPickup and entry.zedcommPickup.id == wireId end)
+    assert(testState.registry:setCabinetPadlock(cabinetId, 42))
+    check(not ZedComm.NativePlacementActions.canPickUp(native, lead.zedcommPickup, wireTile),
+        "native Pickup rechecks a selected cabinet lead after the cabinet is locked")
+    native:clearCache()
+    native.currentSquare = wireTile
+    local offered = false
+    for _, entry in ipairs(native:getObjectList()) do
+        if entry.zedcommPickup and entry.zedcommPickup.id == wireId then offered = true end
+    end
+    check(not offered, "native Pickup omits wire directly attached to a padlocked cabinet")
+    assert(testState.registry:setCabinetPadlock(cabinetId, nil))
+    native:clearCache()
+    selectNative(wireTile, function(entry) return entry.zedcommPickup and entry.zedcommPickup.id == wireId end)
+    getCell():setDrag(nil, 0)
+end
+
 inventory.AddItem = realAddItem
 getText, getPlayerRadialMenu, KeybindId = originalText, originalRadial, originalKeybind
 IsoFlagType = originalFlagType

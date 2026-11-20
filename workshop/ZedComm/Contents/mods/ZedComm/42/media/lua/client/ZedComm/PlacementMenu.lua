@@ -643,7 +643,7 @@ function Native.canPickUp(cursor, entry, square)
     local run = nativeRun(cursor)
     if not registry or (run and runBusy(cursor.character, run)) then return false end
     local target = placement.resolve(registry, entry.id)
-    return target and target.object == entry.object and target.square == square
+    return target and target.object == entry.object and target.square == square and placement.canPickUp(registry, target)
 end
 
 function Native.pickUp(cursor, entry, square)
@@ -897,7 +897,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             for _, port in ipairs(ports) do
                 local label, cable = portLabel(entry, port), entry.piece.ports[port]
                 if editor then addTo(labels, label, editor.renameJack, registry, entry, port) end
-                if cable then
+                if cable and not padlockId then
                     action((cabinet and "Disconnect cabinet jack (" or "Disconnect door jack (") .. label .. ")", {
                         kind = "disconnect-port", targetId = entry.id, object = entry.object,
                         port = port, cableId = cable,
@@ -919,7 +919,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                     action("Disconnect lamp wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
                 end
             end
-        elseif not padlockId then
+        elseif placement.canPickUp(registry, entry) then
             action(groupedWire and "Pick up" or "Pick up " .. name,
                 { kind = "pickup", targetId = entry.id, object = entry.object }, group)
         end

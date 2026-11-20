@@ -209,6 +209,10 @@ function Placement.resolve(registry, id)
     end
 end
 
+local function hasPadlock(entry)
+    return entry and Circuit.cabinetPadlockId(entry.piece) ~= nil
+end
+
 function Placement.freePorts(entry)
     local piece = entry.piece
     local out = {}
@@ -216,7 +220,7 @@ function Placement.freePorts(entry)
         local count = 0
         for _ in pairs(piece.links) do count = count + 1 end
         if count < Network.MAX_CABLE_LINKS then out[1] = false end
-    elseif not piece.definitionUnavailable then
+    elseif not piece.definitionUnavailable and not hasPadlock(entry) then
         for name, link in pairs(piece.ports) do
             if link == false then out[#out + 1] = name end
         end
@@ -337,6 +341,7 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     if laying and spec.kind ~= "cable" then return false, "Choose a wire to extend this run." end
     local valid, why, height = tileAvailable(square, spec)
     if not valid then return false, why end
+    if laying and hasPadlock(anchor) then return false, "The cabinet is padlocked." end
     if laying and not canExtend(anchor, anchorPort, square) then
         return false, "Select a free end on this tile or a neighboring tile."
     end
@@ -394,8 +399,23 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     return true, id
 end
 
+function Placement.canPickUp(registry, entry)
+    if entry.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end
+    if hasPadlock(entry) then return false, "Remove the cabinet padlock first." end
+    if entry.piece.kind == "cable" then
+        for id in pairs(entry.piece.links) do
+            local piece = registry.network.pieces[id]
+            if piece and Circuit.cabinetPadlockId(piece) then
+                return false, "The wire is connected to a padlocked cabinet."
+            end
+        end
+    end
+    return true
+end
+
 local function pickUp(registry, character, entry)
-    if Circuit.cabinetPadlockId(entry.piece) then return false, "Remove the cabinet padlock first." end
+    local allowed, reason = Placement.canPickUp(registry, entry)
+    if not allowed then return false, reason end
     local record = registry.network:record(entry.id)
     local inventory = character:getInventory()
     local item = instanceItem(entry.spec.itemType)
@@ -763,6 +783,7 @@ local commands = {
         runMessages = { joined = "Wire connected." },
         execute = function(registry, _, command, target)
             local anchor = Placement.resolve(registry, command.anchorId)
+            if hasPadlock(anchor) or hasPadlock(target) then return false, "The cabinet is padlocked." end
             if not Placement.canJoin(registry.network, anchor, command.anchorPort, target, command.port) then
                 return false, "Choose an adjacent, compatible free end."
             end
@@ -774,7 +795,6 @@ local commands = {
         runEffect = "pickup",
         message = "Piece returned to inventory.",
         execute = function(registry, character, _, target)
-            if target.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end
             return pickUp(registry, character, target)
         end,
     },
@@ -815,6 +835,7 @@ local commands = {
         acceptsTarget = boardTarget,
         message = "Jack disconnected.",
         execute = function(registry, _, command, target)
+            if hasPadlock(target) then return false, "The cabinet is padlocked." end
             local cable = target.piece.ports[command.port]
             if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
             return registry:unlink(cable, target.id)
