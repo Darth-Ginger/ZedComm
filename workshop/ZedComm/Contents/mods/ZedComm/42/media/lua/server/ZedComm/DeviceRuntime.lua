@@ -269,7 +269,7 @@ function Runtime.setLampCircuit(registry, id, layout)
         return false, "No ZedComm lamp at that position."
     end
     if layout ~= nil then
-        local valid, reason = ZedComm.InternalCircuit.compile(layout)
+        local valid, reason = ZedComm.InternalCircuit.validate(layout)
         if not valid then return false, reason end
     end
     local state = registry.network:record(id).state

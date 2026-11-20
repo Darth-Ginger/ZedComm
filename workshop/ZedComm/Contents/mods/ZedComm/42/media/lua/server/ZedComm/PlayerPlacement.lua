@@ -584,7 +584,7 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
         or type(expected) ~= "table" or state.circuit ~= expected then
         return false, "The circuit changed. Reopen the editor."
     end
-    local valid, errorMessage = Circuit.compile(layout, cabinet, cabinet and state.adapter or nil)
+    local valid, errorMessage = Circuit.validate(layout, cabinet, cabinet and state.adapter or nil)
     if not valid then return false, errorMessage end
     local added, removed, addedPart, removedPart = 0, 0
     for id, part in pairs(layout.modules) do
