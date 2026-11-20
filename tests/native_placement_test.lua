@@ -444,6 +444,9 @@ do
     function origin:has() return false end
     function approach:canStand() return true end
     function alternate:canStand() return true end
+    local speed = 1
+    getGameSpeed = function() return speed end
+    function player:getVehicle() return self.vehicle end
     ISPathFindAction = {
         pathToNearest = function(_, _, locations)
             return {
@@ -499,6 +502,14 @@ do
     end
     check(walking and walking:isValid() and #walking.locations == 6 and goals["92.5,60.5"] and goals["93.5,61.5"],
         "native Place offers both adjacent floor tiles to the pathfinder")
+    if walking then
+        speed = 3
+        check(not walking:isValid(), "surface walking keeps the native speed limit")
+        speed = 1
+        player.vehicle = {}
+        check(not walking:isValid(), "surface walking cannot start from a vehicle")
+        player.vehicle = nil
+    end
     if walking and walking.location == alternate then
         local action = assert(arrive())
         counter.occupied = true

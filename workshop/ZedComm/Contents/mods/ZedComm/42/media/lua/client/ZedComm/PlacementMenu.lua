@@ -154,7 +154,7 @@ local function queue(player, command, walk, surface)
         end
         walking = ISPathFindAction:pathToNearest(player, locations)
         function walking:isValid()
-            return runs[player] == run
+            return runs[player] == run and not player:getVehicle() and getGameSpeed() <= 2
         end
     elseif walk and not surface and player:getCurrentSquare() ~= destination then
         if not ISWalkToTimedAction then
