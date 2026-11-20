@@ -10,6 +10,8 @@
 
 - Added 8×8 Large and 10×10 XL floor cabinets, a 6×6 Tabletop Cabinet and an 8×8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
 
+- Native Place previews and places Tabletop Cabinets at the furniture's surface height from adjacent floor. Connected Wall Cabinet leads follow the saved wall face down to the floor and toward each linked cable.
+
 - Cabinets can use vanilla keyed padlocks. Padlocking secures the board and prevents pickup, upgrades, and edits to its jack connections while keeping signals flowing.
 
 - Two Mod Options independently control fixture name labels and floating door status markers across saves.

@@ -24,7 +24,7 @@ CABINET_FRAME = 466
 SWITCH_FRAME = 467
 SWITCH_LEAD_SET = "zedcomm_switch_01"
 SWITCH_FLOOR_SET = "zedcomm_switch_floor_01"
-SWITCH_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
+WALL_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
 SWITCH_ART = (CONCEPT_ART / "manual-network-switch.png", CONCEPT_ART / "manual-network-switch-on.png")
 OCCUPANCY_FIRST_FRAME = 419
 WEIGHT_FIRST_FRAME = 425
@@ -61,6 +61,10 @@ def draw_lead(image, *points):
     pen = ImageDraw.Draw(image)
     for width, color in LEAD_STROKES:
         pen.line(points, fill=color, width=width)
+
+
+def wall_lead_foot(center, facing):
+    return center, 216 if facing < 2 else 232
 
 
 def ints(*values):
@@ -304,9 +308,17 @@ def cabinet_variants_page():
     frames = [sprite_frame(LARGE_CABINET, 88, 239), sprite_frame(XL_CABINET, 68, 239),
               sprite_frame(TABLETOP_CABINET, 70, 234)]
     wall, _, _ = sprite_frame(WALL_CABINET, 44, 187)
-    for x, y, mirror in SWITCH_MOUNTS:
+    wired = []
+    for facing, (x, y, mirror) in enumerate(WALL_MOUNTS):
         art = ImageOps.mirror(wall) if mirror else wall
-        frames.append((art, x - art.width // 2, y - art.height))
+        offset = (x - art.width // 2, y - art.height)
+        frames.append((art, *offset))
+        tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
+        draw_lead(tile, (x, y - 3), wall_lead_foot(x, facing))
+        tile.alpha_composite(art, offset)
+        box = tile.getbbox()
+        wired.append((tile.crop(box), box[0], box[1]))
+    frames.extend(wired)
     atlas = Image.new("RGBA", (TILE_WIDTH * len(frames), TILE_HEIGHT))
     metadata = bytearray()
     for index, (art, x, y) in enumerate(frames):
@@ -471,7 +483,7 @@ def switch_page(textures):
     floor_metadata = bytearray()
     directions = ((0, 0), *WIRE_DIRECTIONS)
 
-    for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
+    for facing, (center, baseline, mirror) in enumerate(WALL_MOUNTS):
         back_edge = TILE_CENTER[1] - TILE_WIDTH // 4 + abs(center - TILE_CENTER[0]) // 2
         wall_base = (center, back_edge if facing < 2 else 2 * TILE_CENTER[1] - back_edge)
         for state, frame in enumerate(body):
@@ -485,7 +497,7 @@ def switch_page(textures):
             for direction, (dx, dy) in enumerate(directions):
                 tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
                 socket = (center, baseline - 3)
-                foot = (center, 216 if facing < 2 else 232)
+                foot = wall_lead_foot(center, facing)
                 draw_lead(tile, socket, foot)
                 tile.alpha_composite(frame, (center - width // 2, baseline - height))
                 x, y, right, bottom = tile.getbbox()
@@ -511,10 +523,10 @@ def switch_page(textures):
     body[0].thumbnail((52, 52), Image.Resampling.LANCZOS)
     icon.alpha_composite(body[0], ((64 - body[0].width) // 2, (64 - body[0].height) // 2))
     icon.save(textures / "Item_ZedCommNetworkSwitch.png")
-    count = len(SWITCH_MOUNTS) * len(body)
+    count = len(WALL_MOUNTS) * len(body)
     return (texture_page(SET + "_switch", atlas, metadata, count)
             + texture_page(SWITCH_LEAD_SET, wired, wired_metadata, count * len(directions))
-            + texture_page(SWITCH_FLOOR_SET, floor, floor_metadata, len(SWITCH_MOUNTS) * len(directions)))
+            + texture_page(SWITCH_FLOOR_SET, floor, floor_metadata, len(WALL_MOUNTS) * len(directions)))
 
 
 def route_page(start):
@@ -776,7 +788,7 @@ def main():
     tiles = b"tdef" + ints(1, 12) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
-    switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
+    switch_count = len(WALL_MOUNTS) * len(SWITCH_ART)
     tiles += ints(7, 2, 1, SWITCH_FRAME + switch_count)
     for index in range(count):
         if (module_start <= index < plate_start or compact_start <= index < lane_start
@@ -796,7 +808,7 @@ def main():
     tiles += ints(8, 5, 3, switch_count * 5)
     for props in wall_overlays:
         tiles += props * (len(SWITCH_ART) * 5)
-    floor_count = len(SWITCH_MOUNTS) * 5
+    floor_count = len(WALL_MOUNTS) * 5
     tiles += f"{SWITCH_FLOOR_SET}\n{SWITCH_FLOOR_SET}.png\n".encode("ascii")
     tiles += ints(8, 3, 4, floor_count)
     tiles += (ints(1) + b"FloorOverlay\n\n") * floor_count
@@ -813,8 +825,9 @@ def main():
     tiles += ints(0) * 96
     tiles += b"zedcomm_contact_floor_01\nzedcomm_contact_floor_01.png\n" + ints(12, 4, 10, 48)
     tiles += (ints(1) + b"FloorOverlay\n\n") * 48
-    tiles += f"{CABINET_SET}\n{CABINET_SET}.png\n".encode("ascii") + ints(7, 1, 11, 7)
-    tiles += ints(0) * 2 + ints(1) + b"IsTableTop\n\n" + b"".join(wall_overlays)
+    cabinet_count = 3 + 2 * len(WALL_MOUNTS)
+    tiles += f"{CABINET_SET}\n{CABINET_SET}.png\n".encode("ascii") + ints(cabinet_count, 1, 11, cabinet_count)
+    tiles += ints(0) * 2 + ints(1) + b"IsTableTop\n\n" + b"".join(wall_overlays) * 2
     tiles += b"zedcomm_window_contact_01\nzedcomm_window_contact_01.png\n" + ints(12, 4, 12, 48)
     tiles += ints(0) * 48
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)

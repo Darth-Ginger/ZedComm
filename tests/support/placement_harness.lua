@@ -19,6 +19,7 @@ return function()
         local displayIndex = tonumber(string.match(name, "^zedcomm_display_01_(%d+)$"))
         local switchIndex = tonumber(string.match(name, "^zedcomm_switch_01_(%d+)$"))
         local switchFloor = tonumber(string.match(name, "^zedcomm_switch_floor_01_(%d+)$"))
+        local cabinet = tonumber(string.match(name, "^zedcomm_cabinets_01_(%d+)$"))
         local weightGlyph = tonumber(string.match(name, "^zedcomm_weight_face_01_(%d+)$"))
         local doorIndex = tonumber(name:match("^zedcomm_door_01_(%d+)$") or name:match("^zedcomm_door_reverse_01_(%d+)$"))
         local doorFloor = tonumber(name:match("^zedcomm_door_floor_01_(%d+)$"))
@@ -27,9 +28,10 @@ return function()
         if (doorIndex and doorIndex < 288) or (doorFloor and doorFloor < 288)
             or (contactIndex and contactIndex < 96) or (contactFloor and contactFloor < 48)
             or (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40)
-            or (switchFloor and switchFloor < 20) or (weightGlyph and weightGlyph < 62) then
+            or (switchFloor and switchFloor < 20) or (weightGlyph and weightGlyph < 62)
+            or (cabinet and cabinet < 11) then
             if not registeredSprites[name] then
-                local floorOverlay = doorFloor ~= nil or contactFloor ~= nil or displayIndex ~= nil
+                local floorOverlay = doorFloor ~= nil or contactFloor ~= nil or displayIndex ~= nil or switchFloor ~= nil
                     or (index and ((index >= 20 and index <= 25) or (index >= 419 and index <= 431)))
                 local properties = { has = function(_, flag) return floorOverlay and flag == IsoFlagType.FloorOverlay end }
                 registeredSprites[name] = { getName = function() return name end, getProperties = function() return properties end }
@@ -54,6 +56,8 @@ return function()
             function object.setSprite(_, sprite)
                 object.sprite, object.spriteInstance = sprite:getName(), sprite
             end
+            function object:setRenderYOffset(offset) self.offset = offset end
+            function object:getRenderYOffset() return self.offset or 0 end
             function object:invalidateRenderChunkLevel(flag) self.chunkDirty = flag end
             local attachments = {}
             function object.getAttachedAnimSprite() return #attachments > 0 and list(attachments) or nil end

@@ -81,6 +81,7 @@ ISMoveableSpriteProps = {
 dofile(PZ .. "/server/BuildingObjects/ISMoveableCursor.lua")
 local vanillaClicks = 0
 ISMoveableCursor.tryBuild = function() vanillaClicks = vanillaClicks + 1 end
+local gameRender = ISMoveableCursor.render
 ISMoveableCursor.render = function() end
 ISMoveableCursor.setMoveableMode = function(self, mode) ISMoveableCursor.mode[self.player] = mode end
 fire("OnGameStart")
@@ -426,6 +427,91 @@ do
     assert(testState.registry:setCabinetPadlock(cabinetId, nil))
     native:clearCache()
     selectNative(wireTile, function(entry) return entry.zedcommPickup and entry.zedcommPickup.id == wireId end)
+    getCell():setDrag(nil, 0)
+end
+
+do
+    local mockProps = ISMoveableSpriteProps
+    IsoGridSquare = { ignoreBlockingSprites = { add = function() end } }
+    dofile(PZ .. "/shared/Moveables/ISMoveableSpriteProps.lua")
+    mockProps.getTopTable = ISMoveableSpriteProps.getTopTable
+    mockProps.getTotalTableHeight = ISMoveableSpriteProps.getTotalTableHeight
+    ISMoveableSpriteProps = mockProps
+
+    local counter, approach, origin = floorTile(93, 60), floorTile(92, 60), floorTile(91, 60)
+    counter.class = "IsoGridSquare"
+    function origin:has() return false end
+    function approach:canStand() return true end
+    function counter:isSolidTrans() return true end
+    function counter:has(flag) return flag == "IsTableTop" and self.occupied end
+    local furniture = testState.worldObject(counter)
+    local surface = {
+        has = function(_, name) return name == "IsTable" or name == "Surface" end,
+        get = function() return "30" end,
+    }
+    local furnitureSprite = {
+        getName = function() return "test-counter" end,
+        getProperties = function() return surface end,
+    }
+    function furniture:getSprite() return furnitureSprite end
+    function furniture:getRenderYOffset() return 4 end
+
+    local cabinetItem = give("ZedComm.TabletopCabinet")
+    local advanced = give("ZedComm.AdvancedTabletopCabinet")
+    native:setMoveableMode("place")
+    native:clearCache()
+    getCell():setDrag(native, 0)
+    player.tile = origin
+    check(selectType(origin, advanced:getFullType()).object == advanced and not native.canCreate,
+        "native selection offers the Advanced Tabletop but rejects bare floor")
+    local candidate = selectType(counter, cabinetItem:getFullType())
+    local sprite = getSprite("zedcomm_cabinets_01_2")
+    candidate.moveProps.canRotateDirection = function() return false end
+    candidate.moveProps.getFaceDirectionFromSpriteName = function() end
+    local previewOffset
+    sprite.RenderGhostTileColor = function(_, _, _, _, _, offset) previewOffset = offset end
+    Core = { getTileScale = function() return 2 end }
+    renderIsoCircle = function() end
+    gameRender(native, counter:getX(), counter:getY(), counter:getZ(), counter)
+    check(native.canCreate and native.objectSprite == sprite and native.yOffset == 34 and previewOffset == 68,
+        "native Place draws the cabinet at the installed surface height and tile scale")
+    counter.occupied = true
+    native:isValid(counter)
+    check(not native.canCreate, "the native preview rejects an occupied countertop")
+    counter.occupied = false
+    testState.queuedWalk, testState.queued = nil, nil
+    click(counter)
+    local walking = testState.queuedWalk
+    check(walking and walking.location == approach,
+        "native Place routes to the adjacent floor when the countertop cannot be occupied")
+    if walking and walking.location == approach then
+        local action = assert(arrive())
+        counter.occupied = true
+        check(not action:isValid() and not action:complete() and inventory:contains(cabinetItem),
+            "the timed action rejects a countertop occupied during approach")
+        counter.occupied = false
+    else
+        testState.queuedWalk = nil
+    end
+
+    player.tile = approach
+    testState.queuedWalk, testState.queued = nil, nil
+    click(counter)
+    local action = testState.queued
+    check(not testState.queuedWalk and action and action:complete() and not inventory:contains(cabinetItem),
+        "native Place completes from beside the countertop")
+    local entry = placement.piecesAt(testState.registry, counter)[1]
+    check(entry and entry.object:getRenderYOffset() == 34,
+        "final native placement uses the same height as its preview")
+    if entry then
+        native:setMoveableMode("pickup")
+        native:clearCache()
+        selectNative(counter, function(selected) return selected.zedcommPickup and selected.zedcommPickup.id == entry.id end)
+        testState.queuedWalk, testState.queued = nil, nil
+        click(counter)
+        check(not testState.queuedWalk and testState.queued and testState.queued:complete()
+            and inventory:getFirstType(cabinetItem:getFullType()), "native Pickup also works from beside the countertop")
+    end
     getCell():setDrag(nil, 0)
 end
 

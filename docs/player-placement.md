@@ -55,9 +55,9 @@ Right-click an installed part in the cabinet or Advanced Adapter editor and choo
 
 ## Wall switches
 
-Use native **Place** or the ZedComm placement menu to place a floor cabinet, a Tabletop Cabinet on a clear table or countertop, or a Wall Cabinet against a wall. From an adjacent floor tile, wire to a free jack on a raised cabinet.
+Use native **Place** or the ZedComm placement menu to place a floor cabinet, a Tabletop Cabinet on a clear table or countertop, or a Wall Cabinet against a wall. Approach a tabletop from adjacent floor to place or pick up its cabinet. From an adjacent floor tile, wire to a free jack on a raised cabinet.
 
-In native **Place**, select the Network Switch or Wall Cabinet, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. A connected cable follows the wall down to the floor.
+In native **Place**, select the Network Switch or Wall Cabinet, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. Connected switch and Wall Cabinet leads follow the chosen wall face down to the floor.
 
 ## Multiple wires on one tile
 

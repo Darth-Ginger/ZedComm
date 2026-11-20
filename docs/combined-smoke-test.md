@@ -31,9 +31,9 @@ getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
 ## C - Cabinet variants and shared restart
 
 - [ ] **C1.** Open one Large and one Advanced XL. Confirm **8×8 and two fixed IN/OUT pairs** for Large and **10×10 and three pairs** for XL. Link **IN 3 → OUT 3** in the XL. Wire a Test Byte Source to IN 3 and a display to OUT 3. Expect `0 → 255 → 0`. Leave it wired.
-- [ ] **C2.** Place one Tabletop on a table or counter and one Wall Cabinet on an eligible wall. Check that each ends up on its intended surface or face.
+- [ ] **C2.** Use native **Place** to select and preview a Tabletop Cabinet over a clear counter. Confirm that the cursor places it at the preview height from adjacent floor. Place a Wall Cabinet at a corner and wire a jack. Check that the lead drops from the selected wall face and meets the cable. Leave it wired for C4.
 - [ ] **C3.** In debug, stage Electrical **5**, one powered movable lamp with a bulb, a screwdriver, Electronics Scrap, Electric Wire, a full roll of Wire, and Sheet Metal. Keep granted ZedComm parts separate from crafted parts. Pause and say **go** for the console capture.
-- [ ] **C4.** After capture, exit PZ fully and restart **without debug**. Load the same save with cheats off. Confirm that the window still switches `255/0`, the crate still holds the plate at `155`, and XL IN 3 still drives OUT 3. Then continue to D.
+- [ ] **C4.** After capture, exit PZ fully and restart **without debug**. Load the same save with cheats off. Confirm that the window still switches `255/0`, the crate still holds the plate at `155`, and XL IN 3 still drives OUT 3. Confirm that the Wall Cabinet lead draws once after reload and disappears after picking up the cabinet. Then continue to D.
 
 ```lua
 local inv = getPlayer():getInventory()
