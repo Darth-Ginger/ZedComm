@@ -29,11 +29,6 @@ local function reachableAnchor(player, run)
     if anchor and ZedComm.PlayerPlacement.canReach(player, anchor.square) then return anchor end
 end
 
-local function carries(player, item)
-    local inventory = player:getInventory()
-    return item:getContainer() == inventory and inventory:contains(item)
-end
-
 local function stopRun(player)
     local run = runs[player]
     runs[player] = nil
@@ -53,60 +48,17 @@ end
 function Action:new(character, command)
     local action = ISBaseTimedAction.new(self, character)
     action.command = command
-    local duration = (command.kind == "upgrade-cabinet" or command.kind == "install-door"
-        or command.kind == "remove-door-adapters" or command.kind == "install-door-contact"
-        or command.kind == "install-window-contact" or command.kind == "remove-door-contact"
-        or command.kind == "fit-lamp-adapter" or command.kind == "remove-lamp-adapter") and 120 or 25
-    action.maxTime = character:isTimedActionInstant() and 1 or duration
+    local descriptor = ZedComm.PlayerPlacement.getCommand(command.kind)
+    action.maxTime = character:isTimedActionInstant() and 1 or (descriptor and descriptor.duration or 25)
     return action
 end
 
 function Action:isValid()
-    local placement = ZedComm.PlayerPlacement
-    local registry = placement.getRegistry()
-    local command = self.command
-    local run = command.run
-    if not registry or registry.network ~= command.network or not placement.canReach(self.character, command.square)
-        or (run and (runs[self.character] ~= run or (run.id and not reachableAnchor(self.character, run)))) then
+    local run = self.command.run
+    if run and (runs[self.character] ~= run or (run.id and not reachableAnchor(self.character, run))) then
         return false
     end
-    if command.kind == "lay" then
-        local anchor = placement.resolve(registry, command.anchorId)
-        return carries(self.character, command.item) and placement.canLay(anchor, command.anchorPort, command.square)
-    end
-    if command.kind == "place" then
-        return carries(self.character, command.item) and placement.canPlace(command.square, command.item:getFullType())
-    end
-    if command.kind == "fit-lamp-adapter" then
-        return carries(self.character, command.item) and ZedComm.RelayLamp.isEligible(command.object)
-            and command.object:getSquare() == command.square and not command.object:getModData().zedcomm
-            and placement.canFitLampAdapter(self.character,
-                command.item:getFullType() == ZedComm.InternalCircuit.ADVANCED_ADAPTER_ITEM)
-    end
-    if command.kind == "remove-lamp-adapter" then
-        local target = placement.resolve(registry, command.targetId)
-        return target and target.object == command.object and target.square == command.square
-            and target.piece.definitionId == ZedComm.RelayLamp.ID
-    end
-    if command.kind == "upgrade-cabinet" then
-        local target = placement.resolve(registry, command.targetId)
-        return target and target.object == command.object and target.square == command.square
-            and placement.canUpgradeCabinet(self.character, target, command.item)
-    end
-    if command.kind == "install-door" then
-        return ZedComm.Door.isEligible(command.object) and command.object:getSquare() == command.square
-            and command.object:getModData().zedcomm == nil
-            and ZedComm.DoorInstallation.materials(self.character, command.tier) ~= nil
-            and (not command.contact or (not command.object:getModData().zedcommContact
-                and ZedComm.DoorInstallation.contactMaterials(self.character) ~= nil))
-    end
-    if command.kind == "install-door-contact" or command.kind == "install-window-contact" then
-        local contact = ZedComm.DoorContact
-        local id = command.kind == "install-window-contact" and contact.WINDOW_ID or contact.ID
-        return contact.canFit(command.object, id) and command.object:getSquare() == command.square
-            and ZedComm.DoorInstallation.contactMaterials(self.character, id) ~= nil
-    end
-    return true
+    return ZedComm.PlayerPlacement.isValidCommand(self.character, self.command)
 end
 
 function Action:start()
@@ -114,75 +66,61 @@ function Action:start()
     self.character:SetVariable("LootPosition", "Low")
 end
 
+local function clearNativeRun(player, run)
+    runs[player] = nil
+    run.cursor:clearCache()
+end
+
+local function extendRun(player, run, command, id)
+    runs[player] = { network = command.network, id = id, port = false,
+        cursor = run.cursor, native = run.native, lastWire = run.native and command.item or nil }
+    if run.native then run.cursor:clearCache() end
+    return run.cursor and "cursor" or "menu"
+end
+
+local runEffects = {
+    lay = function(player, run, command, id)
+        if run then return extendRun(player, run, command, id) end
+    end,
+    place = function(player, run, command, id)
+        if run and run.native then
+            if command.item:getFullType() == ZedComm.PlayerPlacement.WIRE_TYPE then
+                return extendRun(player, run, command, id)
+            end
+            clearNativeRun(player, run)
+        elseif command.run then
+            stopRun(player)
+        end
+    end,
+    join = function(player, run)
+        if not run then return end
+        if run.native then clearNativeRun(player, run) else stopRun(player) end
+        return "joined"
+    end,
+    pickup = function(player, run, command)
+        if command.run and run.native then
+            clearNativeRun(player, run)
+        elseif run and run.id == command.targetId then
+            stopRun(player)
+        end
+    end,
+}
+
 function Action:complete()
     local command = self.command
     if command.run and not self:isValid() then return false end
-    local ok, result = ZedComm.PlayerPlacement.perform(self.character, command)
+    local placement = ZedComm.PlayerPlacement
+    local ok, result = placement.perform(self.character, command)
     if not ok then
         say(self.character, tostring(result))
         return false
     end
-    local run = runs[self.character]
-    local looseNativeWire = command.kind == "place" and run and run.native
-        and command.item:getFullType() == ZedComm.PlayerPlacement.WIRE_TYPE
-    if (command.kind == "lay" and run) or looseNativeWire then
-        runs[self.character] = { network = command.network, id = result, port = false,
-            cursor = run.cursor, native = run.native, lastWire = run.native and command.item or nil }
-        if run.native then run.cursor:clearCache() end
-        say(self.character, run.cursor and "Wire laid." or "Wire laid. Select the next tile or a free end.")
-    elseif command.kind == "join" and run then
-        if run.native then
-            runs[self.character] = nil
-            run.cursor:clearCache()
-        else
-            stopRun(self.character)
-        end
-        say(self.character, "Wire connected.")
-    elseif command.kind == "place" then
-        if run and run.native then
-            runs[self.character] = nil
-            run.cursor:clearCache()
-        elseif command.run then
-            stopRun(self.character)
-        end
-        local spec = ZedComm.PlayerPlacement.getSpec(command.item:getFullType())
-        say(self.character, spec.kind == "cable" and "Wire placed loose." or "Device placed.")
-    elseif command.kind == "fit-lamp-adapter" then
-        say(self.character, "Lamp adapter fitted.")
-    elseif command.kind == "remove-lamp-adapter" then
-        say(self.character, "Lamp adapter removed.")
-    elseif command.kind == "disconnect-relay" then
-        say(self.character, "Wire disconnected.")
-    elseif command.kind == "disconnect-port" then
-        say(self.character, "Jack disconnected.")
-    elseif command.kind == "install-door-contact" then
-        say(self.character, "Door contact installed. Its output reports actual door position.")
-    elseif command.kind == "install-window-contact" then
-        say(self.character, "Window contact fitted.")
-    elseif command.kind == "remove-door-contact" then
-        say(self.character, "Contact sensor returned to inventory.")
-    elseif command.kind == "install-door" then
-        say(self.character, command.contact and "Door inputs and contact installed. Wire each fixture independently."
-            or "Door adapters installed. Wire the Lock and Open jacks independently.")
-    elseif command.kind == "remove-door-adapters" then
-        say(self.character, "Door adapters and modules returned to inventory.")
-    elseif command.kind == "padlock-cabinet" then
-        say(self.character, "Cabinet padlocked.")
-    elseif command.kind == "remove-cabinet-padlock" then
-        say(self.character, "Cabinet padlock removed.")
-    elseif command.kind == "upgrade-cabinet" then
-        say(self.character, "Cabinet upgraded. Basic Adapter returned to inventory.")
-    elseif command.kind == "set-network-switch" then
-        say(self.character, command.on and "Switch on." or "Switch off.")
-    elseif command.kind == "pickup" then
-        if command.run and run.native then
-            runs[self.character] = nil
-            run.cursor:clearCache()
-        elseif run and run.id == command.targetId then
-            stopRun(self.character)
-        end
-        say(self.character, "Piece returned to inventory.")
-    end
+    local descriptor = placement.getCommand(command.kind)
+    local effect = runEffects[descriptor.runEffect]
+    local outcome = effect and effect(self.character, runs[self.character], command, result)
+    local message = outcome and descriptor.runMessages[outcome] or descriptor.message
+    if type(message) == "function" then message = message(command) end
+    if message then say(self.character, message) end
     return true
 end
 
@@ -281,7 +219,7 @@ local function cursorTarget(cursor, square, run)
     local placement = ZedComm.PlayerPlacement
     local registry = placement.getRegistry()
     if not registry or registry.network ~= run.network then return end
-    if run.item and not carries(player, run.item) then return end
+    if run.item and not ZedComm.PlayerPlacement.carries(player, run.item) then return end
     if run.id then
         local anchor = run.item and resolveAnchor(run) or reachableAnchor(player, run)
         if not anchor then return end
@@ -736,7 +674,7 @@ local function placeInventoryItem(player, item)
     local placement = ZedComm.PlayerPlacement
     local registry = placement.getRegistry()
     local spec = placement.getSpec(item:getFullType())
-    if not registry or not spec or not carries(player, item) then return end
+    if not registry or not spec or not ZedComm.PlayerPlacement.carries(player, item) then return end
     local cursor = Cursor:new(player, spec.sprite)
     if not cursor then
         say(player, "The placement cursor is unavailable.")
@@ -755,7 +693,7 @@ local function onFillInventoryMenu(playerNum, context, items)
     local itemType = first:getFullType()
     if not placement.getSpec(itemType) then return end
     for _, item in ipairs(selected) do
-        if item:getFullType() ~= itemType or not carries(player, item) then return end
+        if item:getFullType() ~= itemType or not ZedComm.PlayerPlacement.carries(player, item) then return end
     end
     context:addOption("Place with ZedComm cursor", player, placeInventoryItem, first)
 end
@@ -1093,7 +1031,7 @@ Events.OnObjectLeftMouseButtonDown.Add(function(object)
 end)
 Events.OnTick.Add(function()
     for player, run in pairs(runs) do
-        if run.item and not carries(player, run.item) then
+        if run.item and not ZedComm.PlayerPlacement.carries(player, run.item) then
             stopRun(player)
         elseif run.id and (not resolveAnchor(run)
             or (not run.item and not actionQueued(player, run.walk) and not reachableAnchor(player, run))) then

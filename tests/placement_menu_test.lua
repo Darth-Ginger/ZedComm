@@ -10,10 +10,41 @@ local optionsAt = testState.optionsAt
 local otherPlate = give("ZedComm.PressurePlate")
 local far = floorTile(46, 40)
 
+local player = testState.player
+function player:isTimedActionInstant() return self.instant == true end
+function player:Say(message) self.lastPlacementMessage = message end
+
 local opts = optionsAt(far)
 assert(opts["Place pressure plate"])()
-check(testState.queued and testState.queued:isValid() and testState.queued:complete() and not inventory:contains(otherPlate),
-    "normal context menu completes timed placement from an exact inventory item")
+check(testState.queued and testState.queued.maxTime == 25 and testState.queued:isValid()
+    and testState.queued:complete() and not inventory:contains(otherPlate)
+    and player.lastPlacementMessage == "Device placed.",
+    "normal context menu uses a short placement action and reports success")
+
+local staleItem = give("ZedComm.PressurePlate")
+local staleTile = floorTile(46, 41)
+player.instant = true
+assert(optionsAt(staleTile)["Place pressure plate"])()
+local staleAction = testState.queued
+inventory:Remove(staleItem)
+check(staleAction.maxTime == 1 and not staleAction:isValid() and not staleAction:complete()
+    and #staleTile.objects == 0 and player.lastPlacementMessage == "That item is no longer in your main inventory.",
+    "instant placement still checks that the exact selected item is carried")
+player.instant = false
+
+local cabinetTile = floorTile(46, 42)
+local placedCabinet, cabinetId = testState.runPlacement(cabinetTile,
+    { kind = "place", item = give("ZedComm.SmallCabinet") })
+assert(placedCabinet, cabinetId)
+local adapter = give("ZedComm.AdvancedAdapter")
+assert(optionsAt(cabinetTile)["Upgrade cabinet with Advanced Adapter"])()
+local upgrade = testState.queued
+assert(testState.target(cabinetTile, cabinetId, "pickup"))
+local cabinet = inventory:getFirstType("ZedComm.SmallCabinet")
+assert(testState.runPlacement(cabinetTile, { kind = "place", item = cabinet }))
+check(upgrade.maxTime == 120 and not upgrade:isValid() and not upgrade:complete()
+    and inventory:contains(adapter) and player.lastPlacementMessage == "That device or wire is no longer on the tile.",
+    "long upgrade action rejects a replacement cabinet with the same network identity")
 local spare = give("ZedComm.SignalWire")
 local nextTile = floorTile(47, 40)
 opts = optionsAt(far)

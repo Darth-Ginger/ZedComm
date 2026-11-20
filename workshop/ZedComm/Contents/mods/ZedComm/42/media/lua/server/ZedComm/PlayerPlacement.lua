@@ -323,10 +323,15 @@ local function removeWorldPiece(registry, entry)
     return true
 end
 
+function Placement.carries(character, item)
+    local inventory = character:getInventory()
+    return item ~= nil and item:getContainer() == inventory and inventory:contains(item)
+end
+
 local function place(registry, character, square, item, anchor, anchorPort, laying, mount)
     local inventory = character:getInventory()
     local spec = item and specFor(item:getFullType())
-    if not spec or item:getContainer() ~= inventory or not inventory:contains(item) then
+    if not spec or not Placement.carries(character, item) then
         return false, "That item is no longer in your main inventory."
     end
     if laying and spec.kind ~= "cable" then return false, "Choose a wire to extend this run." end
@@ -430,7 +435,7 @@ local function fitLampAdapter(registry, square, lamp, character, item)
     local itemType = item and item:getFullType()
     local advanced = itemType == Circuit.ADVANCED_ADAPTER_ITEM
     if (not advanced and itemType ~= Circuit.BASIC_ADAPTER_ITEM)
-        or item:getContainer() ~= inventory or not inventory:contains(item) then
+        or not Placement.carries(character, item) then
         return false, "Bring the matching adapter in your main inventory."
     end
     local skilled, reason = Placement.canFitLampAdapter(character, advanced)
@@ -477,7 +482,7 @@ local function removeLampAdapter(character, registry, entry)
     return true
 end
 
-local function changeCabinetPadlock(registry, character, entry, command)
+local function changeCabinetPadlock(registry, character, command, entry)
     if not cabinetSpecs[entry.piece.definitionId] or not entry.piece.board then
         return false, "That cabinet is no longer available."
     end
@@ -681,85 +686,271 @@ function Placement.changeCircuitBattery(character, registry, target, expected, i
     return true, taken and "Battery installed." or "Battery removed."
 end
 
-function Placement.perform(character, command)
+local function relayTarget(target)
+    return target.piece.definitionId == Relay.ID
+end
+
+local function boardTarget(target)
+    return target.piece.board ~= nil
+end
+
+local function switchTarget(target)
+    return target.piece.definitionId == Switch.ID
+end
+
+local function setNetworkSwitch(registry, target, on)
+    local state = registry.network:record(target.id).state or { mount = Switch.mount(target.square) }
+    if on == nil then on = not state.on end
+    state.on = on
+    return registry:setDeviceState(target.id, state)
+end
+
+local wireRunMessages = {
+    cursor = "Wire laid.",
+    menu = "Wire laid. Select the next tile or a free end.",
+}
+
+local function contactInstallation(contactId, message)
+    return {
+        duration = 120,
+        message = message,
+        validate = function(character, command)
+            return Contact.canFit(command.object, contactId) and command.object:getSquare() == command.square
+                and ZedComm.DoorInstallation.contactMaterials(character, contactId) ~= nil
+        end,
+        execute = function(registry, character, command)
+            if not onSquare(command.object, command.square) then
+                return false, "That fixture is no longer on the tile."
+            end
+            return ZedComm.DoorInstallation.installContact(character, registry, command.object,
+                chooseId(registry, command.square), contactId)
+        end,
+    }
+end
+
+local commands = {
+    place = {
+        runEffect = "place",
+        runMessages = wireRunMessages,
+        message = function(command)
+            local spec = specFor(command.item:getFullType())
+            return spec.kind == "cable" and "Wire placed loose." or "Device placed."
+        end,
+        validate = function(character, command)
+            return Placement.carries(character, command.item)
+                and Placement.canPlace(command.square, command.item:getFullType())
+        end,
+        execute = function(registry, character, command)
+            return place(registry, character, command.square, command.item, nil, nil, false, command.mount)
+        end,
+    },
+    lay = {
+        runEffect = "lay",
+        runMessages = wireRunMessages,
+        validate = function(character, command, registry)
+            local anchor = Placement.resolve(registry, command.anchorId)
+            return Placement.carries(character, command.item)
+                and Placement.canLay(anchor, command.anchorPort, command.square)
+        end,
+        execute = function(registry, character, command)
+            local anchor = Placement.resolve(registry, command.anchorId)
+            return place(registry, character, command.square, command.item, anchor, command.anchorPort, true, command.mount)
+        end,
+    },
+    join = {
+        target = true,
+        runEffect = "join",
+        runMessages = { joined = "Wire connected." },
+        execute = function(registry, _, command, target)
+            local anchor = Placement.resolve(registry, command.anchorId)
+            if not Placement.canJoin(registry.network, anchor, command.anchorPort, target, command.port) then
+                return false, "Choose an adjacent, compatible free end."
+            end
+            return link(registry, anchor, command.anchorPort, target, command.port)
+        end,
+    },
+    pickup = {
+        target = true,
+        runEffect = "pickup",
+        message = "Piece returned to inventory.",
+        execute = function(registry, character, _, target)
+            if target.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end
+            return pickUp(registry, character, target)
+        end,
+    },
+    ["fit-lamp-adapter"] = {
+        duration = 120,
+        message = "Lamp adapter fitted.",
+        validate = function(character, command)
+            return Placement.carries(character, command.item) and Relay.isEligible(command.object)
+                and command.object:getSquare() == command.square and not command.object:getModData().zedcomm
+                and Placement.canFitLampAdapter(character, command.item:getFullType() == Circuit.ADVANCED_ADAPTER_ITEM)
+        end,
+        execute = function(registry, character, command)
+            return fitLampAdapter(registry, command.square, command.object, character, command.item)
+        end,
+    },
+    ["remove-lamp-adapter"] = {
+        target = true,
+        acceptsTarget = relayTarget,
+        duration = 120,
+        message = "Lamp adapter removed.",
+        validate = function() return true end,
+        execute = function(registry, character, _, target)
+            return removeLampAdapter(character, registry, target)
+        end,
+    },
+    ["disconnect-relay"] = {
+        target = true,
+        acceptsTarget = function(target) return target.spec.nativePickup end,
+        message = "Wire disconnected.",
+        execute = function(registry, _, _command, target)
+            local cable = target.piece.ports.signal
+            if not cable then return false, "This fixture has no connected wire." end
+            return registry:unlink(cable, target.id)
+        end,
+    },
+    ["disconnect-port"] = {
+        target = true,
+        acceptsTarget = boardTarget,
+        message = "Jack disconnected.",
+        execute = function(registry, _, command, target)
+            local cable = target.piece.ports[command.port]
+            if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
+            return registry:unlink(cable, target.id)
+        end,
+    },
+    ["install-door-contact"] = contactInstallation(Contact.ID,
+        "Door contact installed. Its output reports actual door position."),
+    ["install-window-contact"] = contactInstallation(Contact.WINDOW_ID, "Window contact fitted."),
+    ["remove-door-contact"] = {
+        target = true,
+        acceptsTarget = function(target) return contactSpecs[target.piece.definitionId] ~= nil end,
+        duration = 120,
+        message = "Contact sensor returned to inventory.",
+        execute = function(registry, character, _, target)
+            if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
+            return ZedComm.DoorInstallation.removeContact(character, registry, target)
+        end,
+    },
+    ["install-door"] = {
+        duration = 120,
+        message = function(command)
+            return command.contact and "Door inputs and contact installed. Wire each fixture independently."
+                or "Door adapters installed. Wire the Lock and Open jacks independently."
+        end,
+        validate = function(character, command)
+            return ZedComm.Door.isEligible(command.object) and command.object:getSquare() == command.square
+                and command.object:getModData().zedcomm == nil
+                and ZedComm.DoorInstallation.materials(character, command.tier) ~= nil
+                and (not command.contact or (not command.object:getModData().zedcommContact
+                    and ZedComm.DoorInstallation.contactMaterials(character) ~= nil))
+        end,
+        execute = function(registry, character, command)
+            if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
+            return ZedComm.DoorInstallation.fit(character, registry, command.object,
+                chooseId(registry, command.square), command.tier,
+                command.contact and chooseId(registry, command.square) or nil)
+        end,
+    },
+    ["remove-door-adapters"] = {
+        target = true,
+        acceptsTarget = function(target) return target.piece.definitionId == Circuit.DOOR_ID end,
+        duration = 120,
+        message = "Door adapters and modules returned to inventory.",
+        execute = function(registry, character, _, target)
+            if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
+            return ZedComm.DoorInstallation.remove(character, registry, target)
+        end,
+    },
+    ["padlock-cabinet"] = {
+        target = true,
+        message = "Cabinet padlocked.",
+        execute = changeCabinetPadlock,
+    },
+    ["remove-cabinet-padlock"] = {
+        target = true,
+        message = "Cabinet padlock removed.",
+        execute = changeCabinetPadlock,
+    },
+    ["upgrade-cabinet"] = {
+        target = true,
+        acceptsTarget = boardTarget,
+        duration = 120,
+        message = "Cabinet upgraded. Basic Adapter returned to inventory.",
+        validate = function(character, command, _, target)
+            return Placement.canUpgradeCabinet(character, target, command.item)
+        end,
+        execute = function(registry, character, command, target)
+            return upgradeCabinet(registry, character, target, command.item)
+        end,
+    },
+    ["set-network-switch"] = {
+        target = true,
+        acceptsTarget = switchTarget,
+        message = function(command) return command.on and "Switch on." or "Switch off." end,
+        execute = function(registry, _, command, target)
+            if type(command.on) ~= "boolean" then return false, "Choose an on or off state." end
+            return setNetworkSwitch(registry, target, command.on)
+        end,
+    },
+    ["toggle-network-switch"] = {
+        target = true,
+        acceptsTarget = switchTarget,
+        execute = function(registry, _, _command, target)
+            return setNetworkSwitch(registry, target)
+        end,
+    },
+}
+
+function Placement.getCommand(kind)
+    return commands[kind]
+end
+
+local function commandRegistry(character, command)
     local registry = Placement.getRegistry()
-    if not registry or registry.network ~= command.network then return false, "This circuit is no longer loaded." end
+    if not registry or registry.network ~= command.network then return nil, "This circuit is no longer loaded." end
     if not Placement.canReach(character, command.square) then
-        return false, "Move onto or next to the target tile."
+        return nil, "Move onto or next to the target tile."
     end
-    if command.kind == "fit-lamp-adapter" then
-        return fitLampAdapter(registry, command.square, command.object, character, command.item)
-    end
-    if command.kind == "install-door-contact" or command.kind == "install-window-contact" then
-        if not onSquare(command.object, command.square) then return false, "That fixture is no longer on the tile." end
-        local contactId = command.kind == "install-window-contact" and Contact.WINDOW_ID or Contact.ID
-        return ZedComm.DoorInstallation.installContact(character, registry, command.object,
-            chooseId(registry, command.square), contactId)
-    end
-    if command.kind == "install-door" then
-        if not onSquare(command.object, command.square) then return false, "That door is no longer on the tile." end
-        return ZedComm.DoorInstallation.fit(character, registry, command.object,
-            chooseId(registry, command.square), command.tier,
-            command.contact and chooseId(registry, command.square) or nil)
-    end
-    if command.kind == "place" or command.kind == "lay" then
-        return place(registry, character, command.square, command.item,
-            Placement.resolve(registry, command.anchorId), command.anchorPort, command.kind == "lay", command.mount)
-    end
+    return registry
+end
+
+local function commandTarget(registry, command, descriptor)
     local target = Placement.resolve(registry, command.targetId)
     if not target or target.square ~= command.square or target.object ~= command.object then
-        return false, "That device or wire is no longer on the tile."
+        return nil, "That device or wire is no longer on the tile."
     end
-    if command.kind == "remove-lamp-adapter" and target.piece.definitionId == Relay.ID then
-        return removeLampAdapter(character, registry, target)
+    if descriptor.acceptsTarget and not descriptor.acceptsTarget(target) then
+        return nil, "Unknown placement action."
     end
-    if command.kind == "disconnect-relay" and target.spec.nativePickup then
-        local cable = target.piece.ports.signal
-        if not cable then return false, "This fixture has no connected wire." end
-        return registry:unlink(cable, target.id)
+    return target
+end
+
+function Placement.isValidCommand(character, command)
+    local registry = commandRegistry(character, command)
+    local descriptor = commands[command.kind]
+    if not registry or not descriptor then return false end
+    if not descriptor.validate then return true end
+    local target
+    if descriptor.target then
+        target = commandTarget(registry, command, descriptor)
+        if not target then return false end
     end
-    if command.kind == "disconnect-port" and target.piece.board then
-        local cable = target.piece.ports[command.port]
-        if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
-        return registry:unlink(cable, target.id)
+    return descriptor.validate(character, command, registry, target)
+end
+
+function Placement.perform(character, command)
+    local registry, reason = commandRegistry(character, command)
+    if not registry then return false, reason end
+    local descriptor = commands[command.kind]
+    if not descriptor then return false, "Unknown placement action." end
+    local target
+    if descriptor.target then
+        target, reason = commandTarget(registry, command, descriptor)
+        if not target then return false, reason end
     end
-    if command.kind == "remove-door-contact" and contactSpecs[target.piece.definitionId] then
-        if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
-        return ZedComm.DoorInstallation.removeContact(character, registry, target)
-    end
-    if command.kind == "remove-door-adapters" and target.piece.definitionId == Circuit.DOOR_ID then
-        if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
-        return ZedComm.DoorInstallation.remove(character, registry, target)
-    end
-    if command.kind == "padlock-cabinet" or command.kind == "remove-cabinet-padlock" then
-        return changeCabinetPadlock(registry, character, target, command)
-    end
-    if command.kind == "upgrade-cabinet" and target.piece.board then
-        return upgradeCabinet(registry, character, target, command.item)
-    end
-    if (command.kind == "set-network-switch" or command.kind == "toggle-network-switch")
-        and target.piece.definitionId == Switch.ID then
-        local state = registry.network:record(target.id).state or { mount = Switch.mount(target.square) }
-        if command.kind == "toggle-network-switch" then
-            state.on = not state.on
-        else
-            if type(command.on) ~= "boolean" then return false, "Choose an on or off state." end
-            state.on = command.on
-        end
-        return registry:setDeviceState(target.id, state)
-    end
-    if command.kind == "pickup" then
-        if target.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end
-        return pickUp(registry, character, target)
-    end
-    if command.kind == "join" then
-        local anchor = Placement.resolve(registry, command.anchorId)
-        if not Placement.canJoin(registry.network, anchor, command.anchorPort, target, command.port) then
-            return false, "Choose an adjacent, compatible free end."
-        end
-        return link(registry, anchor, command.anchorPort, target, command.port)
-    end
-    return false, "Unknown placement action."
+    return descriptor.execute(registry, character, command, target)
 end
 
 ZedComm.PlayerPlacement = Placement
