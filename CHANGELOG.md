@@ -2,15 +2,19 @@
 
 ## Unreleased
 
+- Steady device ticks reuse loaded fixture bindings and routing tables. Unchanged source readings skip signal encoding and publication.
+
+- Circuit validation, lamp byte evaluation, and packet evaluation have separate entry points. Placement timed actions share one command table.
+
 - Vanilla lamp fitting is available in normal singleplayer. It uses one matching adapter and requires Electrical 1 for Basic or 3 for Advanced. Removal returns the installed parts, leaves the cable with a free end, and restores the native switch.
 
-- Door boards, fitting, and fixture cable ends are accessible from either face of single-panel doors. Door and contact housings use the native edge orientation and choose the face toward the player. Native E enforcement and in-game rendering still need sign-off.
+- Door boards, fitting, and fixture cable ends can be reached from either face of single-panel doors. Door and contact housings use the native edge orientation and choose the face toward the player. Native E enforcement and in-game rendering still need sign-off.
 
 - Added a craftable Window Contact with its own sash art and inventory icon. A fitted intact window sends 255 closed or 0 open over one output.
 
 - Electrical assembly recipes grant 2 to 8 Electrical XP per craft. Cutting signal wire grants 1 Electrical XP per craft.
 
-- Added 8Ã—8 Large and 10Ã—10 XL floor cabinets, a 6Ã—6 Tabletop Cabinet and an 8Ã—8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
+- Added 8×8 Large and 10×10 XL floor cabinets, a 6×6 Tabletop Cabinet and an 8×8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
 
 - Native Place previews and places Tabletop Cabinets at the furniture's surface height from adjacent floor. Connected Wall Cabinet leads follow the saved wall face down to the floor and toward each linked cable.
 
@@ -53,13 +57,13 @@
 - Receiver definitions require `receiverModule` and `bindFixture`. The earlier `receive` and `onUnavailable` callbacks are removed.
 - Saves made with development builds before 0.0.1 are not migrated. A display keeps any digit sprites attached by the first renderer, an endpoint whose tag names no definition is refused with a log line, and debug test rigs placed earlier lose their link toggle (the tag field is now `rigWire`).
 - Cabinet jacks can be given a label. The Network Switch mounts on a chosen wall, shows a lead toward its wire and toggles on a click. Output Extensions face right by default.
-- Small Cabinet: a placed 6Ã—6 circuit board with its own input and output jacks, in Basic and Advanced tiers, with an in-place upgrade that returns the Basic Adapter. A cabinet circuit that would feed back into itself through the external wiring is refused.
+- Small Cabinet: a placed 6×6 circuit board with its own input and output jacks, in Basic and Advanced tiers, with an in-place upgrade that returns the Basic Adapter. A cabinet circuit that would feed back into itself through the external wiring is refused.
 - Circuit modules: AND, OR, XOR, NOT, Adder, Subtractor, Multiplier, Cache, Splitter, Timer, Wait, Mains Source, Battery Source, and Input and Output Extensions. Arithmetic modules can work on the full reading in an Advanced cabinet.
 - Network Switch and Advanced Display. Recipes for both adapters, both cabinets, the Splitter and the switch.
 - Adapter editor: opens from up to two tiles away over an open path, edits only from an adjacent tile, and shows a legend for the contact colours.
 - Device definitions (`shared/ZedComm/DeviceDefinitions.lua`) and the device runtime (`server/ZedComm/DeviceRuntime.lua`): pressure, occupancy and weight plates, the numeric display, and a relay fitted to vanilla lamps.
 - Maintained signal packets (ADR-309): a basic byte, or an advanced reading with a byte fallback. Sender and receiver modules in `shared/ZedComm/SignalModules.lua`.
-- Internal circuits (`shared/ZedComm/InternalCircuit.lua`) and the Advanced Adapter's 3Ã—3 editor, starting with a Threshold module.
+- Internal circuits (`shared/ZedComm/InternalCircuit.lua`) and the Advanced Adapter's 3×3 editor, starting with a Threshold module.
 - Player placement: context-menu and cursor placement, wire runs with explicit joins, pickup, and named runs. Wires sharing a tile are drawn in separate lanes.
 - Placeholder sprite pack built by `tools/pack-placeholder-sprites.py`.
 - Tests for the definitions, modules and circuits, and registry tests covering the runtime, placement, menus and editor against the game's own Lua.

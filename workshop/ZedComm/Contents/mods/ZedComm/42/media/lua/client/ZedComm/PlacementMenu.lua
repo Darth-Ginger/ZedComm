@@ -549,8 +549,9 @@ local function extendOrConnect(cursor, run, item, square)
             if runs[player] ~= run then return end
             run.choice = nil
             local destination = approach
-            if not placement.canReach(player, entry.square) and placement.canReach(player, entry.square, entry.object) then
-                destination = player:getCurrentSquare()
+            local opposite = placement.oppositeFace(entry.square, entry.object)
+            if opposite and (opposite == anchor.square or opposite == player:getCurrentSquare()) then
+                destination = opposite
             end
             queue(player, { kind = "join", run = run, network = run.network, square = entry.square,
                 walkSquare = destination, anchorId = run.id, anchorPort = run.port,

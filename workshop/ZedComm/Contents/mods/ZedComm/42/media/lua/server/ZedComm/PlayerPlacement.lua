@@ -125,7 +125,7 @@ local function edgeFixture(object)
     if object then return Contact.host(object) end
 end
 
-local function oppositeFace(square, object)
+function Placement.oppositeFace(square, object)
     local fixture = edgeFixture(object)
     if fixture and fixture:getSquare() == square then return Door.oppositeSquare(fixture) end
 end
@@ -134,7 +134,7 @@ function Placement.canReach(character, square, object)
     local from = character:getCurrentSquare()
     if not loadedSquare(square) or not from then return false end
     return (distance(from, square) <= 1 and clearBetween(from, square))
-        or from == oppositeFace(square, object)
+        or from == Placement.oppositeFace(square, object)
 end
 
 local function withinView(from, square)
@@ -154,7 +154,7 @@ function Placement.canView(character, square, object)
     local from = character:getCurrentSquare()
     if not loadedSquare(square) or not from then return false end
     if withinView(from, square) then return true end
-    local opposite = oppositeFace(square, object)
+    local opposite = Placement.oppositeFace(square, object)
     return opposite ~= nil and withinView(from, opposite)
 end
 
@@ -237,7 +237,7 @@ local function collectPieces(registry, square, out, face)
         local piece = spec and registry.network.pieces[tag.id]
         if piece and piece.kind == spec.kind and piece.definitionId == spec.definitionId
             and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ()
-            and (not face or oppositeFace(square, object) == face) then
+            and (not face or Placement.oppositeFace(square, object) == face) then
             local variants = cabinetSpecs[piece.definitionId]
             if variants then spec = variants[piece.state.adapter] or variants.basic end
             out[#out + 1] = { id = piece.id, piece = piece, object = object, square = square, spec = spec }
@@ -303,8 +303,8 @@ local function linkDistance(first, second, secondKind, secondObject)
         return steps == 1 and clearBetween(first.square, second)
     end
     if steps > 1 then return false end
-    return clearBetween(first.square, second) or second == oppositeFace(first.square, first.object)
-        or first.square == oppositeFace(second, secondObject)
+    return clearBetween(first.square, second) or second == Placement.oppositeFace(first.square, first.object)
+        or first.square == Placement.oppositeFace(second, secondObject)
 end
 
 function Placement.canJoin(network, first, firstPort, second, secondPort)

@@ -58,7 +58,7 @@ assert(runtimeRegistry:link("wire", "display"))
 expectReading(1, true, true, "reattached display reads the current source")
 
 loaded[key(20, 20, 0)] = nil
-expectReading(nil, false, true, "unloaded source fails off without replaying its saved byte")
+expectReading(nil, false, true, "unloaded source fails off without replaying its last byte")
 loaded[key(20, 20, 0)] = true
 expectReading(1, true, true, "source returning with the same byte restores the signal")
 loaded[key(21, 20, 0)] = nil
@@ -69,7 +69,7 @@ expectReading(1, true, true, "loaded receiver reconciles even with a quiet sourc
 local runtimeSave = save(runtimeJava)
 runtimeRegistry, runtimeJava = start(runtimeSave)
 actors = {}
-expectReading(0, false, true, "reload samples live occupancy before delivering the saved high byte")
+expectReading(0, false, true, "reload delivers live occupancy instead of the former high byte")
 processed = simulation.processed
 expectReading(0, false, true, "reload maintains a stable reading")
 check(simulation.processed == processed and #handlers.OnTick == 1,

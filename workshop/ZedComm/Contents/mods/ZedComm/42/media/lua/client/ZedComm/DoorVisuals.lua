@@ -102,8 +102,9 @@ function Visuals.update(network, cell)
                 else
                     local frame = actuatorFrame(door, network, piece, mount)
                     name = (reverse == 1 and "zedcomm_door_reverse_01_" or "zedcomm_door_01_") .. frame
-                    if frame % 36 > 0 then
-                        floorName = "zedcomm_door_floor_01_" .. (math.floor(frame / 72) * 72 + reverse * 36 + frame % 36)
+                    local wireFrame = frame % 36
+                    if wireFrame > 0 then
+                        floorName = "zedcomm_door_floor_01_" .. (mount * 72 + reverse * 36 + wireFrame)
                     end
                 end
                 if entry.name ~= name then setAttachment(entry, name); entry.name = name end

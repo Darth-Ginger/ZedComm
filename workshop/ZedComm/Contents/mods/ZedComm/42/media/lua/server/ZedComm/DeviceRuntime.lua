@@ -10,7 +10,7 @@ local Runtime = {}
 local Relay = ZedComm.RelayLamp
 local pressureSensorId = "ZedComm.PressureSensor"
 local weightPlateId = "ZedComm.WeightPlate"
-local network, version
+local network, topologyVersion
 local entries, sources, sinks, boardEntries = {}, {}, {}, {}
 local routesDirty = false
 local receivers = {}
@@ -580,7 +580,7 @@ local function rebuildEntries()
             if entry.readout then testSources[entry.readout] = nil end
         end
     end
-    version, routesDirty = network.version, true
+    topologyVersion, routesDirty = network.version, true
 end
 
 local function rebuildRoutes()
@@ -621,13 +621,13 @@ function Runtime.prepare(registry)
     if current ~= network then
         for _, previous in pairs(receivers) do releaseReceiver(previous) end
         for _, previous in pairs(boards) do releaseBoard(previous) end
-        network, version = current, nil
+        network, topologyVersion = current, nil
         entries, sources, sinks, boardEntries = {}, {}, {}, {}
         receivers, readings, boards, testSources = {}, {}, {}, {}
         byNetwork, boardInputs, pendingBoards = {}, {}, {}
     end
     if not network then return end
-    if version ~= network.version then rebuildEntries() end
+    if topologyVersion ~= network.version then rebuildEntries() end
 
     local cell = getCell()
     for i = 1, #sources do sampleSource(cell, sources[i]) end
@@ -707,8 +707,7 @@ function Runtime.finish()
     end
 end
 
--- Native door interactions may bypass the outside lock check. Reconcile after
--- their no-argument update event so a held network lock applies from both sides.
+-- Vanilla reports door toggles through this event after changing the door state.
 Events.OnContainerUpdate.Add(function()
     for _, host in pairs(boards) do
         if host.controller then host.controller:flush() end

@@ -541,6 +541,40 @@ do
     getCell():setDrag(nil, 0)
 end
 
+do
+    local makeDoor = dofile("tests/support/door_fixture.lua")(function(tile)
+        local door = IsoObject.new(tile, "zedcomm_devices_01_467")
+        tile:AddTileObject(door)
+        return door
+    end)
+    local owner, farFace, approach = floorTile(120, 60), floorTile(119, 60), floorTile(118, 60)
+    owner.blocked, farFace.blocked = farFace, owner
+    local door = makeDoor(owner)
+    door.north = false
+    give("Base.Screwdriver")
+    give("ZedComm.BasicAdapter")
+    give("ZedComm.BasicAdapter")
+    local ok, doorId = testState.runPlacement(owner, { kind = "install-door", object = door, tier = "basic" })
+    assert(ok, doorId)
+
+    local cursor = { character = player, player = 0, clearCache = function() end }
+    local actions = ZedComm.NativePlacementActions
+    player.tile = farFace
+    testState.choice, testState.queued, testState.queuedWalk = nil, nil, nil
+    actions.place(cursor, give("ZedComm.SignalWire"), farFace)
+    assert(testState.choice.options["Place wire loose"])()
+    assert(testState.queued:complete())
+    testState.queued = nil
+
+    player.tile = approach
+    actions.place(cursor, give("ZedComm.SignalWire"), owner)
+    assert(testState.choice.options["Connect to networked door (Lock IN)"])()
+    check(testState.queuedWalk and testState.queuedWalk.location == farFace,
+        "connecting a door from the far side walks to the cable beside the door")
+    check(arrive():complete() and testState.registry.network.pieces[doorId].ports.lock and not door:isOpen(),
+        "the queued join completes from the far side with the door still closed")
+end
+
 inventory.AddItem = realAddItem
 getText, getPlayerRadialMenu, KeybindId = originalText, originalRadial, originalKeybind
 IsoFlagType = originalFlagType
