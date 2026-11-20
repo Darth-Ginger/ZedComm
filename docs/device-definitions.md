@@ -53,7 +53,7 @@ Definitions and callbacks are not save records. Phase B adds native registration
 These predicates compare the object's explicit definition ID. The game adapter will supply these callbacks to connect the definitions to real objects.
 
 - `getDefinitionId(object)` returns the object's stable definition ID or nil. A native definition matches only its own ID.
-- `getOccupantKinds(object)` returns a dense Lua list of occupant kinds on the sensor's loaded square. The runtime identifies `player`, `zombie`, and `animal` separately. The occupancy plate counts the first two. An empty list represents no supported moving occupants. Phase D handles whether a square is loaded before calling the sensor.
+- `getOccupantCount(object)` counts players and zombies on the loaded square up to 255. It excludes animals and avoids building a list of occupants.
 - `isPressurePlateOccupied(object)` tests for a supported actor, vehicle footprint, or floor-level furniture on the basic plate's tile.
 - `getWeightPlateLoad(object)` returns the estimated mass from eligible on-foot actors, a vehicle that intersects the tile, and qualifying furniture with pickup weight or stored contents. See [weight plate calibration and smoke test](weight-plate.md).
 - `setDisplay(object, value, lit)` applies the reading and indicator. `value` is an integer from 0 to 255 for available input or nil for unavailable input. `lit` is a boolean. The display callback forwards nil separately from zero so the adapter can distinguish them.
@@ -102,9 +102,11 @@ When a definition is missing on load, the registry reports it and preserves the 
 
 ## Phase D runtime
 
-The existing server tick prepares device bindings before draining dirty networks. The runtime resolves each defined endpoint by piece ID and definition ID on its loaded square. The pressure plates inspect the square's moving objects. The basic sensor publishes its configured occupied output and the occupancy plate publishes the player and zombie count. Changed bytes mark the network for the same tick. An unloaded or failing source yields no signal while retaining its saved topology. When the source returns, its availability change schedules a fresh update even if its byte stayed the same.
+The server tick prepares device bindings before draining dirty networks. The runtime caches definition copies, loaded fixture bindings, and delivery groups. Network topology changes refresh the source, receiver, and board lists. Registry load callbacks invalidate bindings on reused squares, and a missing square clears the corresponding transient reading.
 
-A single dispatch subscription delivers to loaded, attached receivers. A display that attaches, reloads or returns to a loaded square receives the current reading even with a steady source. An attached display with no source reports no signal. Detaching the display clears its transient test reading and stops delivery. The runtime keeps display readings in memory and reports changes to the console. The test menu reads that same state. The MVP runtime handles single-port definitions. Multi-port delivery and a visual display are future work.
+Sources sample live inputs each tick. For example, weight plates still inspect furniture and its contents, and contact sensors check their native host. The sender encodes only a changed reading, module selection, or unavailable-to-available transition. The cache compares the full sensor value, so two different weights with the same fallback byte still reach an advanced receiver. An unloaded or failing source clears its signal and retains its saved topology.
+
+One dispatch subscription delivers to loaded, attached receivers and cabinet inputs. A receiver that attaches, reloads, or regains power reconciles against the current signal. An attached display with no source reports no signal. Detaching clears its transient reading. Boards retain their input routing and reevaluate when a signal, timer, or power state changes.
 
 ### Phase D verification
 

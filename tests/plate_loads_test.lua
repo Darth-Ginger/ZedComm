@@ -103,6 +103,9 @@ do
         plateTile.actors = state[1]
         check(placedReading(displayId) == state[2], "occupancy display follows actor count " .. state[2])
     end
+    plateTile.actors = {}
+    for i = 1, 260 do plateTile.actors[i] = zombie end
+    check(placedReading(displayId) == 255, "the sampled actor count saturates at 255")
     check(not runtime.setPressureOutput(testState.registry, plateId, "155")
         and not optionsAt(plateTile)["Set pressure plate output (1)"],
         "the basic plate's fixed-output control is unavailable on a counting plate")

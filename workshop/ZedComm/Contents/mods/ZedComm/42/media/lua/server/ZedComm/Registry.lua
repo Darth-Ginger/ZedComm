@@ -290,6 +290,7 @@ function SZedCommSystem:loadIsoObject(isoObject)
     local tag = tagOf(isoObject)
     if not tag or not isoObject:getSquare() then return end
     if not self.network.pieces[tag.id] then self:addPiece(isoObject) end
+    if ZedComm.DeviceRuntime then ZedComm.DeviceRuntime.invalidateBinding(self.network, tag.id) end
     syncFixture(self, isoObject, tag)
 end
 
@@ -333,6 +334,7 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
                         orphans[#orphans + 1] = object
                     else
                         present[tag.id] = true
+                        if ZedComm.DeviceRuntime then ZedComm.DeviceRuntime.invalidateBinding(self.network, tag.id) end
                     end
                     syncFixture(self, object, tag)
                 end
