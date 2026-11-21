@@ -4,7 +4,6 @@ require "ZedComm/WireShape"
 local ModuleVisuals = {}
 local prefix = "zedcomm_devices_01_"
 local floorStart, mountStart = 14, 32
-local directionFrame = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local missing = {}
 
 local function isHousing(name)
@@ -69,7 +68,7 @@ end
 
 function ModuleVisuals.refresh(object, network, piece, port)
     local direction = ZedComm.WireShape.portDirection(network, piece, port)
-    local name = prefix .. (firstFrame(object) + (directionFrame[direction] or 0))
+    local name = prefix .. (firstFrame(object) + (ZedComm.WireShape.portFrames[direction] or 0))
     ModuleVisuals.setAttachment(object, name, isHousing)
 end
 

@@ -19,7 +19,6 @@ local plateSprites = {
     ["ZedComm.OccupancyPlate"] = { itemType = "ZedComm.OccupancyPlate", firstFrame = 419 },
     ["ZedComm.WeightPlate"] = { itemType = "ZedComm.WeightPlate", firstFrame = 425 },
 }
-local plateFrameOffset = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local lastNetwork, lastVersion
 local layoutNetwork, layoutVersion, cableSprites
 local pendingSquares = {}
@@ -126,7 +125,7 @@ local function refreshSquare(square, network)
                 elseif plate and piece.definitionId == tag.definitionId
                     and tag.placedItem == plate.itemType then
                     local direction = Shape.portDirection(network, piece, "signal")
-                    local frame = plate.firstFrame + (plateFrameOffset[direction] or 0)
+                    local frame = plate.firstFrame + (ZedComm.WireShape.portFrames[direction] or 0)
                     setWorldSprite(object, "zedcomm_devices_01_" .. frame)
                 end
                 if piece.kind == "endpoint" and piece.definitionId and piece.definitionId == tag.definitionId then

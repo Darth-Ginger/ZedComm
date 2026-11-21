@@ -1,6 +1,8 @@
 -- Choose visual lanes from the actual links crossing each tile edge.
 ZedComm = ZedComm or {}
-local WireShape = {}
+local WireShape = {
+    portFrames = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 },
+}
 
 -- Directions are +X, +Y, -X, -Y. The lane increases along +Y on
 -- an X seam and +X on a Y seam, from either side of the seam.

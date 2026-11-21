@@ -10,6 +10,18 @@
 
 ZedComm = ZedComm or {}
 local Definitions = {}
+
+function Definitions.readObjectTag(object)
+    if not object or not object.hasModData or not object:hasModData() then return nil end
+    local data = object:getModData()
+    local tag = data and data.zedcomm
+    return type(tag) == "table" and tag or nil, data
+end
+
+function Definitions.readFixtureTag(object)
+    local tag, data = Definitions.readObjectTag(object)
+    return tag and type(tag.id) == "string" and tag or nil, data
+end
 local entries, ids = {}, {}
 local fields = { id = true, role = true, ports = true, match = true,
     sample = true, readingKind = true, receiverModule = true, bindFixture = true }

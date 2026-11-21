@@ -5,12 +5,8 @@ require "ISUI/ISTextBox"
 
 local Debug = {}
 
-local function tagOf(object)
-    if not object or not object.hasModData or not object:hasModData() then return nil end
-    local data = object:getModData()
-    local tag = data and data.zedcomm
-    return type(tag) == "table" and type(tag.id) == "string" and tag or nil
-end
+require "ZedComm/DeviceDefinitions"
+local tagOf = ZedComm.DeviceDefinitions.readFixtureTag
 
 local function taggedOn(square)
     local out = {}

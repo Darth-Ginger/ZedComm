@@ -2,7 +2,6 @@
 require "ZedComm/ModuleVisuals"
 local Visuals = {}
 local entries = {}
-local directions = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local mounts = { north = 0, west = 1, south = 2, east = 3 }
 
 local function viewerMount(object, viewer)
@@ -25,8 +24,8 @@ end
 
 local function actuatorFrame(object, network, piece, mount)
     local shape = ZedComm.WireShape
-    local lock = directions[shape.portDirection(network, piece, "lock")] or 0
-    local open = directions[shape.portDirection(network, piece, "open")] or 0
+    local lock = ZedComm.WireShape.portFrames[shape.portDirection(network, piece, "lock")] or 0
+    local open = ZedComm.WireShape.portFrames[shape.portDirection(network, piece, "open")] or 0
     return mount * 72 + (object:isLocked() and 36 or 0) + lock * 6 + open
 end
 
@@ -93,7 +92,7 @@ function Visuals.update(network, cell)
                 local mount = viewerMount(door, viewer)
                 local name, floorName
                 if contact then
-                    local direction = directions[ZedComm.WireShape.portDirection(network, piece, "signal")] or 0
+                    local direction = ZedComm.WireShape.portFrames[ZedComm.WireShape.portDirection(network, piece, "signal")] or 0
                     local frame = mount * 12 + reverse * 6 + direction
                     local framesPerFace = isWindow and 12 or 24
                     name = contact.prefix .. (mount * framesPerFace + reverse * 12

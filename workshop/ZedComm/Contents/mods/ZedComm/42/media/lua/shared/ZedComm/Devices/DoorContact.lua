@@ -1,7 +1,7 @@
 require "ZedComm/Devices/Door"
 
 local Door = ZedComm.Door
-local Contact = { ID = "ZedComm.DoorContact", ITEM = "ZedComm.DoorContact", WINDOW_ID = "ZedComm.WindowContact" }
+local Contact = { ID = "ZedComm.DoorContact", WINDOW_ID = "ZedComm.WindowContact" }
 
 local function windowHost(object)
     return object and instanceof(object, "IsoWindow") and object:getSquare() ~= nil
@@ -12,10 +12,10 @@ local function windowIntact(window)
 end
 
 Contact.profiles = {
-    [Contact.ID] = { name = "Door Contact", hostName = "Door", matchHost = Door.isEligible,
+    [Contact.ID] = { name = "Door Contact", matchHost = Door.isEligible,
         canFit = Door.isEligible, prefix = "zedcomm_contact_01_",
         isClosed = function(door) return not door:isOpen() end },
-    [Contact.WINDOW_ID] = { name = "Window Contact", hostName = "Window", matchHost = windowHost,
+    [Contact.WINDOW_ID] = { name = "Window Contact", matchHost = windowHost,
         canFit = function(window) return windowHost(window) and windowIntact(window) end,
         prefix = "zedcomm_window_contact_01_",
         isClosed = function(window) return windowIntact(window) and not window:isOpen() end },

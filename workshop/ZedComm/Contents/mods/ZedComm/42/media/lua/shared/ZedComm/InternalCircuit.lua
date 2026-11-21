@@ -5,7 +5,6 @@ local Sender = ZedComm.SignalModules.Sender
 local Circuit = {
     CABINET_ID = "ZedComm.SmallCabinet",
     DOOR_ID = "ZedComm.Door",
-    ADVANCED_CABINET_ITEM = "ZedComm.AdvancedSmallCabinet",
     BASIC_ADAPTER_ITEM = "ZedComm.BasicAdapter",
     ADVANCED_ADAPTER_ITEM = "ZedComm.AdvancedAdapter",
 }

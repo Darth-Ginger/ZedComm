@@ -19,11 +19,8 @@ local Switch = ZedComm.NetworkSwitch
 local function log(message) print("[ZedComm] registry: " .. message) end
 
 local function tagOf(isoObject)
-    if not isoObject or not isoObject.hasModData or not isoObject:hasModData() then return nil end
-    local data = isoObject:getModData()
-    local tag = data.zedcomm
-    if type(tag) == "table" and type(tag.id) == "string" then return tag end
-    return Relay.restoreTag(isoObject, data)
+    local tag, data = Definitions.readFixtureTag(isoObject)
+    return tag or (data and Relay.restoreTag(isoObject, data))
 end
 
 local function syncFixture(self, object, tag)

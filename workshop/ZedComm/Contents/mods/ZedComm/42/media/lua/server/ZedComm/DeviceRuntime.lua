@@ -19,12 +19,8 @@ local readings = {}
 local testSources = {}
 local circuitTime = 0
 
-local function tagOf(object)
-    if object:hasModData() then
-        local tag = object:getModData().zedcomm
-        if type(tag) == "table" then return tag end
-    end
-end
+require "ZedComm/DeviceDefinitions"
+local tagOf = ZedComm.DeviceDefinitions.readObjectTag
 
 local function findObject(square, piece)
     if not square then return nil end
@@ -593,6 +589,17 @@ local function rebuildRoutes()
     end
     for id, host in pairs(boards) do
         local piece = host.piece
+        if host.controller then
+            host.controlled = {}
+            for action, dependencies in pairs(piece.board.dependencies) do
+                for input in pairs(dependencies) do
+                    if piece.ports[input] or not piece.board.directions[input] then
+                        host.controlled[action] = true
+                        break
+                    end
+                end
+            end
+        end
         for port, role in pairs(piece.board.directions) do
             if role == "sink" then
                 local run = piece.ports[port] and network:networkOf(id, port) or nil
@@ -691,12 +698,8 @@ function Runtime.finish()
     for _, host in pairs(boards) do
         if host.controller then
             for action, module in pairs(host.actions) do
-                local controlled = false
-                for input in pairs(host.piece.board.dependencies[action]) do
-                    if host.piece.ports[input] or not host.piece.board.directions[input] then controlled = true end
-                end
                 local byte = Modules.Packet.basicValue(host.outputs and host.outputs[action])
-                if controlled and (action ~= "openAction" or byte ~= nil) then
+                if host.controlled[action] and (action ~= "openAction" or byte ~= nil) then
                     module:receive(byte)
                 else
                     module:detach()

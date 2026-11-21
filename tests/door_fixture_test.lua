@@ -34,7 +34,7 @@ for _, class in ipairs({ "IsoDoor", "IsoThumpable" }) do
     tick(nil, 255)
     check(door.open and not door.locked and not door.keyed, class .. " missing lock signal unlocks")
     tick(0, nil)
-    check(not door.open, class .. " missing Open signal closes while connected")
+    assert(not door.open)
     tick("detach", "detach")
     door.open = true
     controller:flush()

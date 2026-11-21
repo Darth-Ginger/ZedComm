@@ -98,11 +98,8 @@ function Placement.getRegistry()
     return registry and registry.instance
 end
 
-local function tagOf(object)
-    if not object:hasModData() then return nil end
-    local tag = object:getModData().zedcomm
-    if type(tag) == "table" and type(tag.id) == "string" then return tag end
-end
+require "ZedComm/DeviceDefinitions"
+local tagOf = ZedComm.DeviceDefinitions.readFixtureTag
 
 local cardinalOffsets = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 

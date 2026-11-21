@@ -222,7 +222,6 @@ function Network:recompute(networkId)
     return Packet.copy(sourcePacket(self.pieces[net.sources[1]], net.sourcePort))
 end
 
--- Sink endpoints on a network, for delivery.
 function Network:sinksOf(networkId)
     self:build()
     local net = self.nets[networkId]
