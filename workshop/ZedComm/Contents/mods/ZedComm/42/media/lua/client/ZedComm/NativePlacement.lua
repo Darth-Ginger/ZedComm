@@ -134,6 +134,14 @@ local function install()
     if not class or class == installedClass or not ISMoveableSpriteProps or not placement or not actions then return end
     installedClass = class
 
+    function actions.openWire(player, wireType)
+        local cursor = class:new(player)
+        getCell():setDrag(cursor, cursor.player)
+        cursor:setMoveableMode("place")
+        cursor.zedcommKey = wireType
+        return cursor
+    end
+
     local inventoryList = class.getInventoryObjectList
     function class:getInventoryObjectList()
         local objects = inventoryList(self)

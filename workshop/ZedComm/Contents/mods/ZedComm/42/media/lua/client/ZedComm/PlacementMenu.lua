@@ -341,26 +341,70 @@ function Cursor:new(character, sprite)
     return cursor
 end
 
-local function selectEnd(player, network, entry, port, label)
-    local placement = ZedComm.PlayerPlacement
-    if not placement.canReach(player, entry.square, entry.object) then
-        say(player, "Move onto or next to the free end.")
-        return
-    end
-    local run = { network = network, id = entry.id, port = port }
-    if not reachableAnchor(player, run) then
+local function startSelectedRun(player, run, label)
+    local anchor = reachableAnchor(player, run)
+    if not anchor then
+        runs[player] = nil
         say(player, "That free end is no longer available.")
         return
     end
-    local cursor = Cursor:new(player, placement.getSpec(placement.WIRE_TYPE).sprite)
-    run.cursor = cursor
+    local placement, native = ZedComm.PlayerPlacement, ZedComm.NativePlacementActions
+    if native.openWire then
+        local wireType = placement.WIRE_TYPE
+        run.lastWire = player:getInventory():getFirstType(wireType) or instanceItem(wireType)
+        run.cursor = native.openWire(player, wireType)
+        run.native = true
+    else
+        run.cursor = Cursor:new(player, placement.getSpec(placement.WIRE_TYPE).sprite)
+        if run.cursor then getCell():setDrag(run.cursor, player:getPlayerNum()) end
+    end
     runs[player] = run
-    if cursor then
-        getCell():setDrag(cursor, player:getPlayerNum())
+    if run.cursor then
         say(player, "Selected " .. label .. ". Left-click to lay wire. Right-click to stop or connect.")
     else
         say(player, "Selected " .. label .. ". Use the menu to lay wire or connect.")
     end
+end
+
+local function addApproach(locations, square)
+    if not square or not square:canStand() then return end
+    locations[#locations + 1] = square:getX() + 0.5
+    locations[#locations + 1] = square:getY() + 0.5
+    locations[#locations + 1] = square:getZ()
+end
+
+local function selectEnd(player, network, entry, port, label)
+    local placement = ZedComm.PlayerPlacement
+    local run = { network = network, id = entry.id, port = port }
+    local anchor = resolveAnchor(player, run)
+    if not anchor or anchor.object ~= entry.object then
+        say(player, "That free end is no longer available.")
+        return
+    end
+    if placement.canReach(player, anchor.square, anchor.object) then
+        startSelectedRun(player, run, label)
+        return
+    end
+    local locations = placement.surfaceApproachLocations(anchor.square)
+    addApproach(locations, anchor.square)
+    addApproach(locations, placement.oppositeFace(anchor.square, anchor.object))
+    if #locations == 0 then
+        say(player, "No open floor next to the free end.")
+        return
+    end
+    stopRun(player)
+    local walking = ISPathFindAction:pathToNearest(player, locations)
+    function walking:isValid()
+        return runs[player] == run and not player:getVehicle() and getGameSpeed() <= 2
+    end
+    walking:setOnComplete(function()
+        if runs[player] ~= run then return end
+        run.walk = nil
+        startSelectedRun(player, run, label)
+    end)
+    run.walk = walking
+    runs[player] = run
+    ISTimedActionQueue.add(walking)
 end
 
 local function cancelRun(player)

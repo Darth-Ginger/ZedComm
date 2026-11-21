@@ -575,6 +575,49 @@ do
         "the queued join completes from the far side with the door still closed")
 end
 
+do
+    local tile, other, startTile = floorTile(140, 60), floorTile(141, 60), floorTile(142, 60)
+    tile.canStand, other.canStand = function() return true end, function() return true end
+    local ok, anchorId = runPlacement(tile, { kind = "place", item = give("ZedComm.SignalWire") })
+    assert(ok, anchorId)
+    local okOther, otherId = runPlacement(other, { kind = "place", item = give("ZedComm.SignalWire") })
+    assert(okOther, otherId)
+    while inventory:getFirstType(placement.WIRE_TYPE) do
+        inventory:Remove(inventory:getFirstType(placement.WIRE_TYPE))
+    end
+    local select = assert(testState.optionsAt(tile)["Select wire free end"])
+    local originalPath, originalDebug = ISPathFindAction, showDebugInfoInChat
+    showDebugInfoInChat = function() end
+    ISPathFindAction = { pathToNearest = function(_, character, locations)
+        return {
+            location = other,
+            setOnComplete = function(self, callback) self.onCompleteFunc = callback end,
+        }
+    end }
+    player.tile = startTile
+    testState.queuedWalk = nil
+    select()
+    check(testState.queuedWalk and not getCell():getDrag(0), "selecting a distant free end queues a walk before opening Place")
+    arrive()
+    local resumed = getCell():getDrag(0)
+    check(resumed and resumed.Type == "ISMoveableCursor" and resumed:getMoveableMode() == "place",
+        "arriving at a free end opens native Place")
+    check(resumed.zedcommKey == placement.WIRE_TYPE and ZedComm.NativePlacementActions.activeWireItem(resumed)
+        and not inventory:getFirstType(placement.WIRE_TYPE), "the active free end stays selectable without spare wire")
+    testState.choice, testState.queued = nil, nil
+    resumed:tryBuild(other:getX(), other:getY(), other:getZ())
+    local options = assert(testState.choice).options
+    local connect
+    for label, option in pairs(options) do
+        if label:find("^Connect to ") then connect = option end
+    end
+    assert(connect)()
+    check(testState.queued and testState.queued:complete()
+        and testState.registry.network.pieces[anchorId].links[otherId], "resumed native run joins without consuming wire")
+    getCell():setDrag(nil, 0)
+    ISPathFindAction, showDebugInfoInChat = originalPath, originalDebug
+end
+
 inventory.AddItem = realAddItem
 getText, getPlayerRadialMenu, KeybindId = originalText, originalRadial, originalKeybind
 IsoFlagType = originalFlagType
