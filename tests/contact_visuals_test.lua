@@ -9,6 +9,8 @@ local visuals, check = ZedComm.DoorVisuals, test.check
 test.player.getPerkLevel = function() return 3 end
 test.give("Base.Screwdriver"); test.give("ZedComm.DoorContact")
 local tile = test.floorTile(450, 450)
+local northFace = test.floorTile(450, 449)
+local westFace = test.floorTile(449, 450)
 local door = makeDoor(tile)
 local ok, id = test.runPlacement(tile, { kind = "install-door-contact", object = door })
 assert(ok, id)
@@ -27,22 +29,26 @@ local function leads()
     end
     return count
 end
-for mount, index in pairs({ north = 0, west = 24, south = 48, east = 72 }) do
-    registry.network.pieces[id].state.doorMount = mount
+for _, face in ipairs({
+    { north = true, square = northFace, frame = 0, name = "north" },
+    { north = true, square = tile, frame = 48, name = "south" },
+    { north = false, square = westFace, frame = 24, name = "west" },
+    { north = false, square = tile, frame = 72, name = "east" },
+}) do
+    door.north, test.player.tile = face.north, face.square
     for reverse = 0, 1 do
         door.openSprite = reverse == 1 and { getProperties = function()
             return { has = function(_, key) return key == "attachedE" end }
         end } or nil
         door.open = false
         visuals.update(registry.network, getCell())
-        check(contactName() == "zedcomm_contact_01_" .. (index + reverse * 12 + 6), mount .. " closed sensor selects its hinge and face")
+        check(contactName() == "zedcomm_contact_01_" .. (face.frame + reverse * 12 + 6), face.name .. " closed sensor selects its hinge and face")
         door.open = true
         visuals.update(registry.network, getCell())
-        check(contactName() == "zedcomm_contact_01_" .. (index + reverse * 12), mount .. " open sensor changes magnet spacing")
+        check(contactName() == "zedcomm_contact_01_" .. (face.frame + reverse * 12), face.name .. " open sensor changes magnet spacing")
     end
 end
 check(leads() == 0, "unwired contact creates no floor lead helper")
-registry.network.pieces[id].state.doorMount = "east"
 door.open = true
 door.openSprite = { getProperties = function() return { has = function(_, key) return key == "attachedE" end } end }
 local laid, wire = test.lay(tile, test.give("ZedComm.SignalWire"), id, "signal")

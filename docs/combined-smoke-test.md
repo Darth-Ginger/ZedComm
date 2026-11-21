@@ -1,175 +1,60 @@
 # ZedComm combined Build 42 smoke test
 
-Use this guide for the staged singleplayer build. Run the checkpoints in one disposable debug save and keep the working rigs until the last checkpoint. The first rig uses a Basic Small Cabinet. Later checks add a powered lamp, a Network Switch, two Weight Plates, and an Advanced cabinet.
+Use the existing singleplayer test save and the updated local Workshop build. Reuse the staged door, window and cabinet rigs. Mark each check you run and record any failure or skip. Use one shared reload and one final console capture.
 
-## Setup and check-ins
+## 1. Door and cabinet retest
 
-- On a placed device, open **ZedComm** and choose that device's submenu. A custom name appears in the submenu title, such as **Cabinet (East Entrance)**.
-- Fully restart Project Zomboid in debug mode, enable **ZedComm** for the save, and load in.
-- Find five clear floor tiles in a row for Checkpoint 1. For later checks, use a site with a powered vanilla lamp with a bulb, a wall for the Network Switch, and enough clear space for two parallel runs. A nearby clear road makes vehicle testing easier.
-- Use the Lua command console for the item grants. Put modules in your main inventory, then find them in the editor's **Carried modules** groups. Click a group header to collapse or expand it. Scroll the pane if the list exceeds its height.
-- At each check-in, report PASS or the step and observed result. Include a screenshot for a placement or visual issue if it helps. Pause while still in the save at Checkpoints 1 and 5 for a console capture. Capture again at Checkpoint 6 after reload. The active log is `%USERPROFILE%\Zomboid\console.txt`.
-- A connected `0` is a valid signal. An unavailable signal reads as dashes or **no signal**. **Unattached** means the display itself needs a cable.
-
-## Advanced arithmetic rig
-
-Build this rig on clear tiles. You can use the same save. If it has a Splitter with old internal Out A or Out B links, use a fresh debug save or remove the old module before updating. Run the arithmetic below before the Splitter, timed upgrade, and display checks in Checkpoint 4.
+If this save is missing setup items, open the debug console and grant only the matching lines. Keep these parts separate from the crafted rig in step 3.
 
 ```lua
-getPlayer():getInventory():AddItem("ZedComm.AdvancedSmallCabinet")
-getPlayer():getInventory():AddItems("ZedComm.WeightPlate", 2)
-getPlayer():getInventory():AddItem("ZedComm.AdvancedDisplay")
-getPlayer():getInventory():AddItem("ZedComm.InputExtension")
-getPlayer():getInventory():AddItem("ZedComm.AdderModule")
-getPlayer():getInventory():AddItem("ZedComm.SubtractorModule")
-getPlayer():getInventory():AddItem("ZedComm.MultiplierModule")
-getPlayer():getInventory():AddItem("ZedComm.DebugByteSource")
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 18)
+local inv = getPlayer():getInventory()
+inv:AddItem("Base.Screwdriver")
+inv:AddItems("Base.Padlock", 2)
+inv:AddItem("Base.HandDrill")
+inv:AddItems("ZedComm.DebugByteSource", 2)
+inv:AddItems("ZedComm.AdvancedAdapter", 2)
+inv:AddItem("ZedComm.DoorContact")
+inv:AddItem("ZedComm.TabletopCabinet")
+inv:AddItem("ZedComm.WallCabinet")
+inv:AddItem("ZedComm.NumericDisplay")
+inv:AddItems("ZedComm.SignalWire", 16)
 ```
 
-1. In debug mode, set both Weight Plates to **Advanced Sender** under **ZedComm → Plate → Weight plate sender**. Give them different steady loads. Use **Inspect circuit** in each plate's submenu and record its kg value. Wire plate A to Fixed IN and plate B to an Input Extension. Wire Fixed OUT to the Advanced Display. In the editor, configure Fixed OUT to Advanced.
-2. Install Adder and select **Full Reading** under **Configure**. Link **Fixed IN → Adder A**, **Input Extension → Adder B**, and **Adder OUT → Fixed OUT**. Expect the sum on the face. Use **Read full signal** for the exact kg. Disconnect either input to check for no signal, then reconnect.
-3. Right-click Adder and choose **Remove module**. Verify it returns to inventory and its internal links clear. Install Subtractor, select **Full Reading**, and reconnect the same three links to its A, B, and OUT. Expect A minus B, floored at zero. Swap the inputs to check both orders.
-4. Replace Subtractor with Multiplier and select **Full Reading**. Feed a Weight Plate into **Reading**. Disconnect the other plate from the Input Extension and wire a **Test Byte Source** set to `4` to that jack. Link it to **Factor**. With an `80 kg` load, expect `320` on the display face and `320 kg` under **Read full signal**. Set the output jack to Basic and expect `32`, then set it back to Advanced.
-5. Pause for an arithmetic console capture before moving on to the Checkpoint 4 retest. Record the two input loads, the three operation results, and any difference between the rounded face and the exact readout.
+Bring a screwdriver, two vanilla padlocks, loose Signal Wire and the existing rigs. Use two Test Byte Sources in debug or two Network Switches in normal play to drive the door's Lock and Open jacks independently. Leave the window from Run B fitted until after reload.
 
-If the board already has a direct **Fixed IN → Fixed OUT** link, remove it by clicking the two connected contacts again. The direct link maps any positive input to byte `255`. Route the two inputs through the arithmetic module to carry full readings.
+- [ ] **Door access and art.** At one closed, wired door, open the board from the inside. Use native placement to connect a free end to the door from that side, starting one tile beyond the cable. The character should approach on the same side. Check the maglock, Door Contact housing and leads from both faces through one open and close. Check the fixture names and the two status icons near the hardware. Right-click the open door where its sprite covers a reachable source and confirm the source submenu appears. With Lock OFF, send 0 to Open IN and confirm closure. Cut the cable at the Open source and confirm that manual movement returns while the Open jack stays wired.
+- **Carry forward.** Ordinary wiring, the held-close mouse result and blocked native E passage in both directions were checked in game. The door runtime suite covers the held Lock mouse guard and fail-safe unlock when the connected Lock run loses its source. Recheck these only if a regression appears.
+- [ ] **Wall passthrough.** Drill one opening in a solid wall and route five independent wires through it. Confirm that the menu shows 5/5, a sixth crossing is unavailable, and the wall still blocks movement. Pick up one crossing and confirm the other four remain connected. Leave the four in place for reload.
+- [ ] **Cabinet mounting.** Use native **Place** on a clear countertop while standing a few tiles away. Confirm the character walks to a reachable adjacent tile, the cabinet lands at ghost height, and native **Pickup** returns it. At the wall cabinet, confirm a connected jack has a continuous lead from the chosen wall face to the floor wire. Leave it wired for reload.
+- [ ] **Cabinet padlock.** Use a working cabinet-to-display circuit, ideally the wall cabinet, with one free jack and an unused padlock. Choose **Padlock cabinet**. Confirm the matching key opens the board, then put away all matching keys. Confirm the board stays closed and the display still responds. A free jack must reject new wiring, an attached jack must reject disconnect, and native **Pickup** must omit its directly attached wire. Leave the padlock on for reload. At the wired door, fit **Padlock door board (Remember me)**, put away its keys, and confirm the board opens from inside and the wired inputs still control the door.
 
-## Checkpoint 1 - One plate, Basic cabinet, display
+**Run notes**
 
-```lua
-getPlayer():getInventory():AddItem("ZedComm.PressurePlate")
-getPlayer():getInventory():AddItem("ZedComm.SmallCabinet")
-getPlayer():getInventory():AddItem("ZedComm.ThresholdModule")
-getPlayer():getInventory():AddItem("ZedComm.NumericDisplay")
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 6)
-```
+## 2. Shared reload
 
-1. Place these in a straight line with one clear wire tile between each device: **Pressure Plate → wire → Basic Small Cabinet → wire → Numeric Display**. Use the ZedComm world menu or native **Place**.
-2. Route the first run from the plate into the cabinet's **IN**. Select the plate's free end, lay one segment in the gap, then click the cabinet and choose the **IN** connection. Start a separate run from cabinet **OUT**, lay a segment in the second gap, and connect it to the display. Right-click a wire and use **Inspect wire** if you need to confirm which run you selected.
-3. Choose **ZedComm → Cabinet → Open Small Cabinet**. Check the editor title says **Basic Small Cabinet** and the board is 6×6. Drag **Threshold** from **Carried modules** to column 2, row 1. Select it and use **Configure** to set `50`. Click the matching contacts to make **Fixed IN → Threshold IN**, then **Threshold OUT → Fixed OUT**. Each pair is a separate link.
-4. Set the plate output to `155` via **ZedComm → Plate → Set pressure plate output**. Check the display reads `0 → 255 → 0` as you step on and off. **Read numeric display** should match the digits. Inspect the incoming wire to confirm it carries `155` while occupied.
-5. While the plate is clear, use **Disconnect cabinet jack (IN)**. The display should show no signal. Reconnect that wire to **IN** and check that `0` returns. With a wire on the display's own tile, check that it goes under the housing and leaves the digits visible. Leave the rig built.
+- [ ] Exit fully and launch **without debug**, with crafting and building cheats off. Check that the wall passthrough still shows 4/5 and its four runs are connected. Check the wall lead is present once and the padlocked cabinet still runs and blocks access. Put away or drop the matching keys and verify removal is refused. Retrieve a cabinet key, remove that padlock, and confirm the board and jack are usable again. Open the remembered door board without its keys, confirm you can edit a jack, then remove the padlock keyless. If using the wall cabinet, pick it up and confirm the lead clears.
+- [ ] Open and close the previously fitted Window Contact host. Expect `0` open and `255` closed, with the same wire and visible housing. If the window is disposable, break the glass and expect the display's **no signal** indication. Remove the sensor independently and verify the cable end is free and the contact item returns.
 
-**Check-in 1.** Pause in the save for a console snapshot. Report whether placement, `0 → 255 → 0`, and disconnect/reconnect passed.
+**Reload notes**
 
-## Checkpoint 2 - Arming, lamp adapter and editor
+## 3. Normal-play crafting and lamp
 
-```lua
-getPlayer():getInventory():AddItem("ZedComm.NetworkSwitch")
-getPlayer():getInventory():AddItem("ZedComm.InputExtension")
-getPlayer():getInventory():AddItem("ZedComm.OutputExtension")
-getPlayer():getInventory():AddItem("ZedComm.AndModule")
-getPlayer():getInventory():AddItem("ZedComm.AdvancedAdapter")
-getPlayer():getInventory():AddItem("ZedComm.ThresholdModule")
-getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
-```
+Bring Electrical **5**, a screwdriver, a powered movable vanilla lamp with a bulb, 16 Electronics Scrap, 11 Electric Wire, one full roll of Wire and six Sheet Metal. Craft four Basic Adapters and two Advanced Adapters if you have none staged. The listed materials cover those adapters and the recipes below. Use the current character with no recipe bypass or crafting cheat.
 
-1. Mount the Network Switch on a wall and open the Basic cabinet. Add AND at column 4, row 3. Drag Input Extension to the top edge at column 3, row 1 and use **Rotate Building** (R by default) until its jack faces out. Try a board-interior drop first. It should stay in inventory. Use the displayed number for the new IN jack.
-2. Click the existing Threshold OUT and Fixed OUT contacts again to cut their link. Connect **Threshold OUT → AND A**, **Input Extension OUT → AND B**, and **AND OUT → Fixed OUT**. Wire the Network Switch to the new IN jack. Name this run **Arm** using **Rename run** on its cable. For a steady load, drop a pipe on the Basic Plate and step clear. Switch ON and OFF. The switch sprite should change, and the display should show `255` when armed, `0` when disarmed, and no signal if the Arm input is unplugged. Reconnecting while the switch is ON should restore `255`.
-3. Add an Output Extension to a free edge and connect **Threshold OUT → extension IN**. Wire it to a separate display if you have one, or move the existing display run to that jack temporarily. With the load steady and the arm OFF, the extension should send `255` while Fixed OUT sends `0`. Rotate or move the connected extension to another valid edge and check its links follow. Remove it, then check the item returns and the old wire has a free end. Reinstall and reconnect it if you want to leave the branch built for reload.
-4. At a separate, unconverted powered vanilla lamp with a bulb, choose **ZedComm → Lamp → Install Advanced Adapter**. Wire a Weight Plate straight to the lamp. Open the 3×3 editor, drag in Threshold, and select **Auto-connect**. Set the threshold to `1`; step onto and off the plate and verify the lamp follows. Increase the setting above the occupied byte via **Set threshold** on the lamp, then put it back via the editor. The lamp should follow the new setting while the input stays steady.
-5. Drag that Threshold with the rotate key to two cells on the bottom row. The internal links should follow. Try an overlapping drop and cancel a drag with right-click. From two tiles away along an open path, verify the board can be viewed. Move adjacent to edit.
-6. Keep the lamp wired and occupied. Try the native switch and check the wire keeps control. With a battery or bulb that can be reached while a loose item holds the plate, remove power or the bulb. Restore it with the plate occupied and check the lamp comes back on. Repeat with the plate clear and check the lamp stays off. Record the method you used. Disconnect the lamp's cable and verify manual control returns, then reconnect. Leave the lamp and its circuit built.
+- [ ] In **Crafting → ZedComm**, craft both Signal Wire recipes, one Window Contact and one Advanced XL Cabinet. Window Contact needs Electrical **1**, a Basic Adapter, one Electronics Scrap and one Electric Wire or roll unit. Advanced XL needs Electrical **5**, an Advanced Adapter, four Sheet Metal and two Electronics Scrap. Both keep the screwdriver. Signal Wire makes **5** from one Electric Wire or roll unit, and **50** from one full roll. In the character's Skills panel, hover the next Electrical skill square and record the XP shown before, between and after the two wire crafts. Compare the deltas within the same skill level. Each recipe awards **1 base XP** before character and sandbox multipliers. If a craft levels the skill or the UI cannot show the delta, record the yields and mark precise live XP unverified.
+- [ ] Craft a Pressure Plate, Basic Small Cabinet, Threshold Module and Numeric Display. Using those parts and the Signal Wire you crafted, connect **Plate → Cabinet IN** and **Cabinet OUT → Display**. Link **IN → Threshold → OUT** inside, with Threshold at `1`. Expect `0 → 255 → 0` as you step on and off.
+- [ ] Use **ZedComm → Lamp → Fit Advanced Adapter** on the powered lamp and verify it consumes the adapter. Use **Disconnect cabinet jack (IN)** on the crafted cabinet, leaving the plate end attached. Extend that free cable end to the lamp if needed, then connect and step on and off the plate. Pick up and replace the lamp with native **Moveables**, reconnect the wire and confirm it still follows the plate. Use **Remove lamp adapter** and verify it returns, the wire end is free, and manual control returns.
+- [ ] Pause and say **go** for the final console capture. Report any discrepancies and skipped checks.
 
-**Check-in 2.** Report the arm behavior, lamp editor and power results, and any problems with extension placement. If convenient, test switch pickup and remount on south and east walls without a corner tile. Check the saved latch and both sprite positions.
+**Run notes**
 
-### Checkpoint 2 follow-up - Wall switches and jack labels
+## Prior runs
 
-1. In native **Place**, select a Network Switch and hold left-click on a tile that borders two walls. Drag toward each wall and then toward the open edge. The preview should stay on the original tile and only face eligible walls. Release with the second wall selected and verify the switch matches its preview. Walk between the camera and the switch to check character layering.
-2. Connect a cable from an adjacent tile to a switch above wood flooring. With no debug selector active, verify the lead runs down the wall and across the floor to meet the cable. Left-click within reach and confirm the switch sends `255` or `0`. Click with the placement cursor active and confirm the tool handles the click. Verify the entire lead returns once after reload, then disconnect the cable and confirm the lead disappears. Try a same-tile connection if practical.
-3. Right-click Fixed IN in the cabinet editor and choose **Rename jack**. Label it **Load**. Label the switch input **Arm** and name an output jack too. **ZedComm → Cabinet → Label cabinet jack** in the world menu edits the same labels. Confirm they appear in both the editor and connection menu and that the runs keep their names and signals. Clear a label with a blank entry, then leave a label for the reload check.
-4. Drag a fresh Input Extension to the left edge and a fresh Output Extension to the right edge without rotating. The gold jack marks should face out. Verify their internal terminals face the board. Previously installed extensions keep their rotations.
+| Run | Recorded result |
+| --- | --- |
+| A | Advanced door board, destruction cleanup, secret-door sequence, reload, standalone Contact at `255/0`, and combined fitting passed. Inside-face access and fixture art failed. Native E opened against held requests. |
+| B | Window Contact and both plate checks passed. The window binding and loaded Basic Plate survived the shared reload. |
+| C | Large showed 8×8 with two fixed IN/OUT pairs. Advanced XL showed 10×10 with three pairs, and IN 3 drove OUT 3 through reload. Native tabletop placement and the wall lead still needed work. |
+| D | Representative recipes and a crafted circuit passed with debug enabled and crafting/building cheats off. The console identified an Advanced Small Cabinet in the rig. Exact wire XP was unrecorded and lamp fitting was carried forward. |
 
-## Checkpoint 3 - Plate loads, arithmetic and Boolean controls
-
-```lua
-getPlayer():getInventory():AddItem("ZedComm.WeightPlate")
-getPlayer():getInventory():AddItem("ZedComm.OccupancyPlate")
-getPlayer():getInventory():AddItems("ZedComm.NumericDisplay", 2)
-getPlayer():getInventory():AddItem("ZedComm.InputExtension")
-getPlayer():getInventory():AddItem("ZedComm.AdderModule")
-getPlayer():getInventory():AddItem("ZedComm.OrModule")
-getPlayer():getInventory():AddItem("ZedComm.XorModule")
-getPlayer():getInventory():AddItem("ZedComm.NotModule")
-getPlayer():getInventory():AddItem("ZedComm.DebugByteSource")
-getPlayer():getInventory():AddItems("Base.LeadPipe", 14)
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
-```
-
-1. Check the Basic Plate at `155` with a loose pipe while you stand clear. Removing the item should clear the reading. On both Basic and Weight Plates, check a floor container on the plate and then one tile away. Adding contents should increase the Weight Plate reading and leave Basic at `155` for either loaded or empty furniture. A direct Weight Plate display should read `1` for one pipe and `2` for ten Lead Pipes weighing about 15 in total. A safe vehicle overlap should raise the reading while parked and clear when driven off. An Occupancy Plate should count a lone player as `1`; a live zombie adds one if safely available. Check that a loose pipe does not raise the occupancy count.
-2. Reuse the Basic cabinet. Wire two Weight Plates to **Fixed IN** and a new Input Extension. Route both inputs to **Adder A/B** and connect **Adder OUT → Threshold IN** in place of the old direct input. Leave **Threshold OUT → AND A**, **Arm → AND B**, and **AND OUT → Fixed OUT**. Set Threshold to `2`. Drop one Lead Pipe on each plate and stand clear. Each loaded plate sends `1` because any positive load sends at least `1` in Basic mode. With Arm ON, expect `0` with either pipe alone and `255` with both. With both pipes down, switch Arm OFF and back ON. Unplugging either weight run should clear the output. Reconnecting it should restore `255`.
-3. For OR and XOR, use two independently settable byte inputs such as a switch and a settable plate or **ZedComm → Source → Set test byte** on a manually placed **Test Byte Source**. Connect the selected gate output to a display. Check the four rows below. Then connect either of the inputs to NOT. Verify `0` produces `255`, any positive byte produces `0`, and an unplugged input clears the output. Unplug a required input for OR and XOR as well.
-
-| Input A | Input B | OR | XOR |
-| --- | --- | --- | --- |
-| 0 | 0 | 0 | 0 |
-| Positive | 0 | 255 | 255 |
-| 0 | Positive | 255 | 255 |
-| Positive | Positive | 255 | 0 |
-| Unavailable | Connected | Unavailable | Unavailable |
-
-**Check-in 3.** Report the plate readings and gate results. Note any optional animal, zombie, or vehicle case you skipped.
-
-## Checkpoint 4 - Cabinet upgrade, edge-mounted Splitter and full readings
-
-```lua
-getPlayer():getInventory():AddItem("ZedComm.SmallCabinet")
-getPlayer():getInventory():AddItem("ZedComm.AdvancedAdapter")
-getPlayer():getInventory():AddItem("ZedComm.SplitterModule")
-getPlayer():getInventory():AddItem("ZedComm.InputExtension")
-getPlayer():getInventory():AddItems("ZedComm.AdvancedDisplay", 2)
-getPlayer():getInventory():AddItem("ZedComm.CacheModule")
-getPlayer():getInventory():AddItem("ZedComm.SubtractorModule")
-getPlayer():getInventory():AddItem("ZedComm.MultiplierModule")
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 12)
-```
-
-1. In Crafting, find **Make ZedComm Basic Adapter**, **Advanced Adapter**, **Basic Small Cabinet**, **Advanced Small Cabinet**, **Splitter Module**, and **Network Switch**. Verify that Basic and Splitter need Electrical 1 and Advanced needs 3. Confirm that a cabinet consumes the corresponding Adapter and a sheet of metal, and that tools are retained. Craft both tiers in this save if possible. See the [recipe table](plans/adapter-and-cabinet.md#cabinet-tiers-and-splitter).
-2. Place a fresh Basic Small Cabinet. Try dropping the Splitter in the middle and then on the left edge with its default right-facing jacks pointing inward. Both drops should leave it in inventory. Install it at column 6, row 3 without rotating, with the two gold jacks facing out. Make the single internal link **Fixed IN → Splitter IN**. Right-click the Splitter to confirm **Rename SPL-1** and **Rename SPL-2** exist.
-3. Wire **SPL-1** and **SPL-2** directly to separate Advanced Displays. Name the cable runs **Branch A** and **Branch B**. Wire an Advanced Weight Plate to Fixed IN. With an 80 kg load, both outputs from the Basic cabinet should send `8`. Clearing the plate should give `0` on both.
-4. With instant timed actions off, start **Upgrade cabinet with Advanced Adapter** and interrupt it by walking away. Check that the adapter stays in inventory and the cabinet stays Basic. Retry and wait for the swap. Verify the Basic Adapter returns and the board and named runs survive. Right-click the Splitter and choose **Set SPL-1 to Advanced**. Expect the first display to show `80` on the face and `80 kg` under **Read full signal**, and the second to show byte `8`. Set SPL-2 to Advanced and verify both agree. Unplug one output and watch the other stay live. Unplug Fixed IN and check both clear, then reconnect for reload.
-5. On the Advanced cabinet, route the plate through **Cache Data → Cache OUT → an Advanced output**. Use **Configure** to select **Always**, then check the full readout follows the held load. Switch Cache to its enabled mode. Wire a switch to **Enable** using an Input Extension. OFF clears its output and ON forwards the current full reading. A direct wire from the Advanced Weight Plate to an Advanced Display also reports the full reading. Compare a small change in weight that leaves the byte the same.
-6. For full-reading Adder, Subtractor, and Multiplier, use the [Advanced arithmetic rig](#advanced-arithmetic-rig) above. If you already passed that rig, carry those results forward.
-
-**Check-in 4.** Report the crafting checks, rejected and accepted Splitter placements, adapter swap, independent runs, and typed readouts. Leave the Splitter rig wired for reload if possible.
-
-### Checkpoint 4 follow-up
-
-After updating the build, open the existing wired cabinet and select the Splitter. Use **Configure** or right-click the module body to change either output mode. If the cabinet title says **Advanced Small Cabinet**, both ports should offer Basic or Advanced independently. Check byte and kg on the two branches before repeating Cache. For a new Splitter, use column 6, row 3 at its default rotation with the gold jacks facing right.
-
-1. With Cache set to **Always**, feed it a steady weight and route **Cache OUT → Splitter IN**. Confirm both Advanced outputs show the full weight and respond to a small change that keeps the fallback byte the same. Recheck **Enable** with the switch OFF and ON.
-2. Use **ZedComm → Plate → Rename Plate**, **Rename Cabinet**, or **Rename Display**. Verify the name appears when connecting its jack and the cable run keeps its own name. Close the editor, double-click the nearby cabinet, and look for its name in the title. Expand a carried-module group and drag a module. Verify the blue, green and gold contacts turn with the preview. Check that Cache's inputs clear the mode text and that hovering over **Data** or **Enable** puts its label in the footer.
-3. On both exterior ground and a laid wood floor, inspect the switch lead in normal rendering. It should join the floor run without a gap. Toggle or disconnect it to distinguish a visual gap from a signal break.
-
-## Checkpoint 5 - Timing, power and pre-reload capture
-
-```lua
-getPlayer():getInventory():AddItem("ZedComm.TimerModule")
-getPlayer():getInventory():AddItem("ZedComm.WaitModule")
-getPlayer():getInventory():AddItem("ZedComm.MainsSourceModule")
-getPlayer():getInventory():AddItem("ZedComm.BatterySourceModule")
-getPlayer():getInventory():AddItem("Base.Battery")
-```
-
-1. In either cabinet tier, route a Basic Plate through **Wait → display**. Set Wait to 2 seconds. A quick step leaves the output at `0`; hold pressure for two seconds and expect the configured plate byte. Stepping off immediately returns it to `0`.
-2. Insert a 10-second Timer after Wait. Start with the plate clear to arm the Timer. Leave the editor open as you step onto the plate. Check that Wait counts down from 2 seconds, then its count clears as Timer starts from 10 seconds and the display shows `255`. Step off and check that Timer keeps counting down until the display returns to `0`. Trigger it again and unplug the input. Both the countdown and signal should clear. If you check fast-forward or pause, the duration follows real seconds while the simulation runs.
-3. Wire a one-cell Mains Source to a display, configure `37`, and check `37` when the host has grid or generator power. Shut off the actual power source and look for no signal. Restore it and check `37` returns. If you cannot interrupt mains power, record that case as pending.
-4. Replace the Mains Source with a Battery Source and set `37`. Check no signal with an empty slot. With a charged battery in your main inventory, select the module and use **Insert or remove battery**. Confirm the display reads `37`. Remove the battery and check the reading clears and the battery returns.
-5. Re-establish a timed run for the reload check. Leave the cabinets, a named Splitter branch, switch, and lamp connected. Trigger the Timer if verifying expiration state across reload.
-
-**Check-in 5.** Pause in the save for the pre-reload console capture. After the capture, save and quit to the main menu once.
-
-## Checkpoint 6 - Reload, wiring regression and final capture
-
-1. Reload the same save. Verify the cabinet tier, Threshold value, module positions and rotations, jack labels, run names, switch wall and lead, and splitter output modes survived. Change a load or arm switch and confirm the wired outputs follow without any rewiring. A Timer window from the old session should clear and rearm after a valid zero.
-2. Use native **Pickup** on the upgraded cabinet. Verify it returns as an Advanced Small Cabinet and the old runs are left with free ends. Place it back and explicitly reconnect. Its board and output modes should still be present. Pick up and replace the vanilla lamp with the normal moveable tools. Reattach its run and check that the saved adapter circuit resumes.
-3. Route two independent circuits across a shared tile using normal placement. Include a bend if there is room. Hover the numbered wires to check that the cyan outline follows the exact segment. Use native **Pickup** to remove one wire. Expect one item back and only that route to lose signal. Use an active run to reconnect a compatible existing free end, and confirm an attempted join between two driven runs is rejected. Verify name and reading when the repaired run is inspected.
-4. Leave the game running for the final console capture. Report reload, selective pickup, and any unresolved error, visual issue, or skipped case.
-
-## Verification
-
-- Live singleplayer, Build 42.22.2, 2026-11-17. Darth-Ginger confirmed the remaining Checkpoint 6 checks work for the current scope.
-- Post-cleanup live check, 2026-11-17. Darth-Ginger reported no errors or major differences from the previously tested behavior. Post-reload console: `%USERPROFILE%\Zomboid\zedcomm-test-logs\checkpoint-6-console-20261117-142334-872.txt`.
-- Offline Lua 5.1. All 863 checks passed before and after the cleanup, using the installed Build 42 Lua wrappers with simulated game objects.
+The archived checklist is in `%USERPROFILE%\Zomboid\zedcomm-test-logs\combined-smoke-test-full-repo-2026-11-19.md`. The complete recipe table is in [crafting recipes](recipes.md). Full-inventory checks run offline. Additional recipe and lamp variants remain outside the representative live pass.

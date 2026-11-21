@@ -25,7 +25,8 @@ layout.links = {
     { from = "open", output = "out", to = "gate", input = "a" },
     { from = "gate", output = "out", to = "openAction", input = "in" },
 }
-check(not Circuit.compilePackets(layout, "door", "basic"), "Basic adapters reject programmable logic")
+local valid, rejection = Circuit.validate(layout, "door", "basic")
+check(not valid and rejection == "Door logic requires Advanced Adapters", "Basic adapters reject programmable logic")
 run, reason, board = Circuit.compilePackets(layout, "door", "advanced")
 assert(run, reason)
 check(board.dependencies.openAction.lock and board.dependencies.openAction.open, "action tracks both connected ancestors")

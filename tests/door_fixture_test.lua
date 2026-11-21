@@ -4,6 +4,7 @@ local Door, Modules = ZedComm.Door, ZedComm.SignalModules
 local check = test.check
 instanceof = function(object, class) return object.class == class end
 getSpecificPlayer = function() return {} end
+triggerEvent = test.fire
 
 for _, class in ipairs({ "IsoDoor", "IsoThumpable" }) do
     local door = makeDoor(test.square(10, 10, 0), class)
@@ -24,7 +25,7 @@ for _, class in ipairs({ "IsoDoor", "IsoThumpable" }) do
     tick(255, 255)
     check(door.open and not door.locked and lock.result == "unavailable", class .. " lock waits for open door")
     tick(255, 0)
-    check(not door.open and door.locked, class .. " closure applies pending lock")
+    check(not door.open and door.locked and door.silentCloses == 1, class .. " network closure skips swing animation and applies pending lock")
     tick(255, 255)
     check(not door.open and open.result == "unavailable", class .. " lock blocks opener")
     door.open = true

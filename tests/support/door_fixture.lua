@@ -9,7 +9,7 @@ return function(worldObject)
         door.class, door.open, door.locked, door.keyed = class or "IsoDoor", false, false, false
         door.toggles, door.lockWrites = 0, 0
         function door.getOpenSprite() return door.openSprite end
-        function door.getNorth() return door.north ~= false end
+        function door.isNorth() return door.north ~= false end
         function door.isDoor() return door.doorFlag ~= false end
         function door.isDestroyed() return door.destroyed == true end
         function door.isOpen() return door.open end
@@ -30,6 +30,14 @@ return function(worldObject)
             if not door.rejectToggle then door.open = not door.open end
             if triggerEvent then triggerEvent("OnContainerUpdate") end
         end
+        function door.ToggleDoorSilent()
+            door.toggles = door.toggles + 1
+            door.silentCloses = (door.silentCloses or 0) + 1
+            if not door.rejectToggle then door.open = not door.open end
+        end
+        square.RecalcAllWithNeighbours = square.RecalcAllWithNeighbours or function() end
+        square.setSquareChanged = square.setSquareChanged or function() end
+        door.invalidateRenderChunkLevel = door.invalidateRenderChunkLevel or function() end
         return door
     end
 end

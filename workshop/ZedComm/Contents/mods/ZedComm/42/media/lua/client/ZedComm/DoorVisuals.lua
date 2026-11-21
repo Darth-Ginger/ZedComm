@@ -5,25 +5,29 @@ local entries = {}
 local directions = { [0] = 1, [1] = 2, [2] = 3, [4] = 4, [8] = 5 }
 local mounts = { north = 0, west = 1, south = 2, east = 3 }
 
+local function viewerMount(object, viewer)
+    local square = object:getSquare()
+    if object:isNorth() then
+        return viewer and viewer:getY() >= square:getY() and mounts.south or mounts.north
+    end
+    return viewer and viewer:getX() >= square:getX() and mounts.east or mounts.west
+end
+
 local function actuatorSprite(name)
     return name ~= nil and (name:match("^zedcomm_door_01_%d+$")
         or name:match("^zedcomm_door_reverse_01_%d+$"))
 end
 
 local function contactSprite(name)
-    return name ~= nil and name:match("^zedcomm_contact_01_%d+$")
+    return name ~= nil and (name:match("^zedcomm_contact_01_%d+$")
+        or name:match("^zedcomm_window_contact_01_%d+$"))
 end
 
-local function mountOf(object, piece)
-    local mount = piece.state and piece.state.doorMount or (object:getNorth() and "north" or "west")
-    return mounts[mount]
-end
-
-function Visuals.frame(object, network, piece)
+local function actuatorFrame(object, network, piece, mount)
     local shape = ZedComm.WireShape
     local lock = directions[shape.portDirection(network, piece, "lock")] or 0
     local open = directions[shape.portDirection(network, piece, "open")] or 0
-    return mountOf(object, piece) * 72 + (object:isLocked() and 36 or 0) + lock * 6 + open
+    return mount * 72 + (object:isLocked() and 36 or 0) + lock * 6 + open
 end
 
 local function setAttachment(entry, name)
@@ -70,31 +74,37 @@ local function findObject(square, id)
 end
 
 function Visuals.update(network, cell)
+    local player = getSpecificPlayer(0)
+    local viewer = player and player:getCurrentSquare()
     local seen = {}
     for id, piece in pairs(network and network.pieces or {}) do
-        local contact = piece.definitionId == ZedComm.DoorContact.ID
+        local contact = ZedComm.DoorContact.profiles[piece.definitionId]
         if contact or piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
             local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
             local object = findObject(square, id)
             local door = object
             if contact and object then door = ZedComm.DoorContact.host(object) end
-            if door and ZedComm.Door.isEligible(door) then
+            if door and (contact or ZedComm.Door.isEligible(door)) then
                 local entry = entries[id]
                 if entry and entry.door ~= door then setAttachment(entry, nil); removeLead(entry); entry = nil end
                 entry = entry or { door = door, matches = contact and contactSprite or actuatorSprite }
-                local reverse = ZedComm.Door.reverseHinge(door) and 1 or 0
+                local isWindow = piece.definitionId == ZedComm.DoorContact.WINDOW_ID
+                local reverse = not isWindow and ZedComm.Door.reverseHinge(door) and 1 or 0
+                local mount = viewerMount(door, viewer)
                 local name, floorName
                 if contact then
                     local direction = directions[ZedComm.WireShape.portDirection(network, piece, "signal")] or 0
-                    local frame = mountOf(door, piece) * 12 + reverse * 6 + direction
-                    name = "zedcomm_contact_01_" .. (mountOf(door, piece) * 24 + reverse * 12
-                        + (door:isOpen() and 0 or 6) + direction)
+                    local frame = mount * 12 + reverse * 6 + direction
+                    local framesPerFace = isWindow and 12 or 24
+                    name = contact.prefix .. (mount * framesPerFace + reverse * 12
+                        + (contact.isClosed(door) and 6 or 0) + direction)
                     if direction > 0 then floorName = "zedcomm_contact_floor_01_" .. frame end
                 else
-                    local frame = Visuals.frame(door, network, piece)
+                    local frame = actuatorFrame(door, network, piece, mount)
                     name = (reverse == 1 and "zedcomm_door_reverse_01_" or "zedcomm_door_01_") .. frame
-                    if frame % 36 > 0 then
-                        floorName = "zedcomm_door_floor_01_" .. (math.floor(frame / 72) * 72 + reverse * 36 + frame % 36)
+                    local wireFrame = frame % 36
+                    if wireFrame > 0 then
+                        floorName = "zedcomm_door_floor_01_" .. (mount * 72 + reverse * 36 + wireFrame)
                     end
                 end
                 if entry.name ~= name then setAttachment(entry, name); entry.name = name end

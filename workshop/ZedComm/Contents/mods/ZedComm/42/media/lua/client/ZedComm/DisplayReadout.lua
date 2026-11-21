@@ -105,8 +105,9 @@ Events.OnTick.Add(function()
     local runtime = ZedComm and ZedComm.DeviceRuntime
     if not runtime then return end
     runtime.forEachDisplay(function(object, value, _, weight) refresh(object, value, true, weight) end)
+    runtime.forEachTestSource(function(object, value) refresh(object, value, true) end)
     for object in pairs(active) do
         local _, _, attached = runtime.getDisplay(object)
-        if not attached then refresh(object, nil, false) end
+        if not attached and runtime.getTestSourceValue(object) == nil then refresh(object, nil, false) end
     end
 end)

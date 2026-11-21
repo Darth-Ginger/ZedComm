@@ -32,7 +32,7 @@ function lamp.isActivated() return lamp.active end
 function lamp.setActive(_, active) lamp.active = active end
 local adapter, part = give("ZedComm.AdvancedAdapter"), give("ZedComm.ThresholdModule")
 testState.queued = nil
-assert(optionsAt(lampTile)["Install Advanced Adapter"])()
+assert(optionsAt(lampTile)["Fit Advanced Adapter"])()
 assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
 local id = lamp:getModData().zedcomm.id
 local function circuit() return testState.registry.network:record(id).state.circuit end
@@ -64,6 +64,7 @@ testState.mouseX, testState.mouseY = 72, 142
 testState.panel:render()
 check(not testState.panel.drag.preview.valid and testState.panel.drag.part.column == 1 and testState.panel.drag.part.row == 1,
     "the snapped preview rejects a footprint overlapping a fixed part")
+check(testState.panel.drag.preview.reason == "module overlaps another part", "the preview retains the rejection reason")
 testState.mouseX, testState.mouseY = 133, 86
 testState.panel:render()
 check(not testState.panel.drag.preview.valid and testState.panel.drag.part.row == 0,
@@ -75,12 +76,15 @@ check(testState.panel.drag.preview.valid and testState.panel.drag.part.column ==
     and inventory:contains(part) and not circuit().modules["threshold-1"],
     "moving the pointer previews a valid snapped location without consuming or installing the module")
 testState.panel:onMouseUp(72, 142)
-check(inventory:contains(part) and not circuit().modules["threshold-1"],
+check(inventory:contains(part) and not circuit().modules["threshold-1"]
+    and testState.panel.message == "module overlaps another part",
     "an overlapping placement consumes no module")
 grabCarried()
+inventory.full = true
 testState.panel:onMouseUp(133, 142)
+inventory.full = false
 check(not inventory:contains(part) and circuit().modules["threshold-1"].threshold == 50,
-    "placing the selected module commits the inventory and board together")
+    "installing a module at capacity consumes it and commits the board")
 fire("OnTick")
 check(not lamp.active, "an installed module with no links leaves the lamp off")
 click(85, 142)

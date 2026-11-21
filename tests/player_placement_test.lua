@@ -25,9 +25,11 @@ local plate = give("ZedComm.PressurePlate")
 plate.data.zedcommPlacement = { id = "test-pressure-id", state = { configured = 11 } }
 local displayItem = give("ZedComm.NumericDisplay")
 local wireA, wireB = give("ZedComm.SignalWire"), give("ZedComm.SignalWire")
+inventory.full = true
 local ok, plateId = runPlacement(p0, { kind = "place", item = plate })
+inventory.full = false
 check(ok and plateId == "test-pressure-id" and not inventory:contains(plate)
-    and inventory:contains(otherPlate), "placement consumes the exact selected item and keeps its identity")
+    and inventory:contains(otherPlate), "placement at capacity consumes only the selected item and keeps its identity")
 check(testState.registry.network:record(plateId).state.configured == 11, "placement restores carried configuration")
 check(placement.resolve(testState.registry, plateId).object.sprite == "zedcomm_devices_01_20",
     "placed pressure plate uses its packaged sprite")

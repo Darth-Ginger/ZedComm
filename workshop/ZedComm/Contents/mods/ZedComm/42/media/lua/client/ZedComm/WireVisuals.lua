@@ -4,12 +4,16 @@ if isClient() or isServer() then return end
 require "ZedComm/WireShape"
 require "ZedComm/ModuleVisuals"
 require "ZedComm/DoorVisuals"
+require "ZedComm/InternalCircuit"
 require "ZedComm/Devices/RelayLamp"
 require "ZedComm/Devices/NetworkSwitch"
 local Shape = ZedComm.WireShape
 local ModuleVisuals = ZedComm.ModuleVisuals
 local Relay = ZedComm.RelayLamp
 local Switch = ZedComm.NetworkSwitch
+local wallCabinet = "ZedComm.WallCabinet"
+local Circuit = ZedComm.InternalCircuit
+local leadDirections = { 0, 1, 2, 4, 8 }
 local plateSprites = {
     ["ZedComm.PressureSensor"] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
     ["ZedComm.OccupancyPlate"] = { itemType = "ZedComm.OccupancyPlate", firstFrame = 419 },
@@ -46,7 +50,7 @@ local function spritesFor(network)
     return cableSprites
 end
 
-local function updateSwitchLead(square, lead, name)
+local function updateLead(square, lead, name, label, tag, marker)
     if lead then
         if name then
             setWorldSprite(lead, name)
@@ -54,10 +58,26 @@ local function updateSwitchLead(square, lead, name)
             square:transmitRemoveItemFromSquare(lead)
         end
     elseif name and getSprite(name) then
-        lead = IsoObject.new(square, name, "ZedComm switch lead")
-        lead:getModData().zedcommSwitchLead = true
+        lead = IsoObject.new(square, name, label)
+        lead:getModData()[tag] = marker
         square:AddTileObject(lead)
     end
+end
+
+local function refreshCabinet(object, network, piece, directions)
+    local mount = piece.state and piece.state.mount
+    local sprite = Circuit.wallCabinetSprite(mount)
+    if not sprite then return nil end
+    local wired = false
+    for port in pairs(piece.ports) do
+        local direction = Shape.portDirection(network, piece, port)
+        if direction then
+            directions[direction] = true
+            wired = true
+        end
+    end
+    setWorldSprite(object, wired and Circuit.wallCabinetSprite(mount, true) or sprite)
+    return mount
 end
 
 local function refreshSquare(square, network)
@@ -66,10 +86,21 @@ local function refreshSquare(square, network)
     local objects = square:getObjects()
     local endpoint, endpointIndex, changedOrder
     local switchLead, switchLeadObject
+    local cabinetMount, cabinetDirections, cabinetLeads = nil, {}, {}
+    local duplicates
     for i = 0, objects:size() - 1 do
         local object = objects:get(i)
         local data = object:hasModData() and object:getModData()
         if data and data.zedcommSwitchLead then switchLeadObject = object end
+        local direction = data and data.zedcommCabinetLead
+        if direction then
+            if cabinetLeads[direction] then
+                duplicates = duplicates or {}
+                duplicates[#duplicates + 1] = object
+            else
+                cabinetLeads[direction] = object
+            end
+        end
         local tag = data and data.zedcomm
         if type(tag) == "table" then
             local piece = network.pieces[tag.id]
@@ -90,6 +121,8 @@ local function refreshSquare(square, network)
                     if piece.state then
                         switchLead = Switch.floorLead(piece.state.mount, Shape.portDirection(network, piece, "signal"))
                     end
+                elseif piece.definitionId == wallCabinet and tag.definitionId == wallCabinet then
+                    cabinetMount = refreshCabinet(object, network, piece, cabinetDirections)
                 elseif plate and piece.definitionId == tag.definitionId
                     and tag.placedItem == plate.itemType then
                     local direction = Shape.portDirection(network, piece, "signal")
@@ -107,7 +140,15 @@ local function refreshSquare(square, network)
         end
     end
     if changedOrder then endpoint:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD) end
-    updateSwitchLead(square, switchLeadObject, switchLead)
+    updateLead(square, switchLeadObject, switchLead, "ZedComm switch lead", "zedcommSwitchLead", true)
+    for _, direction in ipairs(leadDirections) do
+        -- Cabinet and switch mounts share the same projected wall and floor anchors.
+        local name = cabinetMount and cabinetDirections[direction] and Switch.floorLead(cabinetMount, direction)
+        updateLead(square, cabinetLeads[direction], name, "ZedComm cabinet lead", "zedcommCabinetLead", direction)
+    end
+    if duplicates then
+        for _, duplicate in ipairs(duplicates) do square:transmitRemoveItemFromSquare(duplicate) end
+    end
 end
 
 local function onTick()
@@ -127,7 +168,7 @@ local function onTick()
     if network == lastNetwork and network.version == lastVersion then return end
     for _, piece in pairs(network.pieces) do
         if piece.kind == "cable" or piece.definitionId == Relay.ID
-            or piece.definitionId == Switch.ID or plateSprites[piece.definitionId] then
+            or piece.definitionId == Switch.ID or piece.definitionId == wallCabinet or plateSprites[piece.definitionId] then
             local square = cell:getGridSquare(piece.x, piece.y, piece.z)
             if square and not seen[square] then
                 seen[square] = true
@@ -138,22 +179,25 @@ local function onTick()
     lastNetwork, lastVersion = network, network.version
 end
 
--- Native placement restores movableData before OnObjectAdded. Wait until
--- the registry has had a chance to restore the relay tag and endpoint.
+-- Wait for the registry to restore the endpoint after native placement or a square load.
 Events.OnObjectAdded.Add(function(object)
     local square = object:getSquare()
     if not square then return end
     if object:hasModData() then
         local data = object:getModData()
         local marker = type(data.movableData) == "table" and data.movableData.zedcommRelay
-        if marker then pendingSquares[square] = true end
+        local tag = data.zedcomm
+        if marker or (type(tag) == "table" and tag.definitionId == wallCabinet) then
+            pendingSquares[square] = true
+        end
     end
 end)
 Events.OnObjectAboutToBeRemoved.Add(function(object)
     if not object:hasModData() then return end
     local data = object:getModData()
     local tag = data.zedcomm
-    if data.zedcommSwitchLead or (type(tag) == "table" and tag.definitionId == Switch.ID) then
+    if data.zedcommSwitchLead or data.zedcommCabinetLead
+        or (type(tag) == "table" and (tag.definitionId == Switch.ID or tag.definitionId == wallCabinet)) then
         local square = object:getSquare()
         if square then pendingSquares[square] = true end
     end

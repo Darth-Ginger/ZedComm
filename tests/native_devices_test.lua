@@ -36,9 +36,7 @@ local context = {
     isPressurePlateOccupied = function(object) return object.occupied end,
     getPressureOutput = function(object) return object.occupiedOutput or 1 end,
     getWeightPlateLoad = function(object) return object.load end,
-    getOccupantKinds = function(object)
-        return object.occupants
-    end,
+    getOccupantCount = function(object) return object.count end,
     clearDisplay = function(object) object.value, object.lit = nil, nil end,
     setDisplay = function(object, value, lit)
         object.value = value
@@ -67,11 +65,8 @@ sensorObject.occupiedOutput = 255
 checkSample(true, 255, "an occupied tile uses the configured byte")
 checkSample(false, 0, "vacating the tile clears the signal")
 
-local occupied = { definitionId = "ZedComm.OccupancyPlate", occupants = { "animal", "vehicle" } }
-check(occupancy.sample(occupied, context) == 0, "occupancy plate ignores animals and vehicles")
-occupied.occupants = {}
-for i = 1, 260 do occupied.occupants[i] = "zombie" end
-check(occupancy.sample(occupied, context) == 255, "actor count saturates at the byte limit")
+local occupied = { definitionId = "ZedComm.OccupancyPlate", count = 4 }
+check(occupancy.sample(occupied, context) == 4, "occupancy plate supplies the sampled actor count")
 
 local weightObject = { definitionId = "ZedComm.WeightPlate" }
 weightObject.load = 1150.25

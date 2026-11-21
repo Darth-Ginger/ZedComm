@@ -81,7 +81,7 @@ do
     lamp.class = "IsoLightSwitch"
     function lamp.getCanBeModified() return true end
     function lamp.getSprite() return nil end
-    assert(runPlacement(lampTile, { kind = "install-relay", object = lamp }))
+    assert(runPlacement(lampTile, { kind = "fit-lamp-adapter", object = lamp, item = give("ZedComm.BasicAdapter") }))
     local lampId = lamp:getModData().zedcomm.id
     local install = assert(menuAt(lampTile).children.Lamp.options["Install test lamp threshold"])
     install()

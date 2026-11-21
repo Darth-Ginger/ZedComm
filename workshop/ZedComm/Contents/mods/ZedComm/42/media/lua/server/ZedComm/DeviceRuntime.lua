@@ -1,6 +1,4 @@
--- Bind loaded world objects to their device definitions, sample sources and
--- evaluate fixture and board circuits around each simulation pass.
--- Display readings and availability live in memory and are rebuilt on load.
+-- Bind loaded fixtures and update their signals around each simulation pass.
 require "ZedComm/NativeDevices"
 require "ZedComm/Simulation"
 require "ZedComm/SignalModules"
@@ -12,10 +10,13 @@ local Runtime = {}
 local Relay = ZedComm.RelayLamp
 local pressureSensorId = "ZedComm.PressureSensor"
 local weightPlateId = "ZedComm.WeightPlate"
-local network
+local network, topologyVersion
+local entries, sources, sinks, boardEntries = {}, {}, {}, {}
+local routesDirty = false
 local receivers = {}
 local byNetwork = {}
 local readings = {}
+local testSources = {}
 local circuitTime = 0
 
 local function tagOf(object)
@@ -25,8 +26,7 @@ local function tagOf(object)
     end
 end
 
-local function findObject(cell, piece)
-    local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
+local function findObject(square, piece)
     if not square then return nil end
     local objects = square:getObjects()
     for i = 0, objects:size() - 1 do
@@ -37,6 +37,22 @@ local function findObject(cell, piece)
             return object
         end
     end
+end
+
+local function boundObject(cell, entry)
+    local piece = entry.piece
+    local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
+    local object = entry.object
+    if square ~= entry.square or (object and object:getSquare() ~= square) then
+        entry.square, entry.object = square, findObject(square, piece)
+    end
+    return entry.object
+end
+
+-- Registry load callbacks also cover objects replaced on a reused square.
+function Runtime.invalidateBinding(current, id)
+    local entry = current == network and entries[id]
+    if entry then entry.square = nil end
 end
 
 local function isPressureOutput(value)
@@ -181,14 +197,17 @@ local context = {
     end,
     isPressurePlateOccupied = isPressurePlateOccupied,
     getWeightPlateLoad = getWeightPlateLoad,
-    getOccupantKinds = function(object)
-        local kinds = {}
+    getOccupantCount = function(object)
+        local count = 0
         local occupants = object:getSquare():getMovingObjects()
         for i = 0, occupants:size() - 1 do
             local kind = occupantKind(occupants:get(i))
-            if kind then kinds[#kinds + 1] = kind end
+            if kind == "player" or kind == "zombie" then
+                count = count + 1
+                if count == 255 then return count end
+            end
         end
-        return kinds
+        return count
     end,
     clearDisplay = function(object) readings[object] = nil end,
     setDisplay = function(object, value, lit)
@@ -233,7 +252,9 @@ function Runtime.setTestByte(registry, id, input)
     if not value or value < 0 or value > 255 or math.floor(value) ~= value then
         return false, "Enter a whole decimal value from 0 to 255."
     end
-    return registry:setDeviceState(id, { byte = value })
+    local state = registry.network:record(id).state or {}
+    state.byte = value
+    return registry:setDeviceState(id, state)
 end
 
 function Runtime.getSenderModule(piece, definition)
@@ -266,7 +287,7 @@ function Runtime.setLampCircuit(registry, id, layout)
         return false, "No ZedComm lamp at that position."
     end
     if layout ~= nil then
-        local valid, reason = ZedComm.InternalCircuit.compile(layout)
+        local valid, reason = ZedComm.InternalCircuit.validate(layout)
         if not valid then return false, reason end
     end
     local state = registry.network:record(id).state
@@ -309,24 +330,48 @@ local function reportError(piece, message)
     piece.runtimeError = message
 end
 
-local function sampleSource(piece, definition, object)
+function Runtime.getTestSourceValue(object)
+    return testSources[object]
+end
+
+function Runtime.forEachTestSource(visit)
+    for object, value in pairs(testSources) do visit(object, value) end
+end
+
+local function sampleSource(cell, entry)
+    local piece, definition = entry.piece, entry.definition
+    local object = entry.port and boundObject(cell, entry)
+    if piece.definitionId == "ZedComm.DebugByteSource" then
+        if entry.readout and object ~= entry.readout then testSources[entry.readout] = nil end
+        if object then testSources[object] = piece.state and piece.state.byte or 0 end
+        entry.readout = object
+    end
     local packet, reason
-    if object and definition then
+    if object then
         local moduleId
         moduleId, reason = Runtime.getSenderModule(piece, definition)
         if moduleId then
-            local ok, result = pcall(definition.sample, object, context)
+            local ok, reading = pcall(definition.sample, object, context)
             if ok then
-                packet, reason = Modules.Sender.encode(result, definition.readingKind, moduleId)
+                if entry.moduleId == moduleId and entry.reading == reading and entry.packet == piece.packet then return end
+                packet, reason = Modules.Sender.encode(reading, definition.readingKind, moduleId)
+                if not reason then entry.moduleId, entry.reading = moduleId, reading end
             else
-                reason = tostring(result)
+                reason = tostring(reading)
             end
         end
     end
-    local published, publishError = network:setPacket(piece.id, packet)
-    if not published then network:setPacket(piece.id, nil) end
-    local failure = reason or publishError
-    reportError(piece, failure and ("sample failed: " .. tostring(failure)) or nil)
+    if not object or reason then entry.moduleId, entry.reading = nil, nil end
+    if packet or piece.packet then
+        local published, publishError = network:setPacket(piece.id, packet)
+        if not published then
+            network:setPacket(piece.id, nil)
+            entry.moduleId = nil
+            reason = reason or publishError
+        end
+    end
+    entry.packet = piece.packet
+    reportError(piece, reason and ("sample failed: " .. tostring(reason)) or nil)
 end
 
 local function bindReceiver(definition, object, piece, installation)
@@ -365,6 +410,13 @@ local function releaseReceiver(receiver)
     readings[receiver.object] = nil
 end
 
+function Runtime.releaseLamp(id)
+    if not receivers[id] then return end
+    releaseReceiver(receivers[id])
+    receivers[id] = nil
+    routesDirty = true
+end
+
 local boards, boardInputs, pendingBoards = {}, {}, {}
 
 local function releaseBoard(host)
@@ -374,8 +426,19 @@ local function releaseBoard(host)
 end
 
 function Runtime.releaseBoard(id)
+    if not boards[id] then return end
     releaseBoard(boards[id])
     boards[id], pendingBoards[id] = nil, nil
+    routesDirty = true
+end
+
+function Runtime.blocksManualDoorOpening(object)
+    local tag = object and tagOf(object)
+    local host = tag and boards[tag.id]
+    if not host or host.object ~= object or not host.controller
+        or not ZedComm.Door.isEligible(object) or object:isOpen() then return false end
+    local requests = host.controller.requests
+    return requests.lockAction == true or requests.openAction == false
 end
 
 function Runtime.getDoorState(id)
@@ -409,50 +472,144 @@ local function updateCircuitClock(logic, board, object)
     return changed or (logic.deadline ~= nil and logic.deadline <= circuitTime)
 end
 
-local function prepareBoard(cell, piece, previous)
-    local object = findObject(cell, piece)
-    if not object then
-        for port, role in pairs(piece.board.directions) do
-            if role == "source" then network:setPacket(piece.id, nil, port) end
+local function prepareBoard(cell, entry)
+    local piece = entry.piece
+    local id, object = piece.id, boundObject(cell, entry)
+    local host = boards[id]
+    if not host or host.object ~= object then
+        Runtime.releaseBoard(id)
+        if not object then
+            for port, role in pairs(piece.board.directions) do
+                if role == "source" and piece.packets[port] then network:setPacket(id, nil, port) end
+            end
+            return
         end
-        return nil
-    end
-    local host = previous and previous.piece == piece and previous.object == object and previous
-        or { piece = piece, object = object, inputs = {}, runs = {} }
-    if host ~= previous then
-        releaseBoard(previous)
+        host = { piece = piece, object = object }
         if piece.board.profile == "door" then
-            local definition = Definitions.get(piece.definitionId)
+            local definition = entry.definition
             host.controller = definition.bindFixture(object, context, piece.state.nativeLock)
             host.actions = {}
             for action in pairs(piece.board.actions) do
                 host.actions[action] = assert(Modules.newReceiver(definition.receiverModule, host.controller:adapter(action)))
             end
         end
+        boards[id] = host
     end
     if host.board ~= piece.board then
         host.board = piece.board
         host.inputs, host.runs = {}, {}
         host.logic = { timers = {} }
-        pendingBoards[piece.id] = host
+        pendingBoards[id] = host
+        routesDirty = true
     end
-    if updateCircuitClock(host.logic, piece.board, object) then pendingBoards[piece.id] = host end
-    for port, role in pairs(piece.board.directions) do
-        if role == "sink" then
-            local run = piece.ports[port] and network:networkOf(piece.id, port) or nil
-            if host.runs[port] ~= run then
-                host.runs[port], host.inputs[port] = run, nil
-                pendingBoards[piece.id] = host
-                Simulation.markDirty(run)
+    if updateCircuitClock(host.logic, piece.board, object) then pendingBoards[id] = host end
+end
+
+local function prepareReceiver(cell, entry)
+    local piece, definition = entry.piece, entry.definition
+    local id, cableId = piece.id, entry.cableId
+    local object = entry.networkId and boundObject(cell, entry)
+    if not object then
+        Runtime.releaseLamp(id)
+        return
+    end
+    local installation = definition.receiverModule and piece.state and piece.state.module
+    local circuit
+    if piece.definitionId == Relay.ID and piece.state then circuit = piece.state.circuit end
+    local receiver = receivers[id]
+    if not receiver or receiver.object ~= object or receiver.cableId ~= cableId
+        or receiver.installation ~= installation or receiver.circuit ~= circuit then
+        Runtime.releaseLamp(id)
+        local module, reason = bindReceiver(definition, object, piece, installation)
+        local evaluate, circuitError, board
+        if circuit ~= nil then evaluate, circuitError, board = Relay.compileCircuit(piece.state) end
+        receiver = {
+            object = object, piece = piece, cableId = cableId,
+            installation = installation, module = module,
+            circuit = circuit, evaluate = evaluate, circuitError = circuitError,
+            board = board, logic = board and { timers = {} },
+        }
+        receivers[id] = receiver
+        routesDirty = true
+        if reason then reportError(piece, "receiver bind failed: " .. reason) end
+    end
+    -- Deliver the latest input before retrying an installation that regained power.
+    if powerRecovered(receiver) then receiver.reconcile = true end
+    local clockChanged = receiver.board and updateCircuitClock(receiver.logic, receiver.board, object)
+    if receiver.networkId ~= entry.networkId or receiver.reconcile or clockChanged then
+        Simulation.markDirty(entry.networkId)
+    end
+    receiver.networkId = entry.networkId
+end
+
+local function rebuildEntries()
+    local previous = entries
+    entries, sources, sinks, boardEntries = {}, {}, {}, {}
+    for id, piece in pairs(network.pieces) do
+        if piece.definitionId and not piece.definitionUnavailable then
+            local entry = previous[id]
+            if not entry or entry.piece ~= piece then
+                entry = { piece = piece, definition = Definitions.get(piece.definitionId) }
             end
-            if run then
-                local group = boardInputs[run] or {}
-                group[#group + 1] = { host = host, port = port }
-                boardInputs[run] = group
+            local definition = entry.definition
+            if piece.board then
+                boardEntries[#boardEntries + 1] = entry
+            elseif definition then
+                local port = #definition.ports == 1 and definition.ports[1]
+                local expectedRole = piece.role == "source" and "source" or "receiver"
+                if definition.role ~= expectedRole or not port or piece.ports[port] == nil then port = nil end
+                entry.port = port
+                if piece.role == "source" then
+                    sources[#sources + 1] = entry
+                else
+                    entry.cableId = port and piece.ports[port] or nil
+                    entry.networkId = entry.cableId and network:networkOf(id, port) or nil
+                    sinks[#sinks + 1] = entry
+                end
+                if not port or (piece.role ~= "source" and not entry.networkId) then
+                    entry.object, entry.square = nil, nil
+                end
+            end
+            entries[id] = entry
+        end
+    end
+    for id, entry in pairs(previous) do
+        if entries[id] ~= entry then
+            Runtime.releaseLamp(id)
+            Runtime.releaseBoard(id)
+            if entry.readout then testSources[entry.readout] = nil end
+        end
+    end
+    topologyVersion, routesDirty = network.version, true
+end
+
+local function rebuildRoutes()
+    byNetwork, boardInputs = {}, {}
+    for _, receiver in pairs(receivers) do
+        local run = receiver.networkId
+        local group = byNetwork[run] or {}
+        group[#group + 1] = receiver
+        byNetwork[run] = group
+    end
+    for id, host in pairs(boards) do
+        local piece = host.piece
+        for port, role in pairs(piece.board.directions) do
+            if role == "sink" then
+                local run = piece.ports[port] and network:networkOf(id, port) or nil
+                if host.runs[port] ~= run then
+                    host.runs[port], host.inputs[port] = run, nil
+                    pendingBoards[id] = host
+                    Simulation.markDirty(run)
+                end
+                if run then
+                    local group = boardInputs[run] or {}
+                    group[#group + 1] = { host = host, port = port }
+                    boardInputs[run] = group
+                end
             end
         end
     end
-    return host
+    routesDirty = false
 end
 
 function Runtime.prepare(registry)
@@ -464,80 +621,19 @@ function Runtime.prepare(registry)
     if current ~= network then
         for _, previous in pairs(receivers) do releaseReceiver(previous) end
         for _, previous in pairs(boards) do releaseBoard(previous) end
-        network = current
-        receivers, readings, boards = {}, {}, {}
+        network, topologyVersion = current, nil
+        entries, sources, sinks, boardEntries = {}, {}, {}, {}
+        receivers, readings, boards, testSources = {}, {}, {}, {}
+        byNetwork, boardInputs, pendingBoards = {}, {}, {}
     end
-    byNetwork, boardInputs, pendingBoards = {}, {}, {}
     if not network then return end
+    if topologyVersion ~= network.version then rebuildEntries() end
 
     local cell = getCell()
-    local attached, loadedBoards = {}, {}
-    for id, piece in pairs(network.pieces) do
-        if piece.board then
-            loadedBoards[id] = prepareBoard(cell, piece, boards[id])
-        elseif piece.definitionId and not piece.definitionUnavailable then
-            local definition = Definitions.get(piece.definitionId)
-            -- A definition callback takes or returns one value, so only
-            -- single-port definitions are bound. Boards are handled above.
-            local port = definition and #definition.ports == 1 and definition.ports[1]
-            local object = port and piece.ports[port] ~= nil and findObject(cell, piece)
-            local expectedRole = piece.role == "source" and "source" or "receiver"
-            if definition and definition.role ~= expectedRole then object = nil end
-            if piece.role == "source" then
-                sampleSource(piece, definition, object)
-            elseif object and piece.ports[port] then
-                local networkId = network:networkOf(id, port)
-                if networkId then
-                    local cableId = piece.ports[port]
-                    local installation
-                    if definition.receiverModule and piece.state then installation = piece.state.module end
-                    local circuit
-                    if piece.definitionId == Relay.ID and piece.state then circuit = piece.state.circuit end
-                    local previous = receivers[id]
-                    local receiver = previous
-                    if not previous or previous.piece ~= piece or previous.object ~= object
-                        or previous.cableId ~= cableId or previous.installation ~= installation
-                        or previous.circuit ~= circuit then
-                        local module, reason = bindReceiver(definition, object, piece, installation)
-                        local evaluate, circuitError, board
-                        if circuit ~= nil then
-                            evaluate, circuitError, board = Relay.compileCircuit(piece.state)
-                        end
-                        receiver = {
-                            object = object, definition = definition, piece = piece, cableId = cableId,
-                            installation = installation, module = module,
-                            circuit = circuit, evaluate = evaluate, circuitError = circuitError,
-                            board = board, logic = board and { timers = {} },
-                        }
-                        if reason then reportError(piece, "receiver bind failed: " .. reason) end
-                    end
-                    -- Retry after the simulation samples the latest input.
-                    -- This avoids applying a stale ON when power and input
-                    -- both change in the same tick.
-                    if powerRecovered(receiver) then receiver.reconcile = true end
-                    local clockChanged = receiver.board and updateCircuitClock(receiver.logic, receiver.board, object)
-                    if receiver ~= previous or receiver.networkId ~= networkId or receiver.reconcile or clockChanged then
-                        Simulation.markDirty(networkId)
-                    end
-                    receiver.networkId = networkId
-                    attached[id] = receiver
-                    local group = byNetwork[networkId]
-                    if not group then
-                        group = {}
-                        byNetwork[networkId] = group
-                    end
-                    group[#group + 1] = receiver
-                end
-            end
-        end
-    end
-    for id, previous in pairs(receivers) do
-        if attached[id] ~= previous then releaseReceiver(previous) end
-    end
-    for id, previous in pairs(boards) do
-        if loadedBoards[id] ~= previous then releaseBoard(previous) end
-    end
-    receivers, boards = attached, loadedBoards
+    for i = 1, #sources do sampleSource(cell, sources[i]) end
+    for i = 1, #sinks do prepareReceiver(cell, sinks[i]) end
+    for i = 1, #boardEntries do prepareBoard(cell, boardEntries[i]) end
+    if routesDirty then rebuildRoutes() end
 end
 
 function Runtime.deliver(networkId, packet)
@@ -579,7 +675,9 @@ end
 -- Publish only after all input runs for this pass have delivered. The
 -- simulation queues changed output runs for its next pass.
 function Runtime.finish()
-    for id, host in pairs(pendingBoards) do
+    local batch = pendingBoards
+    for id, host in pairs(batch) do
+        if pendingBoards == batch then pendingBoards = {} end
         local piece = host.piece
         local outputs, deadline = piece.evaluate(host.inputs, host.logic)
         host.outputs = outputs
@@ -597,8 +695,9 @@ function Runtime.finish()
                 for input in pairs(host.piece.board.dependencies[action]) do
                     if host.piece.ports[input] or not host.piece.board.directions[input] then controlled = true end
                 end
-                if controlled then
-                    module:receive(Modules.Packet.basicValue(host.outputs and host.outputs[action]))
+                local byte = Modules.Packet.basicValue(host.outputs and host.outputs[action])
+                if controlled and (action ~= "openAction" or byte ~= nil) then
+                    module:receive(byte)
                 else
                     module:detach()
                 end
@@ -609,8 +708,7 @@ function Runtime.finish()
     end
 end
 
--- Native door interactions may bypass the outside lock check. Reconcile after
--- their no-argument update event so a held network lock applies from both sides.
+-- Vanilla reports door toggles through this event after changing the door state.
 Events.OnContainerUpdate.Add(function()
     for _, host in pairs(boards) do
         if host.controller then host.controller:flush() end

@@ -352,7 +352,7 @@ end
 function Network:addEndpoint(id, x, y, z, role, ports, definitionId, state)
     if type(id) ~= "string" or string.find(id, "#", 1, true) then return false, "bad id" end
     if not checkPosition(x, y, z) then return false, "bad position" end
-    if role ~= "source" and role ~= "sink" and (role ~= "cabinet" or definitionId ~= Circuit.CABINET_ID) then
+    if role ~= "source" and role ~= "sink" and (role ~= "cabinet" or not Circuit.cabinets[definitionId]) then
         return false, "bad role"
     end
     local existing = self.pieces[id]
@@ -518,6 +518,9 @@ function Network:setDeviceState(id, state)
         stateCopy.fixtureName = piece.state.fixtureName
     end
     if piece.board then
+        if stateCopy then
+            stateCopy.padlockKeyId, stateCopy.padlockOwner = piece.state.padlockKeyId, piece.state.padlockOwner
+        end
         local evaluate, reason, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, piece.board.profile,
             stateCopy and stateCopy.adapter)
         if not evaluate then return false, reason end
@@ -564,6 +567,33 @@ function Network:renameFixture(id, name)
     piece.state = piece.state or {}
     piece.state.fixtureName = label ~= "" and label or nil
     return true, piece.state.fixtureName
+end
+
+function Network:setFixtureOption(id, option, enabled)
+    local piece = self.pieces[id]
+    if not piece or piece.kind ~= "endpoint" or not piece.definitionId or piece.definitionUnavailable then
+        return false, "That fixture is no longer available."
+    end
+    if type(enabled) ~= "boolean" or (option ~= "showFixtureName"
+        and (option ~= "configureOnDoubleClick" or piece.definitionId ~= "ZedComm.DebugByteSource")) then
+        return false, "That option is unavailable for this fixture."
+    end
+    piece.state = piece.state or {}
+    piece.state[option] = enabled or nil
+    return true
+end
+
+function Network:setPadlock(id, keyId, owner)
+    local piece = self.pieces[id]
+    if not Circuit.canPadlock(piece) then return false, "That board cannot be padlocked." end
+    if owner ~= nil and (keyId == nil or type(owner) ~= "string" or owner == "") then
+        return false, "Invalid remembered player."
+    end
+    if keyId ~= nil and (type(keyId) ~= "number" or keyId < 0 or keyId > 2147483647 or keyId ~= math.floor(keyId)) then
+        return false, "Invalid padlock key."
+    end
+    piece.state.padlockKeyId, piece.state.padlockOwner = keyId, owner
+    return true
 end
 
 function Network:renameCabinetPort(id, port, name)

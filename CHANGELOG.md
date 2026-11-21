@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- A connected door's Open input releases manual movement when its signal is unavailable. A valid zero still commands Close.
+
+- Fixture names and separate lock and door status icons sit closer to their fixtures and below game windows. A door sprite that catches a right-click exposes the menu for reachable fixtures behind it.
+
+- Wall passthroughs carry up to five independent wire runs across one solid wall edge. Drill an opening or fit a plastic or metal cover. The wall retains movement collision.
+
+- Steady device ticks reuse loaded fixture bindings and routing tables. Unchanged source readings skip signal encoding and publication.
+
+- Circuit validation, lamp byte evaluation, and packet evaluation have separate entry points. Placement timed actions share one command table.
+
+- Vanilla lamp fitting is available in normal singleplayer. It uses one matching adapter and requires Electrical 1 for Basic or 3 for Advanced. Removal returns the installed parts, leaves the cable with a free end, and restores the native switch.
+
+- Door boards, fitting, and fixture cable ends can be reached from either face of single-panel doors. Door and contact housings use the native edge orientation and choose the face toward the player. Native E can play a brief opening animation while passage remains blocked. In-game rendering still needs sign-off.
+
+- Added a craftable Window Contact with its own sash art and inventory icon. A fitted intact window sends 255 closed or 0 open over one output.
+
+- Electrical assembly recipes grant 2 to 8 Electrical XP per craft. Cutting signal wire grants 1 Electrical XP per craft.
+
+- Added 8×8 Large and 10×10 XL floor cabinets, a 6×6 Tabletop Cabinet and an 8×8 Wall Cabinet. Every form comes in Basic and Advanced tiers.
+
+- Native Place previews and places Tabletop Cabinets at the furniture's surface height from adjacent floor. Connected Wall Cabinet leads follow the saved wall face down to the floor and toward each linked cable.
+
+- Cabinets and door retrofit boards can use vanilla padlocks. A matching key or a remembered installer can service the locked board. Both padlock modes keep signals flowing.
+
+- Two Mod Options independently control fixture name labels and floating door status markers across saves.
+
 
 - Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 255, open sends 0, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
 

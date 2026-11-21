@@ -14,7 +14,7 @@ Native **Pickup** recovers a pressure plate or display with its settings. Its wi
 
 On a shared tile, a wire draws behind any registered device using a floor overlay sprite.
 
-Right-click a device and open **ZedComm** to find its submenu. For example, **Cabinet (East Entrance)** contains that cabinet's editor, jack labels, connections and pickup action. In debug mode, the device's testing actions appear there too. The shared test-rig command lives under **ZedComm → Debug**.
+Right-click a device and open **ZedComm** to find its submenu. If a door sprite catches the click, the menu also offers reachable ZedComm fixtures behind it. For example, **Cabinet (East Entrance)** contains that cabinet's editor, jack labels, connections and pickup action. In debug mode, the device's testing actions appear there too. The shared test-rig command lives under **ZedComm → Debug**.
 
 ## Starting from a loose wire
 
@@ -39,6 +39,8 @@ When runs join, a custom name takes precedence over a default. If both names are
 
 Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Cabinet → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
 
+Padlock a cabinet or door board from its **ZedComm** submenu. A matching key lets you open the board, edit jacks, and pick up wire directly attached to it. The **Remember me** fitting option saves that permission for the installing survivor. The circuit still runs and a door's Lock/Open inputs still control the door. Remove the padlock before picking up or upgrading a cabinet or removing door adapters. A remembered survivor can remove it without a key and leave the existing copies intact.
+
 Double-click a nearby cabinet to open its editor. On an Advanced cabinet, a jack carrying an Advanced weight packet shows kilograms. Hover over it to see the exact weight and fallback byte. A jack carrying a Basic packet shows the byte.
 
 Use the placed device's rename action, such as **ZedComm → Plate → Rename Plate**, **Rename Cabinet**, or **Rename Display**. The name appears in wiring choices and on the cabinet or adapter title. It follows the fixture through pickup and reload. Leave the field blank to reset it. Jack labels and cable run names can be edited independently.
@@ -53,11 +55,21 @@ Right-click an installed part in the cabinet or Advanced Adapter editor and choo
 
 ## Wall switches
 
-In native **Place**, select the Network Switch, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. A connected cable follows the wall down to the floor.
+Use native **Place** or the ZedComm placement menu to place a floor cabinet, a Tabletop Cabinet on a clear table or countertop, or a Wall Cabinet against a wall. Approach a tabletop from adjacent floor to place or pick up its cabinet. From an adjacent floor tile, wire to a free jack on a raised cabinet.
+
+In native **Place**, select the Network Switch or Wall Cabinet, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. Connected switch and Wall Cabinet leads follow the chosen wall face down to the floor.
 
 ## Multiple wires on one tile
 
 Select the free end of the intended run and left-click an occupied wire tile with the placement cursor. If the connection menu opens, choose **Lay wire here**. The new piece consumes one wire and connects only to the selected run. The context menu also offers **Lay another wire here (N present)** after you exit the cursor. On a shared tile, open **ZedComm → Wire 1 of 2** (or the appropriate wire number). **Inspect**, **Select free end**, **Connect selected run**, and **Pick up** appear inside that wire’s submenu when applicable. Hover a wire’s submenu or one of its actions to outline that exact segment in cyan. Inspect a wire to see the direction of its links and how many ends are free. Numbering uses saved piece IDs, so load order does not change it while the same wires are present. Picking up a wire removes only that segment. Parallel runs use up to five separate lanes across shared tile edges. Wires that turn together follow nested curves. A device lead keeps its centered connection and passing cables use separate lanes. Use the exact-wire outline when inspecting or picking up a segment.
+
+## Wall passthroughs
+
+1. Stand next to a solid wall with a Hand Drill. Right-click the floor and choose **ZedComm**, the wall direction, then **Drill passthrough**. Either face can work on the same fitting. With a Screwdriver and one Plastic Tray or Scrap Metal, you can fit a cover.
+2. Select a free cable end on the near-side wall tile. Use that wall's submenu to **Feed wire through** with a spare Signal Wire, or **Connect to wire** to join a numbered free end on the far-side tile. Continue the run from the far side.
+3. The wall menu shows the number of crossing cables. One edge supports five independent runs. Pickup of a selected crossing wire frees its slot. Disconnect all crossings before sealing an opening.
+
+The wall keeps its movement collision. Covers and occupancy appear in the menu. Demolishing the wall removes the fitting and leaves the now unobstructed cable links in place.
 
 ## Pressure plate output
 
@@ -77,6 +89,12 @@ The occupancy variant uses the same native placement, pickup, and wire tools. It
 ## Weight plate
 
 The weight variant uses the same placement, pickup, and wiring tools. It sends an estimated load from on-foot actors and an overlapping vehicle. See [weight plate calibration and smoke test](weight-plate.md).
+
+## Retrofit a vanilla lamp
+
+1. Carry a Basic Adapter at Electrical 1 or an Advanced Adapter at Electrical 3 in your main inventory. Right-click a modifiable vanilla lamp and choose **ZedComm → Lamp → Fit Basic Adapter** or **Fit Advanced Adapter**. The timed action uses the adapter when it finishes.
+2. Connect the signal wire to the lamp's free end. While wired, the signal controls the lamp. An Advanced Adapter also provides a 3×3 circuit editor. Native pickup carries the installation with the lamp. Reconnect the wire after placing the lamp again.
+3. Choose **ZedComm → Lamp → Remove lamp adapter** to take out the adapter and any installed modules. Leave room in your main inventory for the recovered parts. The wire remains on the floor and the native switch works again. To change tiers, remove the fitted adapter, fit the new one, and reconnect the wire. Older test fittings without a recorded adapter can be removed without returning an adapter.
 
 ## In-game check
 

@@ -23,8 +23,6 @@ local optionsAt = testState.optionsAt
 
 dofile(testState.LUA .. "client/ZedComm/WireVisuals.lua")
 do
-    local debugBefore = getDebug
-    getDebug = function() return true end
     testState.registry, testState.java = start()
     local relay = ZedComm.RelayLamp
     local srcSquare, wireSquare, lampSquare = floorTile(90, 90), floorTile(91, 90), floorTile(92, 90)
@@ -37,6 +35,7 @@ do
         lamp:getModData().movableData = movableData
         function lamp.getCanBeModified() return eligible end
         function lamp.getSprite() return nil end
+        function lamp.invalidateRenderChunkLevel() lamp.renderDirty = true end
         function lamp.canSwitchLight() return lamp.powered end
         function lamp.isActivated() return lamp.active end
         function lamp.setActive(_, value)
@@ -64,21 +63,58 @@ do
 
     local plain = lampAt(floorTile(93, 90), false)
     local fixture = lampAt(lampSquare, true, { zedcommDevice = { def = "SpikeLamp" } })
-    check(not optionsAt(plain:getSquare())["Install test relay"]
-        and not runPlacement(plain:getSquare(), { kind = "install-relay", object = plain }),
+    check(not optionsAt(lampSquare)["Fit Basic Adapter"]
+        and not runPlacement(lampSquare, { kind = "fit-lamp-adapter", object = fixture }),
+        "a lamp cannot be fitted for free")
+    local basic = give("ZedComm.BasicAdapter")
+    check(not optionsAt(plain:getSquare())["Fit Basic Adapter"]
+        and not runPlacement(plain:getSquare(), { kind = "fit-lamp-adapter", object = plain, item = basic }),
         "ineligible lights do not get a retrofit action and reject direct installation")
-    local options = optionsAt(lampSquare)
+    local advanced = give("ZedComm.AdvancedAdapter")
+    player.electrical = 0
+    local options = testState.menuAt(lampSquare).children.Lamp
+    check(options.entries["Fit Basic Adapter (Requires Electrical 1)"].notAvailable
+        and not runPlacement(lampSquare, { kind = "fit-lamp-adapter", object = fixture, item = basic }),
+        "below Electrical 1 the Basic fit is disabled and direct fitting fails")
+    player.electrical = 2
+    options = testState.menuAt(lampSquare).children.Lamp
+    check(options.entries["Fit Advanced Adapter (Requires Electrical 3)"].notAvailable
+        and not runPlacement(lampSquare, { kind = "fit-lamp-adapter", object = fixture, item = advanced })
+        and testState.inventory:contains(advanced),
+        "below Electrical 3 the Advanced fit is disabled and retains the adapter")
+    player.electrical = 3
+    local advancedSquare = floorTile(93, 91)
+    local advancedLamp = lampAt(advancedSquare, true)
+    assert(optionsAt(advancedSquare)["Fit Advanced Adapter"])()
+    check(testState.queued:isValid(), "Advanced action validates at Electrical 3")
+    player.electrical = 2
+    check(not testState.queued:isValid() and not testState.queued:complete()
+        and testState.inventory:contains(advanced), "Advanced validates skill again before fitting")
+    player.electrical = 3
+    check(testState.queued:complete() and advancedLamp:getModData().zedcomm.state.circuit
+        and not testState.inventory:contains(advanced), "Advanced fitting succeeds at Electrical 3")
+    local advancedId = advancedLamp:getModData().zedcomm.id
+    assert(runtime.setLampCircuit(testState.registry, advancedId, ZedComm.InternalCircuit.thresholdPreset()))
+    assert(optionsAt(advancedSquare)["Remove lamp adapter"])()
+    check(testState.queued:isValid() and testState.queued:complete()
+        and testState.inventory:getFirstType("ZedComm.AdvancedAdapter")
+        and testState.inventory:getFirstType("ZedComm.ThresholdModule")
+        and not testState.registry.network.pieces[advancedId],
+        "removing an Advanced retrofit recovers its adapter and board module")
+    player.electrical = 1
+    options = optionsAt(lampSquare)
     testState.queued = nil
-    assert(options["Install test relay"])()
+    assert(options["Fit Basic Adapter"])()
     assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
     fire("OnTick")
+    check(not testState.inventory:contains(basic), "fitting consumes the Basic Adapter outside debug")
     check(housingIs(fixture, 14) and #plain.attachments == 1, "only the installed lamp gets an unplugged housing")
     local id = fixture:getModData().zedcomm.id
     local installed = testState.registry.network:record(id).state.module
     check(installed.id == relay.MODULE and fixture:getModData().movableData.zedcommRelay.id == id
         and fixture:getModData().movableData.zedcommDevice.def == "SpikeLamp",
-        "test install creates the relay endpoint and preserves unrelated moveable data")
-    check(not runPlacement(lampSquare, { kind = "install-relay", object = fixture })
+        "fitting creates the relay endpoint and preserves unrelated moveable data")
+    check(not runPlacement(lampSquare, { kind = "fit-lamp-adapter", object = fixture, item = give("ZedComm.BasicAdapter") })
         and testState.registry.network:record(id).state.module.id == relay.MODULE,
         "reinstall is rejected without changing the installed relay")
     check(optionsAt(lampSquare)["Select relay lamp free end"] and not optionsAt(lampSquare)["Pick up relay lamp"],
@@ -133,7 +169,7 @@ do
 
     options = optionsAt(lampSquare)
     testState.queued = nil
-    assert(options["Disconnect relay wire"])()
+    assert(options["Disconnect lamp wire"])()
     assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
     fire("OnTick")
     check(not relay.isWired(fixture) and manual:isValid() and manual:complete()
@@ -143,7 +179,8 @@ do
     fire("OnTick")
     check(fixture.active, "reconnect applies current source without a new sample")
 
-    local durable = { module = { id = relay.MODULE, config = { label = "workbench" } } }
+    local durable = testState.registry.network:record(id).state
+    durable.module.config.label = "workbench"
     assert(testState.registry:setDeviceState(id, durable))
     fixture:RemoveAttachedAnim(1)
     testState.registry, testState.java = start(save(testState.java))
@@ -276,7 +313,28 @@ do
     assert(testState.registry:link(wireId, id))
     tickLamp(8, false, "reconnecting uses the retained threshold instead of direct on/off")
 
-    getDebug = debugBefore
+    local data = restored:getModData()
+    local inventory = testState.inventory
+    assert(optionsAt(newLampSquare)["Remove lamp adapter"])()
+    inventory.full = true
+    check(not testState.queued:complete() and relay.isWired(restored)
+        and data.movableData.zedcommRelay, "a full inventory leaves the fitted lamp and run intact")
+    inventory.full = false
+    local count = #testState.carried
+    check(testState.queued:complete() and #testState.carried == count + 2
+        and not data.zedcomm and not data.movableData.zedcommRelay and data.movableData.zedcommDevice
+        and #restored.attachments == 1 and restored.renderDirty and not relay.isWired(restored)
+        and testState.registry.network.pieces[wireId] and not testState.registry.network.pieces[id]
+        and nextManual:isValid() and nextManual:complete(),
+        "removal restores the lamp, recovers the saved parts and leaves the wire on the floor")
+    local legacyState = { module = { id = relay.MODULE, config = {} } }
+    local legacyTile = floorTile(94, 90)
+    local legacy = lampAt(legacyTile, true, { zedcommRelay = { id = "legacy-relay", state = legacyState } })
+    fire("OnObjectAdded", legacy)
+    count = #testState.carried
+    assert(optionsAt(legacyTile)["Remove lamp adapter"])()
+    check(testState.queued:complete() and #testState.carried == count,
+        "removing a legacy relay without a recorded adapter does not create an adapter")
 end
 
 testState.finish()

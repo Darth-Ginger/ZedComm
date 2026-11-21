@@ -51,7 +51,28 @@ local kinds = {
 }
 Circuit.kinds = kinds
 
-function Circuit.size(cabinet) return cabinet and 6 or 3 end
+Circuit.cabinets = {
+    [Circuit.CABINET_ID] = { name = "Small Cabinet", sprite = "zedcomm_devices_01_466", cells = 6, pairs = 1 },
+    ["ZedComm.LargeCabinet"] = { name = "Large Cabinet", sprite = "zedcomm_cabinets_01_0", cells = 8, pairs = 2 },
+    ["ZedComm.XLCabinet"] = { name = "XL Cabinet", sprite = "zedcomm_cabinets_01_1", cells = 10, pairs = 3 },
+    ["ZedComm.TabletopCabinet"] = { name = "Tabletop Cabinet", sprite = "zedcomm_cabinets_01_2",
+        cells = 6, pairs = 1, mount = "surface" },
+    ["ZedComm.WallCabinet"] = { name = "Wall Cabinet", sprite = "zedcomm_cabinets_01_3",
+        cells = 8, pairs = 2, mount = "wall" },
+}
+
+local wallCabinetFrames = { north = 3, west = 4, south = 5, east = 6 }
+
+function Circuit.wallCabinetSprite(face, wired)
+    local frame = wallCabinetFrames[face]
+    if frame then return "zedcomm_cabinets_01_" .. (frame + (wired and 4 or 0)) end
+end
+
+
+function Circuit.size(profile)
+    local cabinet = Circuit.cabinets[profile]
+    return cabinet and cabinet.cells or (profile and 6 or 3)
+end
 
 function Circuit.dimensions(profile)
     return Circuit.size(profile), profile == "door" and 3 or Circuit.size(profile)
@@ -59,7 +80,26 @@ end
 
 function Circuit.profileFor(definitionId)
     if definitionId == Circuit.DOOR_ID then return "door" end
-    if definitionId == Circuit.CABINET_ID then return true end
+    if Circuit.cabinets[definitionId] then return definitionId end
+end
+
+function Circuit.canPadlock(piece)
+    return piece and piece.board and (Circuit.cabinets[piece.definitionId] ~= nil or piece.definitionId == Circuit.DOOR_ID)
+end
+
+function Circuit.padlockId(piece)
+    return Circuit.canPadlock(piece) and piece.state.padlockKeyId or nil
+end
+
+function Circuit.remembersPlayer(piece, character)
+    local owner = piece.state.padlockOwner
+    return owner ~= nil and character ~= nil and character:getModData().zedcommPadlockIdentity == owner
+end
+
+function Circuit.canService(piece, character)
+    local keyId = Circuit.padlockId(piece)
+    return keyId == nil or (character ~= nil and (Circuit.remembersPlayer(piece, character)
+        or character:getInventory():haveThisKeyId(keyId) ~= nil))
 end
 
 function Circuit.defaultRotation(kind)
@@ -122,16 +162,22 @@ end
 function Circuit.fixedParts(cabinet)
     if cabinet == "door" then
         return {
-            lock = { column = 1, row = 1, rotation = 0, kind = "input", label = "Lock IN" },
-            open = { column = 2, row = 3, rotation = 270, kind = "input", label = "Open IN" },
-            lockAction = { column = 6, row = 1, rotation = 0, kind = "output", label = "Lock", action = true },
-            openAction = { column = 4, row = 3, rotation = 90, kind = "output", label = "Open", action = true },
+            lock = { column = 1, row = 1, rotation = 0, kind = "input", label = "Lock IN", moveable = false },
+            open = { column = 2, row = 3, rotation = 270, kind = "input", label = "Open IN", moveable = false },
+            lockAction = { column = 6, row = 1, rotation = 0, kind = "output", label = "Lock", action = true, moveable = false },
+            openAction = { column = 4, row = 3, rotation = 90, kind = "output", label = "Open", action = true, moveable = false },
         }
     end
-    return {
-        input = { column = 1, row = 1, rotation = 0, kind = "input" },
-        output = { column = Circuit.size(cabinet), row = 1, rotation = 0, kind = "output" },
-    }
+    local profile = Circuit.cabinets[cabinet]
+    local count, columns = profile and profile.pairs or 1, Circuit.size(cabinet)
+    local parts = {}
+    for index = 1, count do
+        local suffix = index == 1 and "" or "-" .. index
+        local row = 1 + (index - 1) * 3
+        parts["input" .. suffix] = { column = 1, row = row, rotation = 0, kind = "input", moveable = false }
+        parts["output" .. suffix] = { column = columns, row = row, rotation = 0, kind = "output", moveable = false }
+    end
+    return parts
 end
 
 function Circuit.moduleAllowed(kind, cabinet)
@@ -160,11 +206,11 @@ local function occupy(cells, part, columns, rows)
     return true
 end
 
-local function mountFacesEdge(part, size)
+local function mountFacesEdge(part, columns, rows)
     if part.rotation == 0 then return part.column == 1 end
     if part.rotation == 90 then return part.row == 1 end
-    if part.rotation == 180 then return part.column == size end
-    return part.row == size
+    if part.rotation == 180 then return part.column == columns end
+    return part.row == rows
 end
 
 local function collectParts(modules, cabinet)
@@ -180,7 +226,7 @@ local function collectParts(modules, cabinet)
         local ok, reason = occupy(cells, part, size, rows)
         if not ok then return nil, reason end
         local spec = kinds[part.kind]
-        if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size) then
+        if (spec.jack or spec.externalOutputs) and not mountFacesEdge(part, size, rows) then
             return nil, spec.externalOutputs and "Splitter must mount on an edge with its jacks facing out"
                 or "extension jack must face out from an edge"
         end
@@ -293,7 +339,7 @@ local function timedValue(part, id, packet, environment)
     return Packet.basic(state.output or 0), state.due
 end
 
-function Circuit.compilePackets(layout, cabinet, adapter)
+local function validateLayout(layout, cabinet, adapter)
     if type(layout) ~= "table" or type(layout.modules) ~= "table" or type(layout.links) ~= "table" then
         return nil, "invalid internal circuit"
     end
@@ -324,30 +370,20 @@ function Circuit.compilePackets(layout, cabinet, adapter)
     end
     local order = orderParts(parts, drivers)
     if not order then return nil, "internal circuit feedback" end
-    local directions, dependencies, ancestors, partOutputs, actions = {}, {}, {}, {}, {}
-    local hasMains
+    local directions, partOutputs, actions = {}, {}, {}
     for _, id in ipairs(order) do
-        local kind = parts[id].kind
-        if kind == "mainsSource" then hasMains = true end
-        local spec = kinds[kind]
+        local spec = kinds[parts[id].kind]
         local jack = spec.jack
         local action = cabinet == "door" and jack == "source"
         if action then actions[id] = true else directions[id] = jack end
-        local inputs = {}
-        if jack == "sink" or (cabinet == "door" and spec.source) then inputs[id] = true end
-        for _, driver in pairs(drivers[id] or {}) do
-            for input in pairs(ancestors[driver]) do inputs[input] = true end
-        end
-        ancestors[id] = inputs
         if jack == "source" then
             partOutputs[id] = { id }
-            dependencies[id] = inputs
         elseif spec.externalOutputs then
             local ports = {}
             for branch = 1, spec.externalOutputs do
                 local port = Circuit.splitterPort(id, branch)
                 ports[branch] = port
-                directions[port], dependencies[port] = "source", inputs
+                directions[port] = "source"
             end
             partOutputs[id] = ports
         end
@@ -361,6 +397,35 @@ function Circuit.compilePackets(layout, cabinet, adapter)
             if directions[id] ~= "source" or mode ~= "advanced" then return nil, "invalid output mode" end
             modes[id] = mode
         end
+    end
+
+    return { parts = parts, drivers = drivers, order = order, directions = directions, partOutputs = partOutputs,
+        actions = actions, modes = modes, basicCabinet = basicCabinet }
+end
+
+function Circuit.validate(layout, cabinet, adapter)
+    local circuit, reason = validateLayout(layout, cabinet, adapter)
+    return circuit ~= nil, reason
+end
+
+function Circuit.compilePackets(layout, cabinet, adapter)
+    local circuit, reason = validateLayout(layout, cabinet, adapter)
+    if not circuit then return nil, reason end
+    local parts, drivers, order = circuit.parts, circuit.drivers, circuit.order
+    local directions, partOutputs, actions = circuit.directions, circuit.partOutputs, circuit.actions
+    local modes, basicCabinet = circuit.modes, circuit.basicCabinet
+    local dependencies, ancestors = {}, {}
+    local hasMains
+    for _, id in ipairs(order) do
+        local kind = parts[id].kind
+        if kind == "mainsSource" then hasMains = true end
+        local inputs = {}
+        if directions[id] == "sink" or (cabinet == "door" and kinds[kind].source) then inputs[id] = true end
+        for _, driver in pairs(drivers[id] or {}) do
+            for input in pairs(ancestors[driver]) do inputs[input] = true end
+        end
+        ancestors[id] = inputs
+        for _, port in ipairs(partOutputs[id] or {}) do dependencies[port] = inputs end
     end
 
     local function evaluate(inputs, environment)
@@ -424,21 +489,12 @@ function Circuit.doorPreset()
     } }
 end
 
--- Numeric preview and byte-facing fixtures use the same compiled graph.
-function Circuit.compile(layout, cabinet, adapter)
-    local evaluate, reason, board = Circuit.compilePackets(layout, cabinet, adapter)
+function Circuit.compile(layout)
+    local evaluate, reason, board = Circuit.compilePackets(layout)
     if not evaluate then return nil, reason end
-    if not cabinet then
-        return function(value, environment)
-            local outputs, deadline = evaluate({ input = Packet.basic(value) }, environment)
-            return Packet.basicValue(outputs.output), deadline
-        end, nil, board
-    end
-    return function(inputs)
-        local packets, outputs = {}, {}
-        for id, value in pairs(inputs) do packets[id] = Packet.basic(value) end
-        for id, packet in pairs(evaluate(packets)) do outputs[id] = Packet.basicValue(packet) end
-        return outputs
+    return function(value, environment)
+        local outputs, deadline = evaluate({ input = Packet.basic(value) }, environment)
+        return Packet.basicValue(outputs.output), deadline
     end, nil, board
 end
 

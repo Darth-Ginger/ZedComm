@@ -61,6 +61,12 @@ function ModuleVisuals.setAttachment(object, name, matches)
     return changed
 end
 
+function ModuleVisuals.clear(object)
+    if ModuleVisuals.setAttachment(object, nil, isHousing) then
+        object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD)
+    end
+end
+
 function ModuleVisuals.refresh(object, network, piece, port)
     local direction = ZedComm.WireShape.portDirection(network, piece, port)
     local name = prefix .. (firstFrame(object) + (directionFrame[direction] or 0))

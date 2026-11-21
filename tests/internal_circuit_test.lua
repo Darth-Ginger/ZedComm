@@ -3,13 +3,26 @@ package.path = shared .. "?.lua;" .. package.path
 next = nil
 require "ZedComm/InternalCircuit"
 local Circuit = ZedComm.InternalCircuit
+local packet = ZedComm.SignalModules.Packet
 local checks = 0
 local function check(condition, message)
     assert(condition, message)
     checks = checks + 1
 end
 
+local function compileBytes(layout, cabinet, adapter)
+    local evaluate, reason, board = Circuit.compilePackets(layout, cabinet, adapter)
+    if not evaluate then return nil, reason end
+    return function(inputs)
+        local packets, outputs = {}, {}
+        for id, value in pairs(inputs) do packets[id] = packet.basic(value) end
+        for id, output in pairs(evaluate(packets)) do outputs[id] = packet.basicValue(output) end
+        return outputs
+    end, nil, board
+end
+
 local state = Circuit.thresholdPreset()
+check(Circuit.validate(state) == true, "lamp layout validates without an evaluator")
 local run = assert(Circuit.compile(state))
 check(run(8) == 0 and run(50) == 255 and run(115) == 255, "threshold is inclusive")
 check(run(nil) == nil and run(0) == 0, "missing input is distinct from zero")
@@ -60,7 +73,7 @@ local board = {
         { from = "input", output = "out", to = "spare", input = "in" },
     },
 }
-local evaluate, err, topology = Circuit.compile(board, true)
+local evaluate, err, topology = compileBytes(board, true)
 assert(evaluate, err)
 check(topology.directions.arm == "sink" and topology.directions.spare == "source"
     and topology.dependencies.output.arm and topology.dependencies.output.input
@@ -84,15 +97,15 @@ board.modules.threshold.threshold = 120
 check(evaluate({ input = 115, arm = 255 }).output == 255, "cabinet evaluator snapshots module settings")
 for _, fit in ipairs({ { 1, 4, 0 }, { 3, 1, 90 }, { 6, 4, 180 }, { 3, 6, 270 } }) do
     local extension = { kind = "inputExtension", column = fit[1], row = fit[2], rotation = fit[3] }
-    check(Circuit.compile({ modules = { jack = extension }, links = {} }, true), "extension fits on each edge")
+    check(Circuit.validate({ modules = { jack = extension }, links = {} }, true), "extension fits on each edge")
     extension.column = 2
     extension.row = 2
-    check(not Circuit.compile({ modules = { jack = extension }, links = {} }, true), "centered jack is invalid")
+    check(not Circuit.validate({ modules = { jack = extension }, links = {} }, true), "centered jack is invalid")
 end
 board.links[6] = { from = "input", output = "out", to = "gate", input = "a" }
-check(not Circuit.compile(board, true), "each AND terminal accepts one driver")
+check(not Circuit.validate(board, true), "each AND terminal accepts one driver")
 board.links[6].output = "in"
-check(not Circuit.compile(board, true), "cabinet enforces contact direction")
+check(not Circuit.validate(board, true), "cabinet enforces contact direction")
 
 local evaluatorBoard = {
     modules = {
@@ -105,7 +118,7 @@ local evaluatorBoard = {
         { from = "module", output = "out", to = "output", input = "in" },
     },
 }
-local adder = assert(Circuit.compile(evaluatorBoard, true))
+local adder = assert(compileBytes(evaluatorBoard, true))
 check(adder({ input = 60, second = 55 }).output == 115, "Adder sums its two bytes")
 check(adder({ input = 200, second = 200 }).output == 255, "Adder saturates at 255")
 check(adder({ input = 60, second = 0 }).output == 60, "Adder treats zero as a connected input")
@@ -115,7 +128,7 @@ check(adder({ input = 60 }).output == nil and adder({ second = 55 }).output == n
 
 for kind, expected in pairs({ ["or"] = { 0, 255, 255, 255 }, xor = { 0, 255, 255, 0 } }) do
     evaluatorBoard.modules.module.kind = kind
-    local gate = assert(Circuit.compile(evaluatorBoard, true))
+    local gate = assert(compileBytes(evaluatorBoard, true))
     for i, inputs in ipairs({ { 0, 0 }, { 0, 1 }, { 170, 0 }, { 170, 1 } }) do
         check(gate({ input = inputs[1], second = inputs[2] }).output == expected[i], kind .. " boolean truth table")
     end
@@ -127,10 +140,9 @@ inverter.modules.threshold = { kind = "not", column = 2, row = 1, rotation = 0 }
 local invert = assert(Circuit.compile(inverter))
 check(invert(0) == 255 and invert(1) == 0 and invert(255) == 0, "NOT inverts byte truth in the 3x3 adapter")
 check(invert(nil) == nil, "NOT preserves unavailable input")
-local cabinetInverter = assert(Circuit.compile(inverter, true))
+local cabinetInverter = assert(compileBytes(inverter, true))
 check(cabinetInverter({ input = 0 }).output == 255, "the same NOT module also works in a cabinet")
 
-local packet = ZedComm.SignalModules.Packet
 evaluatorBoard.modules.module.kind = "cache"
 evaluatorBoard.links[1].input = "data"
 evaluatorBoard.links[2].input = "enable"
@@ -183,7 +195,10 @@ check(branches[firstPort] == nil and branches[secondPort] == nil, "a Basic split
 check(splitBoard.dependencies[firstPort].input and splitBoard.dependencies[secondPort].input,
     "both splitter outputs depend on the same input run")
 split.outputModes = { [firstPort] = "advanced", [secondPort] = "advanced" }
-check(not Circuit.compilePackets(split, true, "basic"), "a Basic cabinet rejects advanced output configuration")
+local valid, reason = Circuit.validate(split, true, "basic")
+check(not valid and reason == "Advanced output requires an Advanced Cabinet",
+    "validation rejects advanced output configuration on a Basic cabinet")
+check(Circuit.validate(split, true, "advanced"), "validation recognizes advanced splitter outputs")
 local advancedSplit = assert(Circuit.compilePackets(split, true, "advanced"))
 branches = advancedSplit({ input = noFallback })
 check(packet.equal(branches[firstPort], noFallback) and packet.equal(branches[secondPort], noFallback),
@@ -212,10 +227,10 @@ check(multiplied.value.amount == 320 and multiplied.basicValue == 32, "a basic s
 check(read({ input = packet.weight(80), second = packet.weight(4) }).output == nil,
     "the Factor port requires a scalar")
 evaluatorBoard.modules.module.fullReading = false
-local byteMath = assert(Circuit.compile(evaluatorBoard, true, "advanced"))
+local byteMath = assert(compileBytes(evaluatorBoard, true, "advanced"))
 check(byteMath({ input = 120, second = 4 }).output == 255, "byte multiplication saturates")
 evaluatorBoard.modules.module.kind = "subtractor"
-byteMath = assert(Circuit.compile(evaluatorBoard, true, "advanced"))
+byteMath = assert(compileBytes(evaluatorBoard, true, "advanced"))
 check(byteMath({ input = 25, second = 8 }).output == 17 and byteMath({ input = 0, second = 20 }).output == 0
     and byteMath({ input = 25 }).output == nil, "byte subtraction keeps true zero separate from missing")
 

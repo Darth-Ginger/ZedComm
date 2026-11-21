@@ -1,4 +1,8 @@
 {
     "IGUI_ItemCat_ZedComm": "ZedComm",
-    "IGUI_CraftingCategories_ZedComm": "ZedComm"
+    "IGUI_CraftingCategories_ZedComm": "ZedComm",
+    "IGUI_ZedComm_FixtureLabels": "Show fixture name labels",
+    "IGUI_ZedComm_FixtureLabelsTooltip": "Show the world-space names of fixtures with their name label enabled.",
+    "IGUI_ZedComm_DoorMarkers": "Show door status markers",
+    "IGUI_ZedComm_DoorMarkersTooltip": "Show the floating maglock icon and lock and door state."
 }

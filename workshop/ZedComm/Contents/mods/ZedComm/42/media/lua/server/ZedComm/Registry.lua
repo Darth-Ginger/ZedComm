@@ -164,7 +164,7 @@ function SZedCommSystem:addPiece(isoObject)
     if tag.kind == "cable" then
         ok, err = self.network:addCable(tag.id, x, y, z)
     elseif tag.kind == "endpoint" then
-        if tag.definitionId == ZedComm.InternalCircuit.CABINET_ID then
+        if ZedComm.InternalCircuit.cabinets[tag.definitionId] then
             ok, err = self.network:addEndpoint(tag.id, x, y, z, "cabinet", nil, tag.definitionId, tag.state)
         elseif tag.definitionId ~= nil then
             local def = Definitions.get(tag.definitionId)
@@ -234,17 +234,34 @@ function SZedCommSystem:renameRun(cableId, name)
     return self.runLabels:rename(cableId, name)
 end
 
+local function syncFixtureState(self, id)
+    local piece = self.network.pieces[id]
+    self:syncPiece(id, piece.x, piece.y, piece.z)
+    syncLoadedFixture(self, piece)
+end
+
 function SZedCommSystem:renameFixture(id, name)
     local ok, result = self.network:renameFixture(id, name)
-    if ok then
-        local piece = self.network.pieces[id]
-        self:syncPiece(id, piece.x, piece.y, piece.z)
-        syncLoadedFixture(self, piece)
-    end
+    if ok then syncFixtureState(self, id) end
     return ok, result
 end
 
-function SZedCommSystem:renameCabinetPort(id, port, name)
+function SZedCommSystem:setFixtureOption(id, option, enabled)
+    local ok, reason = self.network:setFixtureOption(id, option, enabled)
+    if ok then syncFixtureState(self, id) end
+    return ok, reason
+end
+
+function SZedCommSystem:setPadlock(id, keyId, owner)
+    local ok, reason = self.network:setPadlock(id, keyId, owner)
+    if ok then syncFixtureState(self, id) end
+    return ok, reason
+end
+
+function SZedCommSystem:renameCabinetPort(id, port, name, character)
+    if not ZedComm.InternalCircuit.canService(self.network.pieces[id], character) then
+        return false, "The board is padlocked."
+    end
     local ok, result = self.network:renameCabinetPort(id, port, name)
     if ok then
         local piece = self.network.pieces[id]
@@ -276,6 +293,7 @@ function SZedCommSystem:loadIsoObject(isoObject)
     local tag = tagOf(isoObject)
     if not tag or not isoObject:getSquare() then return end
     if not self.network.pieces[tag.id] then self:addPiece(isoObject) end
+    if ZedComm.DeviceRuntime then ZedComm.DeviceRuntime.invalidateBinding(self.network, tag.id) end
     syncFixture(self, isoObject, tag)
 end
 
@@ -315,10 +333,11 @@ function SZedCommSystem:OnChunkLoaded(wx, wy)
                 local object = objects:get(j)
                 local tag = tagOf(object)
                 if tag then
-                    if tag.definitionId == ZedComm.DoorContact.ID and not ZedComm.DoorContact.host(object) then
+                    if ZedComm.DoorContact.profiles[tag.definitionId] and not ZedComm.DoorContact.host(object) then
                         orphans[#orphans + 1] = object
                     else
                         present[tag.id] = true
+                        if ZedComm.DeviceRuntime then ZedComm.DeviceRuntime.invalidateBinding(self.network, tag.id) end
                     end
                     syncFixture(self, object, tag)
                 end

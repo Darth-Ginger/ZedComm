@@ -212,13 +212,16 @@ local function editLampThreshold(player, object)
     box:addToUIManager()
 end
 
-function Debug.optionsAt(registry, square, fixtureActions)
+function Debug.optionsAt(registry, square, fixtureActions, extraTiles)
     local tileOptions = { { "Place wired byte test rig", Debug.placeByteRig, square } }
     local function add(options, label, callback, target)
         options[#options + 1] = { label, callback, target }
     end
 
     local tagged = taggedOn(square)
+    for _, tile in ipairs(extraTiles or {}) do
+        for _, object in ipairs(taggedOn(tile)) do tagged[#tagged + 1] = object end
+    end
     for _, object in ipairs(tagged) do
         local tag = tagOf(object)
         local piece = registry.network.pieces[tag.id]

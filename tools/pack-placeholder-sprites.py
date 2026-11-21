@@ -13,12 +13,18 @@ CONCEPT_ART = ROOT / "art" / "first-release-concepts"
 OCCUPANCY_ART = CONCEPT_ART / "occupancy-plate.png"
 WEIGHT_ART = CONCEPT_ART / "weight-plate.png"
 DISPLAY_ART = CONCEPT_ART / "numeric-display-blank-face.png"
-FLOOR_CABINET = ROOT / "art" / "cabinet-prototypes" / "network-cabinet-floor-frame.png"
+CABINET_ART = ROOT / "art" / "cabinet-prototypes"
+FLOOR_CABINET = CABINET_ART / "network-cabinet-floor-frame.png"
+LARGE_CABINET = CABINET_ART / "network-cabinet-large.png"
+XL_CABINET = CABINET_ART / "network-cabinet-xl.png"
+TABLETOP_CABINET = CABINET_ART / "network-cabinet-tabletop-frame.png"
+WALL_CABINET = CABINET_ART / "network-cabinet-wall-frame.png"
+CABINET_SET = "zedcomm_cabinets_01"
 CABINET_FRAME = 466
 SWITCH_FRAME = 467
 SWITCH_LEAD_SET = "zedcomm_switch_01"
 SWITCH_FLOOR_SET = "zedcomm_switch_floor_01"
-SWITCH_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
+WALL_MOUNTS = ((80, 183, False), (48, 183, True), (48, 199, False), (80, 199, True))
 SWITCH_ART = (CONCEPT_ART / "manual-network-switch.png", CONCEPT_ART / "manual-network-switch-on.png")
 OCCUPANCY_FIRST_FRAME = 419
 WEIGHT_FIRST_FRAME = 425
@@ -55,6 +61,10 @@ def draw_lead(image, *points):
     pen = ImageDraw.Draw(image)
     for width, color in LEAD_STROKES:
         pen.line(points, fill=color, width=width)
+
+
+def wall_lead_foot(center, facing):
+    return center, 216 if facing < 2 else 232
 
 
 def ints(*values):
@@ -276,9 +286,9 @@ def plate_frames(source, terminal_mask=PLATE_TERMINAL_MASK, sockets=PLATE_SOCKET
         yield plate_frame(body, direction, sockets=sockets)
 
 
-def write_icon(source, target):
+def write_icon(source, target, width=56):
     icon = Image.new("RGBA", (64, 64))
-    art, _, _ = sprite_frame(source, 56, 64)
+    art, _, _ = sprite_frame(source, width, 64)
     icon.alpha_composite(art, ((64 - art.width) // 2, (64 - art.height) // 2))
     icon.save(target)
 
@@ -294,8 +304,63 @@ def texture_page(name, atlas, metadata, count):
     return pack_string(name) + ints(count, 1) + metadata + ints(len(png)) + png
 
 
+def cabinet_variants_page():
+    frames = [sprite_frame(LARGE_CABINET, 88, 239), sprite_frame(XL_CABINET, 68, 239),
+              sprite_frame(TABLETOP_CABINET, 70, 234)]
+    wall, _, _ = sprite_frame(WALL_CABINET, 44, 187)
+    wired = []
+    for facing, (x, y, mirror) in enumerate(WALL_MOUNTS):
+        art = ImageOps.mirror(wall) if mirror else wall
+        offset = (x - art.width // 2, y - art.height)
+        frames.append((art, *offset))
+        tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
+        draw_lead(tile, (x, y - 3), wall_lead_foot(x, facing))
+        tile.alpha_composite(art, offset)
+        box = tile.getbbox()
+        wired.append((tile.crop(box), box[0], box[1]))
+    frames.extend(wired)
+    atlas = Image.new("RGBA", (TILE_WIDTH * len(frames), TILE_HEIGHT))
+    metadata = bytearray()
+    for index, (art, x, y) in enumerate(frames):
+        atlas_x = index * TILE_WIDTH
+        atlas.alpha_composite(art, (atlas_x, 0))
+        metadata += sprite_record(index, atlas_x, 0, art.width, art.height, x, y, CABINET_SET)
+    return texture_page(CABINET_SET, atlas, metadata, len(frames))
+
+
 DOOR_BASES = ((68, 194), (60, 194), (68, 198), (60, 198))
 DOOR_FAR_BASES = ((116, 218), (12, 218), (116, 222), (12, 222))
+
+
+def door_status_icons(textures):
+    idle = "#121916"
+    red, green = "#ff6964", "#81df93"
+    for name, color in (("Locked", red), ("Unlocked", green)):
+        image = Image.new("RGBA", (16, 16))
+        pen = ImageDraw.Draw(image)
+        pen.rounded_rectangle((0, 0, 15, 15), radius=3, fill=idle)
+        if name == "Locked":
+            pen.arc((4, 2, 11, 10), 180, 360, fill=color, width=2)
+            pen.line((4, 5, 4, 8), fill=color, width=2)
+            pen.line((10, 5, 10, 8), fill=color, width=2)
+        else:
+            pen.arc((7, 2, 14, 10), 180, 360, fill=color, width=2)
+            pen.line((7, 5, 7, 8), fill=color, width=2)
+        pen.rectangle((3, 7, 12, 13), fill=color)
+        pen.point((8, 10), fill=idle)
+        image.save(textures / f"ZedCommMaglock{name}.png")
+
+    for name, color in (("Closed", red), ("Open", green)):
+        image = Image.new("RGBA", (16, 16))
+        pen = ImageDraw.Draw(image)
+        pen.rounded_rectangle((0, 0, 15, 15), radius=3, fill=idle)
+        pen.rectangle((4, 2, 11, 13), outline=color)
+        if name == "Open":
+            pen.polygon(((5, 3), (9, 5), (9, 14), (5, 13)), fill=color, outline=idle)
+            pen.line((5, 3, 9, 5, 9, 14, 5, 13, 5, 3), fill=color)
+        else:
+            pen.point((9, 8), fill=color)
+        image.save(textures / f"ZedCommDoor{name}.png")
 
 
 def door_pages():
@@ -356,41 +421,55 @@ def door_pages():
     return b"".join(pages) + texture_page("zedcomm_door_floor_010", floor, floor_metadata, 288)
 
 
-def contact_pages(textures):
-    body_atlas = Image.new("RGBA", (1536, 1536))
-    floor_atlas = Image.new("RGBA", (1536, 256))
+def contact_pages(textures, window=False):
+    tileset = "zedcomm_window_contact_01" if window else "zedcomm_contact_01"
+    if window:
+        art, _, _ = sprite_frame(CONCEPT_ART / "window-contact.png", 18, 256)
+        sensor_art, magnet_art = art.crop((0, 0, 11, art.height)), art.crop((11, 0, art.width, art.height))
+    reverse_count = 1 if window else 2
+    body_atlas = Image.new("RGBA", (1536, 768 * reverse_count))
+    floor_atlas = None if window else Image.new("RGBA", (1536, 256))
     body_records, floor_records = [], {}
     icon = None
     for facing in range(4):
         mirror = facing in (1, 3)
-        for reverse in range(2):
+        for reverse in range(reverse_count):
             hinge_x, hinge_y = (DOOR_FAR_BASES if reverse else DOOR_BASES)[facing]
             for closed in range(2):
                 for mode in range(6):
-                    index = facing * 24 + reverse * 12 + closed * 6 + mode
+                    index = (facing * reverse_count + reverse) * 12 + closed * 6 + mode
                     tile = Image.new("RGBA", (128, 256))
                     ground = Image.new("RGBA", (128, 256))
                     # The sensor sits below the actuator so both remain readable.
                     x, y = hinge_x, hinge_y - 112
                     towards_leaf = (-1 if mirror else 1) * (-1 if reverse else 1)
-                    draw = ImageDraw.Draw(tile)
-                    sensor = (x - 5, y, x + 4, y + 23)
-                    draw.rectangle(sensor, fill="#c2bda4", outline="#373d38")
-                    draw.line((x-2,y+4,x+1,y+4), fill="#737a6c", width=2)
-                    draw.line((x-2,y+19,x+1,y+19), fill="#737a6c", width=2)
-                    magnet_x = x + towards_leaf * (12 if closed else 22)
-                    draw.rectangle((magnet_x-3,y+3,magnet_x+3,y+20), fill="#959784", outline="#373d38")
+                    if window:
+                        sensor = ImageOps.mirror(sensor_art) if towards_leaf < 0 else sensor_art
+                        magnet = ImageOps.mirror(magnet_art) if towards_leaf < 0 else magnet_art
+                        tile.alpha_composite(sensor, (x - sensor.width // 2, y))
+                        magnet_x = x + towards_leaf * 10
+                        tile.alpha_composite(magnet, (magnet_x - magnet.width // 2, y - (0 if closed else 12)))
+                        lead_y = y + sensor.height
+                    else:
+                        draw = ImageDraw.Draw(tile)
+                        sensor = (x - 5, y, x + 4, y + 23)
+                        draw.rectangle(sensor, fill="#c2bda4", outline="#373d38")
+                        draw.line((x-2,y+4,x+1,y+4), fill="#737a6c", width=2)
+                        draw.line((x-2,y+19,x+1,y+19), fill="#737a6c", width=2)
+                        magnet_x = x + towards_leaf * (12 if closed else 22)
+                        draw.rectangle((magnet_x-3,y+3,magnet_x+3,y+20), fill="#959784", outline="#373d38")
+                        lead_y = y + 23
                     if mode:
                         lane_x = hinge_x - 6
-                        draw_lead(tile, (x,y+23), (lane_x,y+28), (lane_x,hinge_y))
+                        draw_lead(tile, (x,lead_y), (lane_x,lead_y+5), (lane_x,hinge_y))
                         dx, dy = ((0,0), *WIRE_DIRECTIONS)[mode-1]
                         draw_lead(ground, (lane_x,hinge_y), (lane_x,hinge_y+8), (64+dx,224+dy))
                     box = tile.getbbox()
                     left, top, right, bottom = box
                     ax, ay = index % 12 * 128, index // 12 * 192
                     body_atlas.alpha_composite(tile.crop(box), (ax,ay))
-                    body_records.append(sprite_record(index, ax,ay,right-left,bottom-top,left,top,"zedcomm_contact_01"))
-                    if closed == 0:
+                    body_records.append(sprite_record(index, ax,ay,right-left,bottom-top,left,top,tileset))
+                    if closed == 0 and not window:
                         slot = facing * 12 + reverse * 6 + mode
                         box = ground.getbbox() or (0,192,1,193)
                         left,top,right,bottom = box
@@ -399,11 +478,14 @@ def contact_pages(textures):
                         floor_records[slot] = sprite_record(slot,ax,ay,right-left,bottom-top,left,top,"zedcomm_contact_floor_01")
                     if index == 6:
                         icon = tile.crop(tile.getbbox())
+    if window:
+        write_icon(CONCEPT_ART / "window-contact.png", textures / "Item_ZedCommWindowContact.png", width=29)
+        return texture_page(tileset + "0", body_atlas, b"".join(body_records), 48)
     icon.thumbnail((48,48),Image.Resampling.NEAREST)
     inventory = Image.new("RGBA",(64,64))
     inventory.alpha_composite(icon,((64-icon.width)//2,(64-icon.height)//2))
     inventory.save(textures / "Item_ZedCommDoorContact.png")
-    return (texture_page("zedcomm_contact_010", body_atlas, b"".join(body_records), 96)
+    return (texture_page(tileset + "0", body_atlas, b"".join(body_records), 96)
             + texture_page("zedcomm_contact_floor_010", floor_atlas,
                            b"".join(floor_records[i] for i in range(48)), 48))
 
@@ -427,7 +509,7 @@ def switch_page(textures):
     floor_metadata = bytearray()
     directions = ((0, 0), *WIRE_DIRECTIONS)
 
-    for facing, (center, baseline, mirror) in enumerate(SWITCH_MOUNTS):
+    for facing, (center, baseline, mirror) in enumerate(WALL_MOUNTS):
         back_edge = TILE_CENTER[1] - TILE_WIDTH // 4 + abs(center - TILE_CENTER[0]) // 2
         wall_base = (center, back_edge if facing < 2 else 2 * TILE_CENTER[1] - back_edge)
         for state, frame in enumerate(body):
@@ -441,7 +523,7 @@ def switch_page(textures):
             for direction, (dx, dy) in enumerate(directions):
                 tile = Image.new("RGBA", (TILE_WIDTH, TILE_HEIGHT))
                 socket = (center, baseline - 3)
-                foot = (center, 216 if facing < 2 else 232)
+                foot = wall_lead_foot(center, facing)
                 draw_lead(tile, socket, foot)
                 tile.alpha_composite(frame, (center - width // 2, baseline - height))
                 x, y, right, bottom = tile.getbbox()
@@ -467,10 +549,10 @@ def switch_page(textures):
     body[0].thumbnail((52, 52), Image.Resampling.LANCZOS)
     icon.alpha_composite(body[0], ((64 - body[0].width) // 2, (64 - body[0].height) // 2))
     icon.save(textures / "Item_ZedCommNetworkSwitch.png")
-    count = len(SWITCH_MOUNTS) * len(body)
+    count = len(WALL_MOUNTS) * len(body)
     return (texture_page(SET + "_switch", atlas, metadata, count)
             + texture_page(SWITCH_LEAD_SET, wired, wired_metadata, count * len(directions))
-            + texture_page(SWITCH_FLOOR_SET, floor, floor_metadata, len(SWITCH_MOUNTS) * len(directions)))
+            + texture_page(SWITCH_FLOOR_SET, floor, floor_metadata, len(WALL_MOUNTS) * len(directions)))
 
 
 def route_page(start):
@@ -716,19 +798,24 @@ def main():
     cabinet_metadata = sprite_record(CABINET_FRAME, 0, 0, right - left, bottom - top, left, top)
     cabinet_page = texture_page(SET + "_cabinet", cropped_cabinet, cabinet_metadata, 1)
     switch_frames = switch_page(textures)
+    door_status_icons(textures)
     write_icon(FLOOR_CABINET, textures / "Item_ZedCommSmallCabinet.png")
+    write_icon(LARGE_CABINET, textures / "Item_ZedCommLargeCabinet.png")
+    write_icon(XL_CABINET, textures / "Item_ZedCommXLCabinet.png", width=22)
+    write_icon(TABLETOP_CABINET, textures / "Item_ZedCommTabletopCabinet.png")
+    write_icon(WALL_CABINET, textures / "Item_ZedCommWallCabinet.png")
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 14) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
-        + weight_face + door_pages() + contact_pages(textures)
+        b"PZPK" + ints(1, 16) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        + weight_face + door_pages() + contact_pages(textures) + cabinet_variants_page() + contact_pages(textures, window=True)
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 10) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 12) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
-    switch_count = len(SWITCH_MOUNTS) * len(SWITCH_ART)
+    switch_count = len(WALL_MOUNTS) * len(SWITCH_ART)
     tiles += ints(7, 2, 1, SWITCH_FRAME + switch_count)
     for index in range(count):
         if (module_start <= index < plate_start or compact_start <= index < lane_start
@@ -748,7 +835,7 @@ def main():
     tiles += ints(8, 5, 3, switch_count * 5)
     for props in wall_overlays:
         tiles += props * (len(SWITCH_ART) * 5)
-    floor_count = len(SWITCH_MOUNTS) * 5
+    floor_count = len(WALL_MOUNTS) * 5
     tiles += f"{SWITCH_FLOOR_SET}\n{SWITCH_FLOOR_SET}.png\n".encode("ascii")
     tiles += ints(8, 3, 4, floor_count)
     tiles += (ints(1) + b"FloorOverlay\n\n") * floor_count
@@ -765,6 +852,11 @@ def main():
     tiles += ints(0) * 96
     tiles += b"zedcomm_contact_floor_01\nzedcomm_contact_floor_01.png\n" + ints(12, 4, 10, 48)
     tiles += (ints(1) + b"FloorOverlay\n\n") * 48
+    cabinet_count = 3 + 2 * len(WALL_MOUNTS)
+    tiles += f"{CABINET_SET}\n{CABINET_SET}.png\n".encode("ascii") + ints(cabinet_count, 1, 11, cabinet_count)
+    tiles += ints(0) * 2 + ints(1) + b"IsTableTop\n\n" + b"".join(wall_overlays) * 2
+    tiles += b"zedcomm_window_contact_01\nzedcomm_window_contact_01.png\n" + ints(12, 4, 12, 48)
+    tiles += ints(0) * 48
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 
