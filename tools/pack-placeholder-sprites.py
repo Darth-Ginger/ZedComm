@@ -332,7 +332,38 @@ DOOR_BASES = ((68, 194), (60, 194), (68, 198), (60, 198))
 DOOR_FAR_BASES = ((116, 218), (12, 218), (116, 222), (12, 222))
 
 
-def door_pages(textures):
+def door_status_icons(textures):
+    idle = "#121916"
+    red, green = "#ff6964", "#81df93"
+    for name, color in (("Locked", red), ("Unlocked", green)):
+        image = Image.new("RGBA", (16, 16))
+        pen = ImageDraw.Draw(image)
+        pen.rounded_rectangle((0, 0, 15, 15), radius=3, fill=idle)
+        if name == "Locked":
+            pen.arc((4, 2, 11, 10), 180, 360, fill=color, width=2)
+            pen.line((4, 5, 4, 8), fill=color, width=2)
+            pen.line((10, 5, 10, 8), fill=color, width=2)
+        else:
+            pen.arc((7, 2, 14, 10), 180, 360, fill=color, width=2)
+            pen.line((7, 5, 7, 8), fill=color, width=2)
+        pen.rectangle((3, 7, 12, 13), fill=color)
+        pen.point((8, 10), fill=idle)
+        image.save(textures / f"ZedCommMaglock{name}.png")
+
+    for name, color in (("Closed", red), ("Open", green)):
+        image = Image.new("RGBA", (16, 16))
+        pen = ImageDraw.Draw(image)
+        pen.rounded_rectangle((0, 0, 15, 15), radius=3, fill=idle)
+        pen.rectangle((4, 2, 11, 13), outline=color)
+        if name == "Open":
+            pen.polygon(((5, 3), (9, 5), (9, 14), (5, 13)), fill=color, outline=idle)
+            pen.line((5, 3, 9, 5, 9, 14, 5, 13, 5, 3), fill=color)
+        else:
+            pen.point((9, 8), fill=color)
+        image.save(textures / f"ZedCommDoor{name}.png")
+
+
+def door_pages():
     pages = []
     floor = Image.new("RGBA", (2048, 1152))
     floor_records = {}
@@ -371,11 +402,6 @@ def door_pages(textures):
                                 dx, dy = ((0, 0), *WIRE_DIRECTIONS)[mode-1]
                                 draw_lead(ground, (lane_x,hinge_y), foot, (64+dx,224+dy))
                         ImageDraw.Draw(body).text((7 if mirror else 24, 35), "L O", fill="#d0c7aa")
-                        if facing == 0 and reverse == 0 and lock == 0 and opener == 0:
-                            suffix = "Locked" if locked else "Unlocked"
-                            icon = body.crop(body.getbbox())
-                            icon.thumbnail((24, 20), Image.Resampling.LANCZOS)
-                            icon.save(textures / f"ZedCommMaglock{suffix}.png")
                         tile.alpha_composite(body, (body_x, body_y))
                         box = tile.getbbox()
                         x, y, right, bottom = box
@@ -772,6 +798,7 @@ def main():
     cabinet_metadata = sprite_record(CABINET_FRAME, 0, 0, right - left, bottom - top, left, top)
     cabinet_page = texture_page(SET + "_cabinet", cropped_cabinet, cabinet_metadata, 1)
     switch_frames = switch_page(textures)
+    door_status_icons(textures)
     write_icon(FLOOR_CABINET, textures / "Item_ZedCommSmallCabinet.png")
     write_icon(LARGE_CABINET, textures / "Item_ZedCommLargeCabinet.png")
     write_icon(XL_CABINET, textures / "Item_ZedCommXLCabinet.png", width=22)
@@ -781,7 +808,7 @@ def main():
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
         b"PZPK" + ints(1, 16) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
-        + weight_face + door_pages(textures) + contact_pages(textures) + cabinet_variants_page() + contact_pages(textures, window=True)
+        + weight_face + door_pages() + contact_pages(textures) + cabinet_variants_page() + contact_pages(textures, window=True)
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.

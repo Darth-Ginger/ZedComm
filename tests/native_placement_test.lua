@@ -414,7 +414,7 @@ do
     native:clearCache()
     getCell():setDrag(native, 0)
     local lead = selectNative(wireTile, function(entry) return entry.zedcommPickup and entry.zedcommPickup.id == wireId end)
-    assert(testState.registry:setCabinetPadlock(cabinetId, 42))
+    assert(testState.registry:setPadlock(cabinetId, 42))
     check(not ZedComm.NativePlacementActions.canPickUp(native, lead.zedcommPickup, wireTile),
         "native Pickup rechecks a selected cabinet lead after the cabinet is locked")
     native:clearCache()
@@ -424,7 +424,7 @@ do
         if entry.zedcommPickup and entry.zedcommPickup.id == wireId then offered = true end
     end
     check(not offered, "native Pickup omits wire directly attached to a padlocked cabinet")
-    assert(testState.registry:setCabinetPadlock(cabinetId, nil))
+    assert(testState.registry:setPadlock(cabinetId, nil))
     native:clearCache()
     selectNative(wireTile, function(entry) return entry.zedcommPickup and entry.zedcommPickup.id == wireId end)
     getCell():setDrag(nil, 0)

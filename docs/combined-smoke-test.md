@@ -9,7 +9,8 @@ If this save is missing setup items, open the debug console and grant only the m
 ```lua
 local inv = getPlayer():getInventory()
 inv:AddItem("Base.Screwdriver")
-inv:AddItem("Base.Padlock")
+inv:AddItems("Base.Padlock", 2)
+inv:AddItem("Base.HandDrill")
 inv:AddItems("ZedComm.DebugByteSource", 2)
 inv:AddItems("ZedComm.AdvancedAdapter", 2)
 inv:AddItem("ZedComm.DoorContact")
@@ -19,18 +20,19 @@ inv:AddItem("ZedComm.NumericDisplay")
 inv:AddItems("ZedComm.SignalWire", 16)
 ```
 
-Bring a screwdriver, a vanilla padlock, loose Signal Wire and the existing rigs. Use two Test Byte Sources in debug or two Network Switches in normal play to drive the door's Lock and Open jacks independently. Leave the window from Run B fitted until after reload.
+Bring a screwdriver, two vanilla padlocks, loose Signal Wire and the existing rigs. Use two Test Byte Sources in debug or two Network Switches in normal play to drive the door's Lock and Open jacks independently. Leave the window from Run B fitted until after reload.
 
-- [ ] **Door access and art.** At an existing wired door, close and unlock it with both inputs at `0`. From each face, open **ZedComm → Door → Open Door Board**, then use **Disconnect door jack (Open IN)** and reconnect from inside using an accessible wire end on that side. Verify the maglock and each connected lead from both faces. Check that Lock and Door indicators stay legible and that the fixtures stay aligned while the door opens. Use one north-facing door and repeat the cable connection at a west-facing door from one tile beyond the loose end. The character should approach on that same side. If a Door Contact is fitted, check its independent housing and lead without repeating the previously verified signal sequence.
-- [ ] **Door requests.** With the door shut, set Lock and Open to `255`. Confirm it stays shut and mouse interaction cannot open it from either side. Disconnect the source at the other end of the Lock run, leaving the Lock jack wired. Expect unlock and open with Open still `255`. Set Open to `0`. Expect closure and the mouse action to respect the held Close request. **Native E is a separate release blocker.** Keep it out of this pass until there is a supported interception path.
+- [ ] **Door access and art.** At one closed, wired door, open the board from the inside. Use native placement to connect a free end to the door from that side, starting one tile beyond the cable. The character should approach on the same side. Check the maglock, Door Contact housing and leads from both faces through one open and close. Check the fixture names and the two status icons near the hardware. Right-click the open door where its sprite covers a reachable source and confirm the source submenu appears. With Lock OFF, send 0 to Open IN and confirm closure. Cut the cable at the Open source and confirm that manual movement returns while the Open jack stays wired.
+- **Carry forward.** Ordinary wiring, the held-close mouse result and blocked native E passage in both directions were checked in game. The door runtime suite covers the held Lock mouse guard and fail-safe unlock when the connected Lock run loses its source. Recheck these only if a regression appears.
+- [ ] **Wall passthrough.** Drill one opening in a solid wall and route five independent wires through it. Confirm that the menu shows 5/5, a sixth crossing is unavailable, and the wall still blocks movement. Pick up one crossing and confirm the other four remain connected. Leave the four in place for reload.
 - [ ] **Cabinet mounting.** Use native **Place** on a clear countertop while standing a few tiles away. Confirm the character walks to a reachable adjacent tile, the cabinet lands at ghost height, and native **Pickup** returns it. At the wall cabinet, confirm a connected jack has a continuous lead from the chosen wall face to the floor wire. Leave it wired for reload.
-- [ ] **Cabinet padlock.** Use a working cabinet-to-display circuit, ideally the wall cabinet, with one free jack and an unused padlock. Choose **Padlock cabinet** and keep the matching keys it gives you. Confirm the board stays closed and the display still responds. A free jack must reject new wiring, an attached jack must reject disconnect, and native **Pickup** must omit its directly attached wire. Leave the padlock on for reload.
+- [ ] **Cabinet padlock.** Use a working cabinet-to-display circuit, ideally the wall cabinet, with one free jack and an unused padlock. Choose **Padlock cabinet**. Confirm the matching key opens the board, then put away all matching keys. Confirm the board stays closed and the display still responds. A free jack must reject new wiring, an attached jack must reject disconnect, and native **Pickup** must omit its directly attached wire. Leave the padlock on for reload. At the wired door, fit **Padlock door board (Remember me)**, put away its keys, and confirm the board opens from inside and the wired inputs still control the door.
 
 **Run notes**
 
 ## 2. Shared reload
 
-- [ ] Exit fully and launch **without debug**, with crafting and building cheats off. Check the wall lead is present once and the padlocked cabinet still runs and blocks access. Put away or drop the matching keys and verify removal is refused. Retrieve one matching key, remove the padlock, and confirm the board and jack are usable again. If using the wall cabinet, pick it up and confirm the lead clears.
+- [ ] Exit fully and launch **without debug**, with crafting and building cheats off. Check that the wall passthrough still shows 4/5 and its four runs are connected. Check the wall lead is present once and the padlocked cabinet still runs and blocks access. Put away or drop the matching keys and verify removal is refused. Retrieve a cabinet key, remove that padlock, and confirm the board and jack are usable again. Open the remembered door board without its keys, confirm you can edit a jack, then remove the padlock keyless. If using the wall cabinet, pick it up and confirm the lead clears.
 - [ ] Open and close the previously fitted Window Contact host. Expect `0` open and `255` closed, with the same wire and visible housing. If the window is disposable, break the glass and expect the display's **no signal** indication. Remove the sensor independently and verify the cable end is free and the contact item returns.
 
 **Reload notes**

@@ -83,7 +83,7 @@ local function addPlacedPieces(cursor, objects, placement, registry)
     end
     for _, entry in ipairs(pieces) do
         if entry.piece.kind == "cable" then wireNumber = wireNumber + 1 end
-        if placement.canPickUp(registry, entry) then
+        if placement.canPickUp(registry, entry, cursor.character) then
             local name = entry.object:getName()
             local detail
             if entry.piece.kind == "cable" then

@@ -83,8 +83,23 @@ function Circuit.profileFor(definitionId)
     if Circuit.cabinets[definitionId] then return definitionId end
 end
 
-function Circuit.cabinetPadlockId(piece)
-    return Circuit.cabinets[piece.definitionId] and piece.state and piece.state.padlockKeyId or nil
+function Circuit.canPadlock(piece)
+    return piece and piece.board and (Circuit.cabinets[piece.definitionId] ~= nil or piece.definitionId == Circuit.DOOR_ID)
+end
+
+function Circuit.padlockId(piece)
+    return Circuit.canPadlock(piece) and piece.state.padlockKeyId or nil
+end
+
+function Circuit.remembersPlayer(piece, character)
+    local owner = piece.state.padlockOwner
+    return owner ~= nil and character ~= nil and character:getModData().zedcommPadlockIdentity == owner
+end
+
+function Circuit.canService(piece, character)
+    local keyId = Circuit.padlockId(piece)
+    return keyId == nil or (character ~= nil and (Circuit.remembersPlayer(piece, character)
+        or character:getInventory():haveThisKeyId(keyId) ~= nil))
 end
 
 function Circuit.defaultRotation(kind)

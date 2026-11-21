@@ -695,8 +695,9 @@ function Runtime.finish()
                 for input in pairs(host.piece.board.dependencies[action]) do
                     if host.piece.ports[input] or not host.piece.board.directions[input] then controlled = true end
                 end
-                if controlled then
-                    module:receive(Modules.Packet.basicValue(host.outputs and host.outputs[action]))
+                local byte = Modules.Packet.basicValue(host.outputs and host.outputs[action])
+                if controlled and (action ~= "openAction" or byte ~= nil) then
+                    module:receive(byte)
                 else
                     module:detach()
                 end

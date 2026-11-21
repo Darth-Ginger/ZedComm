@@ -88,6 +88,10 @@ return function()
         function tile.isSolid() return false end
         function tile.isSolidTrans() return false end
         function tile.isBlockedTo(_, other) return tile.blocked == other end
+        function tile:getWall(north) return north and self.northWall or not north and self.westWall or nil end
+        function tile:getDoorOrWindow() return self.doorOrWindow end
+        function tile:getWindowFrameTo() return self.windowFrame end
+        function tile:getHoppableTo() return self.hoppable end
         function tile.getMovingObjects() return list(tile.actors or {}) end
         function tile.AddTileObject(_, object) tile.objects[#tile.objects + 1] = object end
         function tile.transmitRemoveItemFromSquare(_, object)
@@ -106,6 +110,7 @@ return function()
             if item:getFullType() == fullType then return item end
         end
     end
+    function inventory.haveThisKeyId() return nil end
     function inventory.contains(_, item) return item.container == inventory end
     function inventory.hasRoomFor() return not inventory.full end
     function inventory.AddItem(_, item)
@@ -146,7 +151,8 @@ return function()
         return item
     end
     Perks = { Electricity = 1 }
-    local player = { tile = nil, electrical = 3 }
+    local player = { tile = nil, electrical = 3, modData = {} }
+    function player:getModData() return self.modData end
     function player:getPerkLevel(perk) return perk == Perks.Electricity and self.electrical or 0 end
     function player.getInventory() return inventory end
     function player.getPlayerNum() return 0 end

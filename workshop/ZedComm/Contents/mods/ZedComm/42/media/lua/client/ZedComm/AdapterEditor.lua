@@ -34,7 +34,7 @@ end
 local function selectedHost(player, registry, target, view)
     local placement = ZedComm.PlayerPlacement
     local entry = placement.getRegistry() == registry and placement.resolve(registry, target.id)
-    if not entry or entry.object ~= target.object or Circuit.cabinetPadlockId(entry.piece) then return nil end
+    if not entry or entry.object ~= target.object or not Circuit.canService(entry.piece, player) then return nil end
     if view and placement.canView(player, entry.square, entry.object) or placement.canReach(player, entry.square, entry.object) then return entry end
 end
 
@@ -112,7 +112,7 @@ function Editor.renameJack(player, registry, target, id)
             player:Say("That object is no longer within reach.")
             return
         end
-        local ok, result = registry:renameCabinetPort(target.id, id, button.parent.entry:getText())
+        local ok, result = registry:renameCabinetPort(target.id, id, button.parent.entry:getText(), player)
         local message = ok and ("Jack label updated to " .. result .. ".") or result
         player:Say(message)
         print("[ZedComm] " .. message)
@@ -124,8 +124,8 @@ function Editor.renameJack(player, registry, target, id)
     box:addToUIManager()
 end
 
-function Editor.addOptions(add, registry, entry)
-    if Circuit.cabinetPadlockId(entry.piece) then return end
+function Editor.addOptions(add, registry, entry, player)
+    if not Circuit.canService(entry.piece, player) then return end
     local layout = entry.piece.state and entry.piece.state.circuit
     local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= ZedComm.RelayLamp.ID) or type(layout) ~= "table"
@@ -882,8 +882,8 @@ function Editor:close()
 end
 
 function Editor.open(player, registry, target)
-    if Circuit.cabinetPadlockId(target.piece) then
-        player:Say("The cabinet is padlocked.")
+    if not Circuit.canService(target.piece, player) then
+        player:Say("The board is padlocked.")
         return
     end
     local entry = selectedHost(player, registry, target, true)

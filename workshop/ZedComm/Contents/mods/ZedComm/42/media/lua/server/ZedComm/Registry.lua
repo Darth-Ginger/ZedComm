@@ -252,13 +252,16 @@ function SZedCommSystem:setFixtureOption(id, option, enabled)
     return ok, reason
 end
 
-function SZedCommSystem:setCabinetPadlock(id, keyId)
-    local ok, reason = self.network:setCabinetPadlock(id, keyId)
+function SZedCommSystem:setPadlock(id, keyId, owner)
+    local ok, reason = self.network:setPadlock(id, keyId, owner)
     if ok then syncFixtureState(self, id) end
     return ok, reason
 end
 
-function SZedCommSystem:renameCabinetPort(id, port, name)
+function SZedCommSystem:renameCabinetPort(id, port, name, character)
+    if not ZedComm.InternalCircuit.canService(self.network.pieces[id], character) then
+        return false, "The board is padlocked."
+    end
     local ok, result = self.network:renameCabinetPort(id, port, name)
     if ok then
         local piece = self.network.pieces[id]

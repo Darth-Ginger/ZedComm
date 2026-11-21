@@ -518,6 +518,9 @@ function Network:setDeviceState(id, state)
         stateCopy.fixtureName = piece.state.fixtureName
     end
     if piece.board then
+        if stateCopy then
+            stateCopy.padlockKeyId, stateCopy.padlockOwner = piece.state.padlockKeyId, piece.state.padlockOwner
+        end
         local evaluate, reason, board = Circuit.compilePackets(stateCopy and stateCopy.circuit, piece.board.profile,
             stateCopy and stateCopy.adapter)
         if not evaluate then return false, reason end
@@ -580,22 +583,22 @@ function Network:setFixtureOption(id, option, enabled)
     return true
 end
 
-function Network:setCabinetPadlock(id, keyId)
+function Network:setPadlock(id, keyId, owner)
     local piece = self.pieces[id]
-    if not piece or not Circuit.cabinets[piece.definitionId] or not piece.board then
-        return false, "That cabinet is no longer available."
+    if not Circuit.canPadlock(piece) then return false, "That board cannot be padlocked." end
+    if owner ~= nil and (keyId == nil or type(owner) ~= "string" or owner == "") then
+        return false, "Invalid remembered player."
     end
     if keyId ~= nil and (type(keyId) ~= "number" or keyId < 0 or keyId > 2147483647 or keyId ~= math.floor(keyId)) then
         return false, "Invalid padlock key."
     end
-    piece.state.padlockKeyId = keyId
+    piece.state.padlockKeyId, piece.state.padlockOwner = keyId, owner
     return true
 end
 
 function Network:renameCabinetPort(id, port, name)
     local piece = self.pieces[id]
     if not piece or not piece.board or not piece.board.directions[port] then return false, "That cabinet jack is gone." end
-    if Circuit.cabinetPadlockId(piece) then return false, "The cabinet is padlocked." end
     local label, reason = cleanLabel(name)
     if not label then return false, reason end
     local labels = piece.state.portLabels or {}

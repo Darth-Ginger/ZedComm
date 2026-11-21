@@ -269,18 +269,14 @@ function Placement.resolve(registry, id)
     end
 end
 
-local function hasPadlock(entry)
-    return entry and Circuit.cabinetPadlockId(entry.piece) ~= nil
-end
-
-function Placement.freePorts(entry)
+function Placement.freePorts(entry, character)
     local piece = entry.piece
     local out = {}
     if piece.kind == "cable" then
         local count = 0
         for _ in pairs(piece.links) do count = count + 1 end
         if count < Network.MAX_CABLE_LINKS then out[1] = false end
-    elseif not piece.definitionUnavailable and not hasPadlock(entry) then
+    elseif not piece.definitionUnavailable and Circuit.canService(piece, character) then
         for name, link in pairs(piece.ports) do
             if link == false then out[#out + 1] = name end
         end
@@ -289,9 +285,9 @@ function Placement.freePorts(entry)
     return out
 end
 
-function Placement.hasFreeEnd(entry, port)
+function Placement.hasFreeEnd(entry, port, character)
     if not entry then return false end
-    for _, candidate in ipairs(Placement.freePorts(entry)) do
+    for _, candidate in ipairs(Placement.freePorts(entry, character)) do
         if port == candidate then return true end
     end
     return false
@@ -307,17 +303,22 @@ local function linkDistance(first, second, secondKind, secondObject)
         or first.square == Placement.oppositeFace(second, secondObject)
 end
 
-function Placement.canJoin(network, first, firstPort, second, secondPort)
-    if not Placement.hasFreeEnd(first, firstPort) or not Placement.hasFreeEnd(second, secondPort)
+local function compatibleEnds(network, first, firstPort, second, secondPort, character)
+    if not Placement.hasFreeEnd(first, firstPort, character) or not Placement.hasFreeEnd(second, secondPort, character)
         or first.id == second.id then return false end
     local a, b = first.piece.kind, second.piece.kind
     if a ~= "cable" and b ~= "cable" then return false end
-    if not linkDistance(first, second.square, b, second.object) then return false end
     -- Free ends on the same chain cannot be joined into a loop.
     local firstNet = network:networkOf(first.id, firstPort or nil)
     local secondNet = network:networkOf(second.id, secondPort or nil)
     if firstNet == secondNet then return false end
     return #network.nets[firstNet].sources == 0 or #network.nets[secondNet].sources == 0
+end
+
+function Placement.canJoin(network, first, firstPort, second, secondPort, character)
+    return first ~= nil and second ~= nil
+        and linkDistance(first, second.square, second.piece.kind, second.object)
+        and compatibleEnds(network, first, firstPort, second, secondPort, character)
 end
 
 local function link(registry, first, firstPort, second, secondPort)
@@ -353,12 +354,12 @@ function Placement.canPlace(square, itemType)
     return spec ~= nil and loadedSquare(square) and tileAvailable(square, spec)
 end
 
-local function canExtend(entry, port, square)
-    return square ~= nil and Placement.hasFreeEnd(entry, port) and linkDistance(entry, square, "cable")
+local function canExtend(entry, port, square, character)
+    return square ~= nil and Placement.hasFreeEnd(entry, port, character) and linkDistance(entry, square, "cable")
 end
 
-function Placement.canLay(entry, port, square)
-    return canExtend(entry, port, square) and tileAvailable(square, items[2])
+function Placement.canLay(entry, port, square, character)
+    return canExtend(entry, port, square, character) and tileAvailable(square, items[2])
 end
 
 local function retainedState(item, spec)
@@ -394,7 +395,7 @@ function Placement.carries(character, item)
     return item ~= nil and item:getContainer() == inventory and inventory:contains(item)
 end
 
-local function place(registry, character, square, item, anchor, anchorPort, laying, mount)
+local function place(registry, character, square, item, anchor, anchorPort, laying, mount, throughWall)
     local inventory = character:getInventory()
     local spec = item and specFor(item:getFullType())
     if not spec or not Placement.carries(character, item) then
@@ -403,8 +404,8 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     if laying and spec.kind ~= "cable" then return false, "Choose a wire to extend this run." end
     local valid, why, height = tileAvailable(square, spec)
     if not valid then return false, why end
-    if laying and hasPadlock(anchor) then return false, "The cabinet is padlocked." end
-    if laying and not canExtend(anchor, anchorPort, square) then
+    if laying and anchor and not Circuit.canService(anchor.piece, character) then return false, "The board is padlocked." end
+    if laying and not throughWall and not canExtend(anchor, anchorPort, square, character) then
         return false, "Select a free end on this tile or a neighboring tile."
     end
     if spec.mount == "wall" then
@@ -461,14 +462,14 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     return true, id
 end
 
-function Placement.canPickUp(registry, entry)
+function Placement.canPickUp(registry, entry, character)
     if entry.spec.nativePickup then return false, "Use the normal moveable pickup for this lamp." end
-    if hasPadlock(entry) then return false, "Remove the cabinet padlock first." end
+    if Circuit.padlockId(entry.piece) then return false, "Remove the padlock first." end
     if entry.piece.kind == "cable" then
         for id in pairs(entry.piece.links) do
             local piece = registry.network.pieces[id]
-            if piece and Circuit.cabinetPadlockId(piece) then
-                return false, "The wire is connected to a padlocked cabinet."
+            if not Circuit.canService(piece, character) then
+                return false, "The wire is connected to a padlocked board."
             end
         end
     end
@@ -476,7 +477,7 @@ function Placement.canPickUp(registry, entry)
 end
 
 local function pickUp(registry, character, entry)
-    local allowed, reason = Placement.canPickUp(registry, entry)
+    local allowed, reason = Placement.canPickUp(registry, entry, character)
     if not allowed then return false, reason end
     local record = registry.network:record(entry.id)
     local inventory = character:getInventory()
@@ -564,26 +565,31 @@ local function removeLampAdapter(character, registry, entry)
     return true
 end
 
-local function changeCabinetPadlock(registry, character, command, entry)
-    if not cabinetSpecs[entry.piece.definitionId] or not entry.piece.board then
-        return false, "That cabinet is no longer available."
-    end
+local function changePadlock(registry, character, command, entry)
+    local piece = entry.piece
+    if not Circuit.canPadlock(piece) then return false, "That board cannot be padlocked." end
     local inventory = character:getInventory()
-    local lockedKey = Circuit.cabinetPadlockId(entry.piece)
-    local item, replacementType, replacementCount, keyId
-    if command.kind == "padlock-cabinet" then
-        if lockedKey then return false, "The cabinet is already padlocked." end
+    local lockedKey = Circuit.padlockId(piece)
+    local item, replacementType, replacementCount, keyId, owner
+    if command.kind == "fit-padlock" then
+        if lockedKey then return false, "The board is already padlocked." end
         item = command.item
-        if not item or item:getFullType() ~= "Base.Padlock"
-            or item:getContainer() ~= inventory or not inventory:contains(item) then
+        if not Placement.carries(character, item) or item:getFullType() ~= "Base.Padlock" then
             return false, "Bring a padlock in your main inventory."
         end
         keyId = item:getKeyId()
         replacementType, replacementCount = "Base.KeyPadlock", item:getNumberOfKey()
+        if command.remember then
+            owner = character:getModData().zedcommPadlockIdentity or getRandomUUID()
+        else
+            replacementCount = math.max(1, replacementCount)
+        end
     else
-        if lockedKey == nil or lockedKey ~= command.keyId then return false, "The cabinet padlock changed." end
-        item = inventory:haveThisKeyId(lockedKey)
-        if not item then return false, "Bring the matching padlock key." end
+        if lockedKey == nil or lockedKey ~= command.keyId then return false, "The padlock changed." end
+        if not Circuit.remembersPlayer(piece, character) then
+            item = inventory:haveThisKeyId(lockedKey)
+            if not item then return false, "Bring the matching padlock key." end
+        end
         keyId = lockedKey
         replacementType, replacementCount = "Base.Padlock", 1
     end
@@ -592,11 +598,12 @@ local function changeCabinetPadlock(registry, character, command, entry)
         local replacement = instanceItem(replacementType)
         if not replacement then return false, "Could not create the padlock or its key." end
         replacement:setKeyId(keyId)
-        if lockedKey then replacement:setNumberOfKey(1) end
+        -- A keyless removal leaves the existing keys intact.
+        if lockedKey then replacement:setNumberOfKey(item and 1 or 0) end
         replacements[i] = replacement
     end
-    local container = item:getContainer()
-    container:Remove(item)
+    local container = item and item:getContainer()
+    if container then container:Remove(item) end
     local added = 0
     local ok, reason = false, nil
     for _, replacement in ipairs(replacements) do
@@ -608,19 +615,20 @@ local function changeCabinetPadlock(registry, character, command, entry)
         added = added + 1
     end
     if not reason then
-        local newKeyId = not lockedKey and keyId or nil
-        ok, reason = registry:setCabinetPadlock(entry.id, newKeyId)
+        ok, reason = registry:setPadlock(entry.id, not lockedKey and keyId or nil, owner)
     end
-    if not ok then
+    if ok then
+        if owner then character:getModData().zedcommPadlockIdentity = owner end
+    else
         for i = 1, added do inventory:Remove(replacements[i]) end
-        container:AddItem(item)
+        if container then container:AddItem(item) end
     end
     return ok, reason
 end
 
 function Placement.canUpgradeCabinet(character, entry, adapter)
     if not entry or not cabinetSpecs[entry.piece.definitionId] then return false, "That cabinet is no longer available." end
-    if Circuit.cabinetPadlockId(entry.piece) then return false, "Remove the cabinet padlock first." end
+    if Circuit.padlockId(entry.piece) then return false, "Remove the cabinet padlock first." end
     if entry.spec.adapter ~= "basic" then return false, "This cabinet already has an Advanced Adapter." end
     local inventory = character:getInventory()
     if not adapter or adapter:getFullType() ~= Circuit.ADVANCED_ADAPTER_ITEM
@@ -659,7 +667,7 @@ function Placement.editCircuit(character, registry, target, expected, layout, in
     if not entry or entry.object ~= target.object or not Placement.canReach(character, entry.square, entry.object) then
         return false, "That device is no longer within reach."
     end
-    if Circuit.cabinetPadlockId(entry.piece) then return false, "The cabinet is padlocked." end
+    if not Circuit.canService(entry.piece, character) then return false, "The board is padlocked." end
     local state = entry.piece.state
     local cabinet = Circuit.profileFor(entry.piece.definitionId)
     if (not cabinet and entry.piece.definitionId ~= Relay.ID) or not state
@@ -730,7 +738,7 @@ function Placement.changeCircuitBattery(character, registry, target, expected, i
         or not entry.piece.state or entry.piece.state.circuit ~= expected then
         return false, "The circuit changed or is out of reach."
     end
-    if Circuit.cabinetPadlockId(entry.piece) then return false, "The cabinet is padlocked." end
+    if not Circuit.canService(entry.piece, character) then return false, "The board is padlocked." end
     local layout = registry.network:record(target.id).state.circuit
     local part = layout.modules[id]
     if not part or part.kind ~= "batterySource" then return false, "Select a Battery Source." end
@@ -810,7 +818,131 @@ local function contactInstallation(contactId, message)
     }
 end
 
+local wallEdges = {
+    { name = "north", dx = 0, dy = -1, north = true },
+    { name = "west", dx = -1, dy = 0, north = false },
+    { name = "south", dx = 0, dy = 1, north = true },
+    { name = "east", dx = 1, dy = 0, north = false },
+}
+Placement.wallCoverItems = { plastic = "Base.PlasticTray", metal = "Base.ScrapMetal" }
+Placement.WALL_PASSTHROUGH_LIMIT = 5
+
+local function wallPassthrough(square, edge)
+    local other = getCell():getGridSquare(square:getX() + edge.dx, square:getY() + edge.dy, square:getZ())
+    if not loadedSquare(other) or clearBetween(square, other) then return nil end
+    local owner = (edge.dx > 0 or edge.dy > 0) and other or square
+    local wall = owner:getWall(edge.north)
+    if not wall or owner:getDoorOrWindow(edge.north) or square:getWindowFrameTo(other)
+        or square:getHoppableTo(other) then return nil end
+    local key = edge.north and "north" or "west"
+    local data = wall:hasModData() and wall:getModData().zedcommWallPassthrough
+    return { wall = wall, key = key, square = square, other = other, side = edge.name, cover = data and data[key] }
+end
+
+function Placement.wallPassthroughs(square)
+    local walls = {}
+    for _, edge in ipairs(wallEdges) do
+        local passage = wallPassthrough(square, edge)
+        if passage then walls[#walls + 1] = passage end
+    end
+    return walls
+end
+
+function Placement.wallCrossings(registry, square, other)
+    local count = 0
+    for _, entry in ipairs(Placement.piecesAt(registry, square)) do
+        if entry.piece.kind == "cable" then
+            for id in pairs(entry.piece.links) do
+                local piece = registry.network.pieces[id]
+                if piece.kind == "cable" and piece.x == other:getX() and piece.y == other:getY()
+                    and piece.z == other:getZ() then count = count + 1 end
+            end
+        end
+    end
+    return count
+end
+
+function Placement.canJoinThroughWall(network, passage, anchor, target)
+    return passage.cover and anchor and target and anchor.square == passage.square
+        and target.square == passage.other and anchor.piece.kind == "cable" and target.piece.kind == "cable"
+        and compatibleEnds(network, anchor, false, target, false)
+end
+
+local function commandPassage(command)
+    for _, edge in ipairs(wallEdges) do
+        if edge.name == command.side then
+            local passage = wallPassthrough(command.square, edge)
+            if passage and passage.wall == command.wall then return passage end
+        end
+    end
+end
+
+local function changeWallPassthrough(registry, character, command)
+    local passage = commandPassage(command)
+    if not passage or passage.cover ~= command.expected then return false, "The wall fitting changed." end
+    local inventory = character:getInventory()
+    local cover = command.cover
+    if cover == "bare" then
+        if passage.cover then return false, "This wall already has a passthrough." end
+        if not inventory:getFirstType("Base.HandDrill") then return false, "Bring a hand drill." end
+    elseif Placement.wallCoverItems[cover] then
+        if passage.cover ~= "bare" then return false, "Choose a bare passthrough." end
+        if not inventory:getFirstType("Base.Screwdriver") or not Placement.carries(character, command.item)
+            or command.item:getFullType() ~= Placement.wallCoverItems[cover] then
+            return false, "Bring the matching cover material and a screwdriver."
+        end
+        inventory:Remove(command.item)
+    elseif cover == nil then
+        if not passage.cover then return false, "There is no wall passthrough." end
+        if Placement.wallCrossings(registry, command.square, passage.other) > 0 then
+            return false, "Disconnect the runs through this wall first."
+        end
+    else
+        return false, "Unknown passthrough cover."
+    end
+    local data = passage.wall:getModData()
+    local fittings = data.zedcommWallPassthrough or {}
+    fittings[passage.key] = cover
+    data.zedcommWallPassthrough = (fittings.north or fittings.west) and fittings or nil
+    passage.wall:transmitModData()
+    return true
+end
+
+local function connectThroughWall(registry, character, command)
+    local passage = commandPassage(command)
+    if not passage or not passage.cover then return false, "There is no wall passthrough here." end
+    local anchor = Placement.resolve(registry, command.anchorId)
+    if not anchor or anchor.square ~= command.square or anchor.piece.kind ~= "cable"
+        or not Placement.hasFreeEnd(anchor, false) then return false, "Select a free wire end on this side." end
+    if Placement.wallCrossings(registry, command.square, passage.other) >= Placement.WALL_PASSTHROUGH_LIMIT then
+        return false, "Five runs already cross this wall."
+    end
+    if command.targetId then
+        local target = Placement.resolve(registry, command.targetId)
+        if not target or target.object ~= command.remoteWire
+            or not Placement.canJoinThroughWall(registry.network, passage, anchor, target) then
+            return false, "Choose a compatible free wire end on the other side."
+        end
+        return link(registry, anchor, false, target, false)
+    end
+    return place(registry, character, passage.other, command.item, anchor, false, true, nil, true)
+end
+
 local commands = {
+    ["change-wall-passthrough"] = {
+        duration = 100,
+        message = function(command)
+            if not command.cover then return "Wall passthrough sealed." end
+            return command.cover == "bare" and "Wall passthrough drilled." or "Wall passthrough covered."
+        end,
+        execute = changeWallPassthrough,
+    },
+    ["connect-through-wall"] = {
+        runEffect = "join",
+        runMessages = { joined = "Wire connected through the wall." },
+        message = "Wire connected through the wall.",
+        execute = connectThroughWall,
+    },
     place = {
         runEffect = "place",
         runMessages = wireRunMessages,
@@ -832,7 +964,7 @@ local commands = {
         validate = function(character, command, registry)
             local anchor = Placement.resolve(registry, command.anchorId)
             return Placement.carries(character, command.item)
-                and Placement.canLay(anchor, command.anchorPort, command.square)
+                and Placement.canLay(anchor, command.anchorPort, command.square, character)
         end,
         execute = function(registry, character, command)
             local anchor = Placement.resolve(registry, command.anchorId)
@@ -843,10 +975,12 @@ local commands = {
         target = true,
         runEffect = "join",
         runMessages = { joined = "Wire connected." },
-        execute = function(registry, _, command, target)
+        execute = function(registry, character, command, target)
             local anchor = Placement.resolve(registry, command.anchorId)
-            if hasPadlock(anchor) or hasPadlock(target) then return false, "The cabinet is padlocked." end
-            if not Placement.canJoin(registry.network, anchor, command.anchorPort, target, command.port) then
+            if not Circuit.canService(anchor and anchor.piece, character) or not Circuit.canService(target.piece, character) then
+                return false, "The board is padlocked."
+            end
+            if not Placement.canJoin(registry.network, anchor, command.anchorPort, target, command.port, character) then
                 return false, "Choose an adjacent, compatible free end."
             end
             return link(registry, anchor, command.anchorPort, target, command.port)
@@ -895,8 +1029,8 @@ local commands = {
         target = true,
         acceptsTarget = boardTarget,
         message = "Jack disconnected.",
-        execute = function(registry, _, command, target)
-            if hasPadlock(target) then return false, "The cabinet is padlocked." end
+        execute = function(registry, character, command, target)
+            if not Circuit.canService(target.piece, character) then return false, "The board is padlocked." end
             local cable = target.piece.ports[command.port]
             if not cable or cable ~= command.cableId then return false, "That jack connection changed." end
             return registry:unlink(cable, target.id)
@@ -945,15 +1079,15 @@ local commands = {
             return ZedComm.DoorInstallation.remove(character, registry, target)
         end,
     },
-    ["padlock-cabinet"] = {
+    ["fit-padlock"] = {
         target = true,
-        message = "Cabinet padlocked.",
-        execute = changeCabinetPadlock,
+        message = "Board padlocked.",
+        execute = changePadlock,
     },
-    ["remove-cabinet-padlock"] = {
+    ["remove-padlock"] = {
         target = true,
-        message = "Cabinet padlock removed.",
-        execute = changeCabinetPadlock,
+        message = "Padlock removed.",
+        execute = changePadlock,
     },
     ["upgrade-cabinet"] = {
         target = true,

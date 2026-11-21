@@ -18,15 +18,15 @@ local function say(player, message)
     print("[ZedComm placement] " .. message)
 end
 
-local function resolveAnchor(run)
+local function resolveAnchor(player, run)
     local placement = ZedComm.PlayerPlacement
     local registry = placement.getRegistry()
     local anchor = registry and registry.network == run.network and placement.resolve(registry, run.id)
-    if placement.hasFreeEnd(anchor, run.port) then return anchor end
+    if placement.hasFreeEnd(anchor, run.port, player) then return anchor end
 end
 
 local function reachableAnchor(player, run)
-    local anchor = resolveAnchor(run)
+    local anchor = resolveAnchor(player, run)
     if anchor and ZedComm.PlayerPlacement.canReach(player, anchor.square, anchor.object) then return anchor end
 end
 
@@ -198,7 +198,7 @@ local function portLabel(entry, port)
     return port
 end
 
-local function openEnds(placement, registry, square)
+local function openEnds(placement, registry, square, player)
     local ends, wireNumber = {}, 0
     for _, entry in ipairs(orderedPieces(placement, registry, square)) do
         local label = fixtureLabel(entry)
@@ -206,7 +206,7 @@ local function openEnds(placement, registry, square)
             wireNumber = wireNumber + 1
             label = label .. " " .. wireNumber .. " / " .. (registry:getRunName(entry.id) or "Loose wire")
         end
-        for _, port in ipairs(placement.freePorts(entry)) do
+        for _, port in ipairs(placement.freePorts(entry, player)) do
             local name = port and port ~= "signal" and label .. " (" .. portLabel(entry, port) .. ")" or label
             ends[#ends + 1] = { entry = entry, port = port, label = name }
         end
@@ -214,12 +214,12 @@ local function openEnds(placement, registry, square)
     return ends
 end
 
-local function connectionChoices(placement, registry, anchor, port, square)
+local function connectionChoices(placement, registry, anchor, port, square, player)
     local choices = {}
     if not anchor then return choices end
-    for _, target in ipairs(openEnds(placement, registry, square)) do
+    for _, target in ipairs(openEnds(placement, registry, square, player)) do
         local entry = target.entry
-        if placement.canJoin(registry.network, anchor, port, entry, target.port) then
+        if placement.canJoin(registry.network, anchor, port, entry, target.port, player) then
             choices[#choices + 1] = target
         end
     end
@@ -235,13 +235,13 @@ local function cursorTarget(cursor, square, run)
     if not registry or registry.network ~= run.network then return end
     if run.item and not ZedComm.PlayerPlacement.carries(player, run.item) then return end
     if run.id then
-        local anchor = run.item and resolveAnchor(run) or reachableAnchor(player, run)
+        local anchor = run.item and resolveAnchor(player, run) or reachableAnchor(player, run)
         if not anchor then return end
         local item = run.item or player:getInventory():getFirstType(placement.WIRE_TYPE)
-        if item and placement.canLay(anchor, run.port, square) then return run, item end
-        if #connectionChoices(placement, registry, anchor, run.port, square) > 0 then return run end
+        if item and placement.canLay(anchor, run.port, square, player) then return run, item end
+        if #connectionChoices(placement, registry, anchor, run.port, square, player) > 0 then return run end
     elseif placement.canPlace(square, run.item:getFullType())
-        or (run.item:getFullType() == placement.WIRE_TYPE and #openEnds(placement, registry, square) > 0) then
+        or (run.item:getFullType() == placement.WIRE_TYPE and #openEnds(placement, registry, square, player) > 0) then
         return run, run.item
     end
 end
@@ -528,8 +528,8 @@ end
 
 local function extendOrConnect(cursor, run, item, square)
     local player, placement = cursor.character, ZedComm.PlayerPlacement
-    local registry, anchor = placement.getRegistry(), resolveAnchor(run)
-    local ends = connectionChoices(placement, registry, anchor, run.port, square)
+    local registry, anchor = placement.getRegistry(), resolveAnchor(player, run)
+    local ends = connectionChoices(placement, registry, anchor, run.port, square, player)
     if #ends == 0 then
         if item then placeFromCursor(player, run, item, square, run.id, run.port) end
         return
@@ -574,7 +574,7 @@ function Cursor.placeSelected(cursor, run, item, square)
         placeFromCursor(player, run, item, square)
         return
     end
-    local ends = openEnds(placement, placement.getRegistry(), square)
+    local ends = openEnds(placement, placement.getRegistry(), square, player)
     if #ends == 0 then
         placeFromCursor(player, run, item, square)
         return
@@ -588,7 +588,7 @@ function Cursor.placeSelected(cursor, run, item, square)
     end
     for _, target in ipairs(ends) do
         local entry, port = target.entry, target.port
-        local sameTile = placement.canLay(entry, port, square)
+        local sameTile = placement.canLay(entry, port, square, player)
         local label = "Connect to " .. target.label
         if not sameTile then label = label .. " from an adjacent tile" end
         local option = context:addOption(label, player, function()
@@ -596,7 +596,7 @@ function Cursor.placeSelected(cursor, run, item, square)
             run.choice = nil
             local registry = placement.getRegistry()
             local anchor = registry and registry.network == run.network and placement.resolve(registry, entry.id)
-            if not placement.hasFreeEnd(anchor, port) or anchor.object ~= entry.object then
+            if not placement.hasFreeEnd(anchor, port, player) or anchor.object ~= entry.object then
                 say(player, "That free end is no longer available.")
                 return
             end
@@ -664,7 +664,7 @@ function Native.canPickUp(cursor, entry, square)
     local run = nativeRun(cursor)
     if not registry or (run and runBusy(cursor.character, run)) then return false end
     local target = placement.resolve(registry, entry.id)
-    return target and target.object == entry.object and target.square == square and placement.canPickUp(registry, target)
+    return target and target.object == entry.object and target.square == square and placement.canPickUp(registry, target, cursor.character)
 end
 
 function Native.pickUp(cursor, entry, square)
@@ -739,6 +739,38 @@ local function addOptions(menu, options, player, wire)
     end
 end
 
+local function menuTargets(placement, registry, square, player, context, worldObjects)
+    local targets = orderedPieces(placement, registry, square)
+    local door
+    for _, object in ipairs(worldObjects) do
+        if ZedComm.Door.isEligible(object) then door = object; break end
+    end
+    if not door then return targets end
+
+    local seen, usedTiles, extraTiles = {}, { [square] = true }, {}
+    for _, entry in ipairs(targets) do seen[entry.id] = true end
+    local function addReachableFixtures(tile)
+        if not tile or usedTiles[tile] or not placement.canReach(player, tile) then return end
+        usedTiles[tile], extraTiles[#extraTiles + 1] = true, tile
+        for _, entry in ipairs(placement.piecesAt(registry, tile)) do
+            if entry.piece.kind == "endpoint" and not seen[entry.id] then
+                targets[#targets + 1], seen[entry.id] = entry, true
+            end
+        end
+    end
+
+    addReachableFixtures(ZedComm.Door.oppositeSquare(door))
+    if context.x and context.y then
+        local z = square:getZ()
+        local x = math.floor(screenToIsoX(context.player, context.x, context.y, z))
+        local y = math.floor(screenToIsoY(context.player, context.x, context.y, z))
+        if math.abs(x - square:getX()) + math.abs(y - square:getY()) <= 1 then
+            addReachableFixtures(getCell():getGridSquare(x, y, z))
+        end
+    end
+    return targets, extraTiles
+end
+
 local function onFillMenu(playerNum, context, worldObjects, test)
     if test then return end
     local placement = ZedComm and ZedComm.PlayerPlacement
@@ -754,7 +786,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         run = nil
     end
     -- Saved IDs keep exact wire options in the same order on reload.
-    local targets = orderedPieces(placement, registry, square)
+    local targets, extraTiles = menuTargets(placement, registry, square, player, context, worldObjects)
     local wireCount = 0
     for _, entry in ipairs(targets) do
         if entry.piece.kind == "cable" then wireCount = wireCount + 1 end
@@ -819,10 +851,57 @@ local function onFillMenu(playerNum, context, worldObjects, test)
 
     if run then
         addTo(options, "Pause wire run", cancelRun)
-        if wire and placement.canLay(anchor, run.port, square) then
+        if wire and placement.canLay(anchor, run.port, square, player) then
             local label = "Lay wire here"
             if wireCount > 0 then label = "Lay another wire here (" .. wireCount .. " present)" end
             action(label, { kind = "lay", item = wire, anchorId = run.id, anchorPort = run.port, run = run })
+        end
+    end
+
+    local drill = inventory:getFirstType("Base.HandDrill")
+    local screwdriver = inventory:getFirstType("Base.Screwdriver")
+    for _, passage in ipairs(placement.wallPassthroughs(square)) do
+        if passage.cover or drill then
+            local crossingCount = passage.cover and placement.wallCrossings(registry, square, passage.other)
+            local label = passage.side:gsub("^%l", string.upper) .. " wall passthrough"
+            if crossingCount then
+                label = label .. " (" .. passage.cover .. ", " .. crossingCount .. "/" .. placement.WALL_PASSTHROUGH_LIMIT .. ")"
+            end
+            local group = fixtureMenu(label)
+            local function change(title, cover, item, unavailable)
+                action(title, { kind = "change-wall-passthrough", side = passage.side, wall = passage.wall,
+                    expected = passage.cover, cover = cover, item = item }, group, unavailable)
+            end
+            if not passage.cover then
+                change("Drill passthrough", "bare")
+            else
+                if passage.cover == "bare" and screwdriver then
+                    for _, material in ipairs({ "plastic", "metal" }) do
+                        local item = inventory:getFirstType(placement.wallCoverItems[material])
+                        if item then change("Fit " .. material .. " cover", material, item) end
+                    end
+                end
+                change("Seal passthrough", nil, nil, crossingCount > 0 and "Wired" or nil)
+                if run and anchor.square == square and anchor.piece.kind == "cable"
+                    and crossingCount < placement.WALL_PASSTHROUGH_LIMIT then
+                    local function route(title, entry)
+                        action(title, { kind = "connect-through-wall", side = passage.side, wall = passage.wall,
+                            anchorId = run.id, run = run, targetId = entry and entry.id,
+                            remoteWire = entry and entry.object, item = wire }, group)
+                    end
+                    if wire and placement.canPlace(passage.other, placement.WIRE_TYPE) then route("Feed wire through") end
+                    local number = 0
+                    for _, remote in ipairs(orderedPieces(placement, registry, passage.other)) do
+                        if remote.piece.kind == "cable" then
+                            number = number + 1
+                            if placement.canJoinThroughWall(network, passage, anchor, remote) then
+                                local name = registry:getRunName(remote.id)
+                                route("Connect to wire " .. number .. (name and " (" .. name .. ")" or ""), remote)
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -833,7 +912,8 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     for _, entry in ipairs(targets) do
         local name = fixtureLabel(entry)
         local cabinet = circuit.cabinets[entry.piece.definitionId] ~= nil
-        local padlockId = circuit.cabinetPadlockId(entry.piece)
+        local padlockId = circuit.padlockId(entry.piece)
+        local canService = circuit.canService(entry.piece, player)
         local group, groupedWire
         if entry.piece.kind == "cable" then
             wireNumber = wireNumber + 1
@@ -869,13 +949,13 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         local function addDevice(label, callback, ...)
             addTo(actions, label, callback, ...)
         end
-        local ports = placement.freePorts(entry)
+        local ports = placement.freePorts(entry, player)
         for _, port in ipairs(ports) do
             local label = name
             if port and (#ports > 1 or port ~= "signal") then label = label .. " (" .. portLabel(entry, port) .. ")" end
             addDevice(groupedWire and "Select free end" or "Select " .. label .. " free end",
                 selectEnd, network, entry, port, label)
-            if run and placement.canJoin(network, anchor, run.port, entry, port) then
+            if run and placement.canJoin(network, anchor, run.port, entry, port, player) then
                 action(groupedWire and "Connect selected run" or "Connect wire to " .. label, {
                     kind = "join", targetId = entry.id, object = entry.object, port = port,
                     anchorId = run.id, anchorPort = run.port, run = run,
@@ -895,15 +975,17 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                 kind = "set-network-switch", targetId = entry.id, object = entry.object, on = on,
             }, group)
         end
-        if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(addDevice, registry, entry) end
+        if ZedComm.AdapterEditor then ZedComm.AdapterEditor.addOptions(addDevice, registry, entry, player) end
         if entry.piece.board then
-            if cabinet and padlockId then
+            if padlockId then
                 action("Remove padlock", {
-                    kind = "remove-cabinet-padlock", targetId = entry.id, object = entry.object, keyId = padlockId,
-                }, group)
-            elseif cabinet and padlock then
-                action("Padlock cabinet", {
-                    kind = "padlock-cabinet", targetId = entry.id, object = entry.object, item = padlock,
+                    kind = "remove-padlock", targetId = entry.id, object = entry.object, keyId = padlockId,
+                }, group, not canService and "Matching key required" or nil)
+            elseif padlock and circuit.canPadlock(entry.piece) then
+                local label = cabinet and "Padlock cabinet" or "Padlock door board"
+                action(label, { kind = "fit-padlock", targetId = entry.id, object = entry.object, item = padlock }, group)
+                action(label .. " (Remember me)", {
+                    kind = "fit-padlock", targetId = entry.id, object = entry.object, item = padlock, remember = true,
                 }, group)
             end
             if cabinet and not padlockId and entry.spec.adapter == "basic" and adapter then
@@ -914,12 +996,12 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             local ports, labels = {}, {}
             for port in pairs(entry.piece.ports) do ports[#ports + 1] = port end
             table.sort(ports)
-            local editor = not padlockId and ZedComm.AdapterEditor
+            local editor = canService and ZedComm.AdapterEditor
             if editor then group[#group + 1] = { cabinet and "Label cabinet jack" or "Label door jack", children = labels } end
             for _, port in ipairs(ports) do
                 local label, cable = portLabel(entry, port), entry.piece.ports[port]
                 if editor then addTo(labels, label, editor.renameJack, registry, entry, port) end
-                if cable and not padlockId then
+                if cable and canService then
                     action((cabinet and "Disconnect cabinet jack (" or "Disconnect door jack (") .. label .. ")", {
                         kind = "disconnect-port", targetId = entry.id, object = entry.object,
                         port = port, cableId = cable,
@@ -929,7 +1011,8 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
         if entry.spec.nativePickup then
             if entry.piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
-                action("Remove door adapters", { kind = "remove-door-adapters", targetId = entry.id, object = entry.object }, group)
+                action("Remove door adapters", { kind = "remove-door-adapters", targetId = entry.id, object = entry.object },
+                    group, padlockId and "Remove padlock first" or nil)
             elseif ZedComm.DoorContact.profiles[entry.piece.definitionId] then
                 action("Remove " .. entry.spec.name, { kind = "remove-door-contact", targetId = entry.id, object = entry.object }, group)
                 if entry.piece.ports.signal then
@@ -941,7 +1024,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                     action("Disconnect lamp wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
                 end
             end
-        elseif placement.canPickUp(registry, entry) then
+        elseif placement.canPickUp(registry, entry, player) then
             action(groupedWire and "Pick up" or "Pick up " .. name,
                 { kind = "pickup", targetId = entry.id, object = entry.object }, group)
         end
@@ -992,7 +1075,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
     end
     if getDebug() and ZedComm.DebugCircuits then
-        options[#options + 1] = { "Debug", children = ZedComm.DebugCircuits.optionsAt(registry, square, fixtureActions) }
+        options[#options + 1] = { "Debug", children = ZedComm.DebugCircuits.optionsAt(registry, square, fixtureActions, extraTiles) }
     end
     if #options == 0 then return end
     local root = context:addOption("ZedComm", nil, nil)
@@ -1055,7 +1138,7 @@ Events.OnTick.Add(function()
     for player, run in pairs(runs) do
         if run.item and not ZedComm.PlayerPlacement.carries(player, run.item) then
             stopRun(player)
-        elseif run.id and (not resolveAnchor(run)
+        elseif run.id and (not resolveAnchor(player, run)
             or (not run.item and not actionQueued(player, run.walk) and not reachableAnchor(player, run))) then
             stopRun(player)
         end

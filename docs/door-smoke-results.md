@@ -15,7 +15,7 @@ Live observation on `4dd32ec`: a barricade prevented the door from opening under
 | Lock control | Closed door locks. Already-open door stays pending until closed. | | | |
 | Both controls ON | Applied lock prevents new opening. | | | |
 | Native manual interaction | Held network lock blocks both sides. Record whether this policy is accepted. | | | |
-| Source unavailable | Attached Lock unlocks; attached Open closes. | | | |
+| Source unavailable | Attached Lock unlocks. Attached Open returns movement to the player at the current position. | | | |
 | Physically unwired | Corresponding native function resumes. Original lock flags restored on detach. | | | |
 | Obstructed or barricaded | Movement waits and applies the latest request after clearance. | | | |
 | Four faces and two hinges | Housing stays on frame. Wires follow hinge jamb and remain visible over flooring. | | | |

@@ -129,6 +129,7 @@ function Installation.removeContact(character, registry, entry)
 end
 
 function Installation.remove(character, registry, entry)
+    if Circuit.padlockId(entry.piece) then return false, "Remove the padlock first." end
     if not Door.isEligible(entry.object) then return false, "That door is no longer available." end
     local recovered = Parts.recover(character, entry.piece.state, 2)
     if not recovered then return false, "There is no room for the adapters and modules." end

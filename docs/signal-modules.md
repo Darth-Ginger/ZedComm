@@ -71,3 +71,9 @@ The plate samples the same estimated load with either module. With a Basic Sende
 Craft compatible devices with a basic module by default using modest Electrical skill and common parts. A more involved recipe can fit an advanced sender or receiver at craft time using higher Electrical skill and more materials. Players can also install a separately crafted advanced module into a compatible device as an upgrade and use the existing wire run. Exact skill levels, ingredients, and recipe availability are open balance choices.
 
 Multi-byte data has period precedents. The 1981 Internet Protocol specification describes datagrams with data payloads, and early twisted-pair Ethernet offers a period reference for the technology. [RFC 791](https://www.rfc-editor.org/rfc/rfc791.html) · [IEEE 802.3i-1990](https://standards.ieee.org/ieee/802.3i/1068/)
+
+## Planned stateful modules and signal probing
+
+Latch holds its output after Set goes away and clears it on Reset. Counter holds its count until reset. Preserve both states across save and reload. An in-flight Pulse expires on reload. A one-shot circuit can use Latch to block repeat activation until reset, with Pulse providing a brief output.
+
+The first Signal Probe is a read-only context action with no carried item required. It shows the run name, signal value and connected devices. For a later release, consider requiring a small carried Probe to see the run name and connected devices in the inspection view.
