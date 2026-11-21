@@ -1,24 +1,14 @@
 # ZedComm
 
-A Project Zomboid (Build 42) mod for modular wired electronics and simulated digital signals: redstone-style on/off signaling, with a path toward counters, addressed communication and player-built networks.
+A Project Zomboid Build 42 singleplayer mod for wired electronics. Connect pressure plates, switches and contacts to displays, powered lamps or doors, or route them through cabinets with logic, arithmetic and timing modules.
 
-Status: playable singleplayer prototype on Build 42. Pressure, occupancy and weight plates and a wall-mounted network switch send values over placed signal wire to numeric displays, to lamps fitted with an adapter, and through network cabinets that hold circuits up to 10×10 of logic, arithmetic and timing modules. The [recipe table](docs/recipes.md) lists the craftable parts. The latest recipe changes await in-game verification. In singleplayer, fit a Basic Adapter to a modifiable lamp at Electrical 1 or an Advanced Adapter at Electrical 3. See the [lamp setup and removal steps](docs/player-placement.md#retrofit-a-vanilla-lamp). Multiplayer is not supported. The build plan and the in-game results recorded so far are in [docs/plans/adapter-and-cabinet.md](docs/plans/adapter-and-cabinet.md).
+Requires Build 42.13.0 or later. Multiplayer support is outside the current release.
 
-Small, Tabletop, Large, Wall and XL Cabinets come in Basic and Advanced tiers. Tabletop cabinets mount to a clear table or countertop from beside the furniture. Wall cabinets mount to any eligible wall face and show connected leads down to the floor. Large and XL floor cabinets have extra built-in jack pairs.
+## Documentation
 
-Use a vanilla padlock to secure a cabinet or a door retrofit board. Select **Remember me** when fitting it to let that survivor service the board and jacks without carrying a key. A matching key also grants access. The circuit stays live. Remove the padlock before picking up or upgrading a cabinet or taking off the door adapters.
-
-Doors also accept an independent crafted Contact source that reports actual open/closed state without an actuator board. Fit inputs only, contact only, or both with the associated materials.
-
-A **Window Contact** fits to an intact native window at Electrical 1 with a screwdriver. Wire its source jack to a display or receiver. Closed sends 255, open sends 0, and a broken or missing window sends no signal.
-
-The networked door build is undergoing its [gameplay smoke test](docs/networked-door-smoke-test.md). Its [control policy and installed API research](docs/research/networked-door.md) describe the shared 6x3 board and fail-open Lock behavior.
-
-Under **Options > Mods > ZedComm**, **Show fixture name labels** and **Show door status markers** independently control the two world overlays. Both default to on. Fixtures keep their individual label settings. Door boards and mounted maglock hardware stay visible.
-
-Use the [contributor rules](AGENTS.md) when changing code, tests, or documentation.
-
-ZedComm requires Build 42.13 or later for custom item tags. Its items have a **ZedComm** inventory category and its recipes appear under **ZedComm** in Crafting.
+- [Player Guide](docs/player-placement.md)
+- [Crafting Recipes](docs/recipes.md)
+- [Architecture Reference](docs/architecture.md)
 
 ## Layout
 
@@ -78,14 +68,6 @@ The build stops if `mod.info` lacks `name`, `id` or `versionMin`, or if a stray 
 CI (`.github/workflows/build.yml`) runs both tool sets on every push: PowerShell and Git Bash on Windows, bash on Linux, each checking the link, the deploy guard and the stray-file check.
 
 `preview.png` is drawn by `tools/make-preview.py` (plain Python, no libraries): a pressure plate sending 0x5A over eight lines to a display. Edit and rerun it to change the image.
-
-## Simulation updates
-
-One pass per game tick on `Events.OnTick` (ADR-305). Events only mark a network as needing an update; the pass recomputes each marked network once, samples loaded sensors and delivers values in the same tick. `OnTick` does not run while the game is paused, so the simulation freezes with the game. In singleplayer the pass runs in the game process; in multiplayer it will run on the server tick (validated after the MVP).
-
-The pass lives in `shared/ZedComm/Simulation.lua` (`markDirty` from event handlers, `tick` once per tick) and sends each recomputed value through an adapter in `shared/ZedComm/Dispatch.lua`: `Local` in singleplayer, `Server` on a multiplayer server (a stub until multiplayer is validated). `server/ZedComm/SimulationRunner.lua` registers it on `OnTick` in singleplayer and on a multiplayer server, never on a multiplayer client, and logs `[ZedComm] simulation pass running (singleplayer)` to console.txt on the first tick.
-
-`tests/run.sh` runs every `tests/*_test.lua` with a Lua 5.1 interpreter (`lua5.1`, `luajit` or `lua`); the bash build calls it and skips the tests with a warning when none is installed. CI on Linux installs Lua 5.1 and fails if the tests cannot run.
 
 ## Decisions
 

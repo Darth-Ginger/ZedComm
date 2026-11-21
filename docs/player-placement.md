@@ -1,128 +1,63 @@
-# Player placement and wiring
+# ZedComm Player Guide
 
-In singleplayer, the native **Place** tool cycles through ZedComm pressure plates, numeric displays, and signal wire alongside vanilla moveables. The native **Pickup** tool can recover both endpoints and individual wire segments. The **ZedComm** world context menu also places devices, selects wire ends, and joins runs. The items use the generated placeholder icons and world sprites. Wire sprites follow their explicit links, including bends and free ends. The display shows its reading on the casing and can also be read from its context menu. See the [on-face display and combined smoke test](numeric-display-face.md).
+ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft parts under **Crafting â†’ ZedComm**. [Recipes and Electrical requirements](recipes.md).
 
-Right-click a pressure plate, numeric display, or signal wire in the main inventory and choose **Place with ZedComm cursor**. Click a valid tile to walk there and place that item. The placement action holds the exact selected inventory item and validates the target again on arrival. The world context menu also offers immediate placement within reach. A clear floor tile can hold one device and multiple independent wires. Wiring follows the existing saved registry. A placed piece consumes one item only after registration and any required link succeed. Picking up a device preserves its identity and durable state on the recovered item and leaves connected wire in the world. Pickup of wire returns one unit. Choose **Select free end** to resume an existing run in native **Place**, with Signal Wire selected. If needed, your character first walks within reach of the end. Click a valid neighboring floor tile to walk there and lay one segment. The cursor advances to the new segment after the action finishes. Right-click exits placement and keeps the current end selected for an explicit connection or the existing **Lay wire here** action. Moving out of reach of that end clears the selection. To resume an unfinished run, select its free end again.
+## Place and wire a circuit
 
-## Native Place and Pickup
+1. Use native **Place** and **Cycle through objects** to select a source and a receiver. For a first circuit, use a Pressure Plate and a Numeric Display.
+2. Cycle to **Signal Wire**. Click a free device jack and choose **Connect to**. If the jack tile cannot take wire, choose a valid neighboring floor tile for the first segment.
+3. Click neighboring tiles to extend the run. Click the receiver or another compatible free end and choose **Connect to**. Joining existing ends uses no spare wire. **Lay wire here** adds a segment when you have one.
+4. To resume a run, right-click its end and choose **ZedComm â†’ Select free end**. Your character walks within reach if needed, and native **Place** opens with Signal Wire selected. Right-click exits Place and keeps a reachable end selected for a context-menu connection. Walking out of reach clears that selection.
+5. Use native **Pickup** to recover equipment or wire. A recovered device retains its settings and installed parts. External wires stay in the world, ready to reconnect.
 
-Use the normal **Place** tool and its **Cycle through objects** control to select the device or wire. The cursor previews the selected piece on the floor and walks to the clicked tile. After placing a plate or display, stay in Place and cycle to the next item. ZedComm candidates appear after vanilla moveables, grouped into sources, receivers, cabinets, and wire. Normal stock of each type appears once. Recovered endpoints with saved settings can be selected individually.
+On shared tiles, cycle through numbered wires or open a specific wire's submenu. Hover a choice to outline that segment in cyan. Up to five wire lanes can share a tile edge. Keep one source per run. Use a Splitter for one signal going to multiple independent runs.
 
-Cycling to wire and placing the first segment starts a run. On a tile with a free end, choose **Place wire loose** or **Connect to** the specific end. Starting from an existing cable requires a neighboring tile for the first new segment. Subsequent clicks extend the active end or open the connection choices when a compatible free end is present. Cycling to another item releases that end. Right-click exits the tool and keeps the last reachable end selected for an explicit connection.
+## Mounts and passthroughs
 
-Native **Pickup** recovers a pressure plate or display with its settings. Its wire stays in place with a free end. Place the device again and reconnect it to resume the circuit. To recover wire, use **Pickup** on its tile. On shared tiles, cycle through the numbered cables and use the cyan outline to identify the selected segment.
+- **Floor:** Place plates, displays and floor cabinets on clear tiles.
+- **Tabletop:** Place or pick up a Tabletop Cabinet from the floor beside a clear table or counter. Its jack can be wired from the adjacent floor.
+- **Wall:** With a Network Switch or Wall Cabinet in Place, hold left-click and drag toward an eligible wall face, then release. Click a placed switch within reach to toggle it.
+- **Wall passthrough:** At a solid wall, choose the wall's ZedComm submenu and **Drill passthrough** with a Hand Drill. Select a local free end, then use **Feed wire through** or **Connect to wire** to join an existing far-side end. A fitting carries up to five independent runs. Add a cover with a Screwdriver and a Plastic Tray or Scrap Metal. Free all crossings before sealing. The wall still blocks movement.
 
-On a shared tile, a wire draws behind any registered device using a floor overlay sprite.
+## Sources and readouts
 
-Right-click a device and open **ZedComm** to find its submenu. If a door sprite catches the click, the menu also offers reachable ZedComm fixtures behind it. For example, **Cabinet (East Entrance)** contains that cabinet's editor, jack labels, connections and pickup action. In debug mode, the device's testing actions appear there too. The shared test-rig command lives under **ZedComm → Debug**.
+| Device | What it sends or shows |
+| --- | --- |
+| Pressure Plate | A configured value from 1 to 255 when occupied, 1 by default. Players, zombies, animals, bodies, vehicles, loose items and qualifying floor furniture can trigger it. Clear sends 0. |
+| Occupancy Plate | Number of players and zombies on the tile, capped at 255. Clear sends 0. |
+| Weight Plate | Estimated load from actors, bodies, vehicles, loose items, floor furniture and contents. Basic uses rounded 10 kg steps, with a minimum of 1 for positive load and a cap of 255. An Advanced Sender, selectable in debug, sends estimated kilograms plus the Basic fallback. Seated actors add no separate body-weight reading. |
+| Network Switch | 255 on and 0 off. |
+| Door and Window Contact | 255 closed, 0 open. An unavailable host sends no signal. |
+| Numeric Display | Shows the byte. Zero is a valid reading. A wired display with no live signal shows dashes. An unwired face is blank. |
+| Advanced Display | Shows Basic bytes or the typed weight in kilograms. **Read full signal** gives the exact reading when the face rounds or shows **HI**. |
 
-## Starting from a loose wire
+To change a Pressure Plate's occupied value, right-click it and choose **ZedComm → Plate → Set pressure plate output**. Use **Read numeric display** or **Read full signal** to inspect a receiver.
 
-Click an empty floor tile with the inventory wire cursor to place a standalone segment. On a tile with a free device or cable end, choose **Place wire loose** or **Connect to** the exact end. A device can connect on its own tile when the floor is clear. For an existing cable or a fixture on a blocked tile, select the end and then click a valid adjacent tile. The connected segment becomes the new end of the run.
+## Cabinets and local circuits
 
-## Joining from an active run
+An **adapter** connects the fixture to the wire. A **module** processes a signal or adds a connection inside a board. Basic cabinets handle bytes. Advanced cabinets can handle full readings and let you configure each output's signal mode. Small and Tabletop cabinets use 6Ã—6 boards with one fixed IN/OUT pair. Large and Wall use 8Ã—8 with two pairs, and XL uses 10Ã—10 with three.
 
-With the cursor still laying a run, click a compatible free cable end or endpoint port. Choose **Connect to** the exact target to finish the run without consuming a wire. Choose **Lay wire here** to continue on a valid tile when you have another segment. Cable-to-cable connections use neighboring tiles. A device port can also connect to a cable on its own tile. When there are multiple targets, hover a cable choice to outline that segment in cyan.
+Double-click a nearby cabinet, choose a carried module and drag it onto the grid. Rotate removable parts with **Rotate Building**. Port extensions and Splitters must sit at an edge with their external jacks facing out. Link an output contact to an input contact, and complete the path to a board output. Right-click a link to remove it. Right-click a part to configure or remove it. Fixed jacks stay in place. The board supplies internal links, while external connections use Signal Wire.
 
-| Starting point | Click target | Connection |
-| --- | --- | --- |
-| Wire selected in Place | Free endpoint port | Lay the first wire on the port's tile or a valid neighbor |
-| Wire selected in Place | Existing run's free cable end | Select the end and lay the first new wire on a neighbor |
-| Active run | Existing run's free cable end | Join the two existing segments |
-| Active run | Free endpoint port | Join the current segment to the device |
-
-## Run names
-
-Connected runs get a saved number such as **Run 1**. Unconnected segments show **Loose wire**. Look for the name in connection choices, the native Place and Pickup info panel, and **Inspect wire**. On a shared tile, open the individual wire submenu to inspect it or choose **Rename run**. Enter a custom name to show it alongside the run number, or submit a blank name to restore the default.
-
-When runs join, a custom name takes precedence over a default. If both names are custom or both are defaults, the active run keeps its name. If a run is split, the connected part with the saved name anchor keeps the old name and other connected parts get new numbers. If the anchor is removed or becomes loose, a surviving connected part keeps the name.
-
-Right-click a fixed jack or extension in the cabinet editor and choose **Rename jack**. The world menu also offers **ZedComm → Cabinet → Label cabinet jack**. The label follows the jack through rotation, pickup, and reload and appears in the editor and wiring choices. Enter a blank label to restore the default. A run name belongs to the cable.
-
-Padlock a cabinet or door board from its **ZedComm** submenu. A matching key lets you open the board, edit jacks, and pick up wire directly attached to it. The **Remember me** fitting option saves that permission for the installing survivor. The circuit still runs and a door's Lock/Open inputs still control the door. Remove the padlock before picking up or upgrading a cabinet or removing door adapters. A remembered survivor can remove it without a key and leave the existing copies intact.
-
-Double-click a nearby cabinet to open its editor. On an Advanced cabinet, a jack carrying an Advanced weight packet shows kilograms. Hover over it to see the exact weight and fallback byte. A jack carrying a Basic packet shows the byte.
-
-Use the placed device's rename action, such as **ZedComm → Plate → Rename Plate**, **Rename Cabinet**, or **Rename Display**. The name appears in wiring choices and on the cabinet or adapter title. It follows the fixture through pickup and reload. Leave the field blank to reset it. Jack labels and cable run names can be edited independently.
-
-Carried modules are grouped by function. Click a group header to collapse or expand it, and scroll the pane to reach additional rows. When you drag a module over the board, its preview shows the orientation of its internal contacts and external jacks.
-
-An active Wait or Timer shows its remaining seconds below the configured duration. In a Wait → Timer chain, the Timer countdown starts when Wait forwards the input.
-
-In either circuit editor, right-click a drawn link between its contacts to remove it. If two links overlap, use a section where the link you want is separate. Right-click also cancels an active drag or contact selection.
-
-Right-click an installed part in the cabinet or Advanced Adapter editor and choose **Remove module** to return it to inventory. Removal clears its internal links. Removing a jack extension also leaves its cable end free. Fixed jacks stay on the board. For modules with settings, choose **Configure** from the same menu.
-
-## Wall switches
-
-Use native **Place** or the ZedComm placement menu to place a floor cabinet, a Tabletop Cabinet on a clear table or countertop, or a Wall Cabinet against a wall. Approach a tabletop from adjacent floor to place or pick up its cabinet. From an adjacent floor tile, wire to a free jack on a raised cabinet.
-
-In native **Place**, select the Network Switch or Wall Cabinet, hold left-click on the mounting tile, and drag toward the wall you want. Release to place. **Shift + Rotate Building** also cycles eligible walls in native **Place**. In **Place with ZedComm cursor**, press **Rotate Building**. The ZedComm world placement menu lists the available walls at a corner. Left-click a placed switch within reach to toggle it. Connected switch and Wall Cabinet leads follow the chosen wall face down to the floor.
-
-## Multiple wires on one tile
-
-Select the free end of the intended run and left-click an occupied wire tile with the placement cursor. If the connection menu opens, choose **Lay wire here**. The new piece consumes one wire and connects only to the selected run. The context menu also offers **Lay another wire here (N present)** after you exit the cursor. On a shared tile, open **ZedComm → Wire 1 of 2** (or the appropriate wire number). **Inspect**, **Select free end**, **Connect selected run**, and **Pick up** appear inside that wire’s submenu when applicable. Hover a wire’s submenu or one of its actions to outline that exact segment in cyan. Inspect a wire to see the direction of its links and how many ends are free. Numbering uses saved piece IDs, so load order does not change it while the same wires are present. Picking up a wire removes only that segment. Parallel runs use up to five separate lanes across shared tile edges. Wires that turn together follow nested curves. A device lead keeps its centered connection and passing cables use separate lanes. Use the exact-wire outline when inspecting or picking up a segment.
-
-## Wall passthroughs
-
-1. Stand next to a solid wall with a Hand Drill. Right-click the floor and choose **ZedComm**, the wall direction, then **Drill passthrough**. Either face can work on the same fitting. With a Screwdriver and one Plastic Tray or Scrap Metal, you can fit a cover.
-2. Select a free cable end on the near-side wall tile. Use that wall's submenu to **Feed wire through** with a spare Signal Wire, or **Connect to wire** to join a numbered free end on the far-side tile. Continue the run from the far side.
-3. The wall menu shows the number of crossing cables. One edge supports five independent runs. Pickup of a selected crossing wire frees its slot. Disconnect all crossings before sealing an opening.
-
-The wall keeps its movement collision. Covers and occupancy appear in the menu. Demolishing the wall removes the fitting and leaves the now unobstructed cable links in place.
-
-## Pressure plate output
-
-Right-click a placed plate within reach and choose **ZedComm → Plate → Set pressure plate output**. The menu and dialog show the current setting. Enter a whole number from **1 to 255**. The basic plate sends that value when an actor, a corpse, an overlapping vehicle, a floor-level prop or container, or a loose inventory item occupies the tile. The output returns to **0** when the last load leaves. Plates without a saved setting use **1**, including plates from older saves. The setting survives reload and pickup followed by replacement.
-
-### Concealed basic plate check
-
-1. Wire a basic pressure plate to a numeric display and set its occupied output to **155**. The clear plate reads **0**. Place a crate or bookshelf directly over it using the native moveables tool, then step away. Expect **155** with only the furniture on the plate.
-2. Save and reload with the furniture in place. Expect **155** before touching the furniture or wire. Move the furniture to the neighboring tile and expect **0**. Confirm the plate and wire remain intact and a nearby container or floor decoration stays clear.
-3. Repeat with a vehicle on a road tile. The configured byte should hold while its footprint overlaps, even with the center off the tile. Drive clear and expect **0**.
-4. Drop or place a loose item on the plate and expect **155** after stepping off. Pick up the item or move it to the neighboring tile and expect **0**.
-
-## Occupancy plate
-
-The occupancy variant uses the same native placement, pickup, and wire tools. It sends a live player and zombie count from 0 to 255. See [occupancy plate behavior and smoke test](occupancy-plate.md).
-
-## Weight plate
-
-The weight variant uses the same placement, pickup, and wiring tools. It sends an estimated load from on-foot actors and an overlapping vehicle. See [weight plate calibration and smoke test](weight-plate.md).
+Threshold and Boolean logic emit 0 or 255. Use **Cache** to pass the original reading through when you need its precision. Use **Full Reading** on compatible Advanced arithmetic modules to operate on typed weight. A timed Wait or Timer shows seconds remaining in the editor. A placed Basic cabinet can be upgraded with an Advanced Adapter while retaining its board and runs.
 
 ## Retrofit a vanilla lamp
 
-1. Carry a Basic Adapter at Electrical 1 or an Advanced Adapter at Electrical 3 in your main inventory. Right-click a modifiable vanilla lamp and choose **ZedComm → Lamp → Fit Basic Adapter** or **Fit Advanced Adapter**. The timed action uses the adapter when it finishes.
-2. Connect the signal wire to the lamp's free end. While wired, the signal controls the lamp. An Advanced Adapter also provides a 3×3 circuit editor. Native pickup carries the installation with the lamp. Reconnect the wire after placing the lamp again.
-3. Choose **ZedComm → Lamp → Remove lamp adapter** to take out the adapter and any installed modules. Leave room in your main inventory for the recovered parts. The wire remains on the floor and the native switch works again. To change tiers, remove the fitted adapter, fit the new one, and reconnect the wire. Older test fittings without a recorded adapter can be removed without returning an adapter.
+With a Screwdriver, fit a **Basic Adapter** at Electrical 1 or **Advanced Adapter** at Electrical 3 from the lamp's ZedComm submenu. An Advanced Adapter has a 3Ã—3 local board. The lamp needs its normal bulb and power. A wired lamp follows the signal and switches off on signal loss. Unplug it or remove the adapter to restore manual control. Native pickup retains the installation but leaves the wire behind.
 
-## In-game check
+## Doors and contacts
 
-Restart Project Zomboid with the linked development mod enabled and open a disposable singleplayer save. Obtain the parts through the **ZedComm** crafting category or grant them through the Lua debug console.
+Fit two matched Basic or Advanced Adapters to a supported native door. The shared 6Ã—3 board has independent **Lock IN** and **Open IN** controls. Lock ON blocks new openings and waits if the door is already open. Open ON opens an unlocked door, and a valid 0 closes it when the door can move. Loss of signal unlocks a connected Lock input and releases Open to manual. Physically disconnecting Lock restores the original native lock state. Install a Door or Window Contact separately when you need the fixture's actual state as an output.
 
-```lua
-getPlayer():getInventory():AddItem("ZedComm.PressurePlate")
-getPlayer():getInventory():AddItem("ZedComm.NumericDisplay")
-getPlayer():getInventory():AddItems("ZedComm.SignalWire", 8)
-```
+## Names, access and overlays
 
-### Group 1 — live build, repair and pickup
+Rename fixtures and runs through their ZedComm submenus. Rename a jack by right-clicking it in the editor. Blank names restore the default. Hover a cable choice to identify it before joining or picking it up. **Options â†’ Mods â†’ ZedComm** controls fixture and wire labels and door status markers.
 
-1. Open the default **Place** tool and cycle through a vanilla moveable, the pressure plate, the numeric display, and wire. Place the plate and display on floor tiles several steps away. Confirm the character walks there and places each selected item while the tool stays active. Cancel one placement while walking and confirm it stays in inventory. Plan an L-shaped route between the devices.
-2. Cycle to wire and click the pressure plate. Check **Place wire loose** and **Connect to pressure plate**. Use **Connect to pressure plate** to start the run. Click each neighboring tile along the route. Check that the character walks there, one wire is consumed per successful placement, and the cursor advances around the bend. A click two tiles from the current end should leave the run unchanged. Walk out of reach manually and confirm the cursor closes. Select the current free end again to resume.
-3. Left-click the display tile with the run still active and choose **Connect to numeric display**. Check that **Lay wire here** is also offered when you have wire and the tile can take a new segment. You can connect even after using the last wire in inventory. Use **Read numeric display** and check **0 → 1 → 0** as you step onto and off the plate. Before the explicit connection the display should report unattached, even if a wire is beside it.
-4. Use native **Pickup** on a wire in the middle. Expect one wire back in inventory and **no signal** at the display. Select a remaining free end, lay the recovered piece in the gap, then connect to the other free end. Check that the signal returns.
-5. Use native **Pickup** on the pressure plate. The cable stays in place with a free end. Cycle to the recovered plate in **Place**, put it down again, reconnect that end to it, and check the reading.
-6. Cycle to wire and place the first segment on a clear tile. Check that the next click can extend it and that a tile beyond its neighbor gets a bold red outline. Cycle away and back to wire, click the original tile, and choose **Place wire loose**. Both wires should be independent. Cycle away and back again, click that tile, and choose **Connect to wire 2 / Loose wire from an adjacent tile**. Click the neighboring tile and confirm that only wire 2 connects. Build two independent runs over the same tiles, with at least one straight stretch and one bend. Follow each cable across the tile boundaries and around the turn. Check that the routes stay visibly separate. Use native **Pickup** to cycle through the two outlined segments. Recover one and confirm that only its circuit breaks.
-7. Create two runs with free ends on neighboring tiles. Rename one from a wire's **ZedComm → Rename run** option. With the other run still active in **Place**, left-click the named run's end. Verify the label and cyan outline identify the correct cable. Choose **Connect to** and confirm the runs join without using another wire. Inspect a segment from each side and confirm both show the custom name.
-8. With a plate and display wired, confirm the occupied reading defaults to **1**. Use **Set pressure plate output** to set it to **255** and check **0 → 255 → 0**. Set an intermediate value such as **77** while standing on the plate and check that the display updates without a new step. Leave it set for the reload check.
-9. Leave the working runs connected and pause for a pre-reload console snapshot.
+Use a vanilla Padlock on a cabinet or a door board. A matching key grants access. **Remember me** also grants access to the survivor who fitted it. Protected circuits keep running. Remove the lock before upgrading or picking up a cabinet or removing door adapters.
 
-### Group 2 — reload
+## Example circuits
 
-1. Save and return to the menu. Reload the same save and check that the devices and wire are still in place. Repeat the empty/occupied/empty display checks without reconnecting. Inspect the renamed run and confirm it kept the name and number. Check that the configured plate still sends its saved value when occupied.
-2. Leave the game running and capture the post-reload console. Review `[ZedComm placement]`, `[ZedComm] display`, and registry entries for duplicate pieces, errors, or unexpected changes.
-
-## Offline verification
-
-All 458 offline Lua checks passed. The native bridge checks exercise the installed game's Moveable cursor, tile-building event, and walk-action callbacks with a simulated world. Coverage includes vanilla delegation, endpoint placement and pickup, saved settings, cycling, starting and extending a run, shared tiles, exact connection choices, and run names through merges, splits, and reload. The plate tests cover the default, input validation, immediate delivery while occupied, the maximum byte, and persistence through reload and pickup. The Windows scratch build passed. The active-run join passed in-game. The player confirmed that joined runs retained their names and carried signal after reload. The post-reload console shows the default plate output changing between 0 and 1, a rejected entry, and a custom output of 155 reaching the display. The player confirmed the final configured-plate check with 155 while occupied and 0 when clear. Zombie activation also passed. This completes the current placement smoke test.
+- **Plate readout:** Pressure Plate â†’ Numeric Display. Expect the configured value while occupied and 0 when clear.
+- **Vehicle-triggered lamp:** Weight Plate â†’ Threshold in an Advanced Lamp Adapter â†’ lamp. A threshold of 50 separated the tested 80 kg player (byte 8) from the sheriff car (byte 115). Measure both in your save before selecting a threshold.
+- **Crate-key door:** Feed two Weight Plates through separate Threshold modules. Put a Pressure Plate under a crate and feed its signal through NOT. AND all three conditions, then wire the result to **Open IN** with Lock IN unwired. The door opens when both weight conditions pass and the crate is removed.
+- **Timed door:** Pressure Plate â†’ Wait (2 seconds) â†’ Timer (10 seconds) â†’ **Open IN**. Steady pressure triggers a ten-second open request. Step off to rearm. This combines separately tested timing modules and still needs an end-to-end door check.

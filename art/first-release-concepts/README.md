@@ -1,6 +1,5 @@
 # ZedComm first-release sprite sources
 
-These transparent PNGs were generated with the built-in ImageGen tool. See [first-release art inventory](../../docs/first-release-art.md) for the procurement and state matrix. Keep these as source art for prototyping. Validate anchors, dimensions, occlusion and state registration in Build 42 before packing.
 
 ## Base image prompts
 
