@@ -1,0 +1,4 @@
+name=ZedComm Trigger Probes
+id=ZedCommTriggerProbes
+require=\ZedComm
+versionMin=42.13.0
