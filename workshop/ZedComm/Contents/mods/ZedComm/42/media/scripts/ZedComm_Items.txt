@@ -297,6 +297,42 @@ module ZedComm
         Icon = ZedCommNumericDisplay,
     }
 
+    item TimeOfDaySensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.4,
+        Icon = ZedCommNumericDisplay,
+    }
+
+    item PowerSensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.4,
+        Icon = ZedCommNumericDisplay,
+    }
+
+    item DaylightSensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.4,
+        Icon = ZedCommNumericDisplay,
+    }
+
+    item RainIntensitySensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.4,
+        Icon = ZedCommNumericDisplay,
+    }
+
     item NetworkSwitch
     {
         DisplayCategory = ZedComm,
@@ -475,6 +511,90 @@ module ZedComm
         outputs
         {
             item 1 ZedComm.NetworkSwitch,
+        }
+    }
+
+    craftRecipe ZedCommMakeTimeOfDaySensor
+    {
+        timedAction = MakingElectrical,
+        time = 70,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:4,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.TimeOfDaySensor,
+        }
+    }
+
+    craftRecipe ZedCommMakePowerSensor
+    {
+        timedAction = MakingElectrical,
+        time = 70,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:4,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.PowerSensor,
+        }
+    }
+
+    craftRecipe ZedCommMakeDaylightSensor
+    {
+        timedAction = MakingElectrical,
+        time = 70,
+        SkillRequired = Electricity:2,
+        xpAward = Electricity:5,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 2 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.DaylightSensor,
+        }
+    }
+
+    craftRecipe ZedCommMakeRainIntensitySensor
+    {
+        timedAction = MakingElectrical,
+        time = 70,
+        SkillRequired = Electricity:2,
+        xpAward = Electricity:5,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 2 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.RainIntensitySensor,
         }
     }
 

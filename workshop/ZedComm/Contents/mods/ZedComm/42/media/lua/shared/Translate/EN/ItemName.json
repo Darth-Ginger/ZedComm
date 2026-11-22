@@ -34,6 +34,10 @@
     "ZedComm.XorModule": "ZedComm XOR Module",
     "ZedComm.NotModule": "ZedComm NOT Module",
     "ZedComm.DebugByteSource": "ZedComm Test Byte Source",
+    "ZedComm.TimeOfDaySensor": "Time-of-day Sensor",
+    "ZedComm.PowerSensor": "Power Sensor",
+    "ZedComm.DaylightSensor": "Daylight Sensor",
+    "ZedComm.RainIntensitySensor": "Rain Intensity Sensor",
     "ZedComm.NetworkSwitch": "ZedComm Network Switch",
     "ZedComm.DoorContact": "ZedComm Door Contact",
     "ZedComm.WindowContact": "ZedComm Window Contact"

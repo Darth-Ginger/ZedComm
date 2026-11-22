@@ -512,6 +512,17 @@ local function configurePressurePlate(player, registry, target)
     end)
 end
 
+local function configureSchedule(player, registry, target)
+    local sensors = ZedComm.EnvironmentalSensors
+    local state = target.piece.state or {}
+    local initial = sensors.formatTime(state.startMinute or 0) .. ", " .. sensors.formatTime(state.endMinute or 0)
+    editSetting(player, registry, target, "Daily start and end (HH:MM, HH:MM)", initial, function(value)
+        local ok, reason = sensors.configureSchedule(registry, target.id, value)
+        if not ok then return reason end
+        return "Daily schedule updated."
+    end)
+end
+
 local function clickedSquare(worldObjects)
     for _, object in ipairs(worldObjects) do
         local square = object:getSquare()
@@ -1013,6 +1024,8 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         elseif entry.spec.itemType == "ZedComm.PressurePlate" and ZedComm.DeviceRuntime then
             local value = ZedComm.DeviceRuntime.getPressureOutput(entry.piece)
             addDevice("Set pressure plate output (" .. value .. ")", configurePressurePlate, registry, entry)
+        elseif entry.piece.definitionId == ZedComm.EnvironmentalSensors.CLOCK then
+            addDevice("Set daily schedule", configureSchedule, registry, entry)
         elseif entry.piece.definitionId == ZedComm.NetworkSwitch.ID then
             local on = not (entry.piece.state and entry.piece.state.on)
             action(on and "Turn network switch on" or "Turn network switch off", {

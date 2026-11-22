@@ -48,7 +48,7 @@ end
 -- Registry load callbacks also cover objects replaced on a reused square.
 function Runtime.invalidateBinding(current, id)
     local entry = current == network and entries[id]
-    if entry then entry.square = nil end
+    if entry then entry.square, entry.nextSample = nil, nil end
 end
 
 local function isPressureOutput(value)
@@ -173,6 +173,14 @@ local function getWeightPlateLoad(object)
 end
 
 local context = {
+    getClockMinute = function()
+        local clock = getGameTime()
+        if clock then return clock:getHour() * 60 + clock:getMinutes() end
+    end,
+    isSensorPowered = function(object)
+        return ItemContainer.isObjectPowered(object, true)
+    end,
+    getClimate = function() return getClimateManager() end,
     getDefinitionId = function(object)
         local tag = tagOf(object)
         return tag and tag.definitionId
@@ -342,12 +350,19 @@ local function sampleSource(cell, entry)
         if object then testSources[object] = piece.state and piece.state.byte or 0 end
         entry.readout = object
     end
+    local interval = definition.sampleInterval
+    if interval then
+        if object and entry.sampleObject == object and entry.sampleState == piece.state
+            and entry.nextSample and circuitTime < entry.nextSample then return end
+        entry.sampleObject, entry.sampleState = object, piece.state
+        entry.nextSample = object and (circuitTime + interval) or nil
+    end
     local packet, reason
     if object then
         local moduleId
         moduleId, reason = Runtime.getSenderModule(piece, definition)
         if moduleId then
-            local ok, reading = pcall(definition.sample, object, context)
+            local ok, reading = pcall(definition.sample, object, context, piece.state)
             if ok then
                 if entry.moduleId == moduleId and entry.reading == reading and entry.packet == piece.packet then return end
                 packet, reason = Modules.Sender.encode(reading, definition.readingKind, moduleId)

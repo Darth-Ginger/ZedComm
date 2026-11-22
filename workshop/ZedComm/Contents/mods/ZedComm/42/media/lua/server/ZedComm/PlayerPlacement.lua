@@ -12,6 +12,7 @@ local definitions = ZedComm.DeviceDefinitions
 local Relay = ZedComm.RelayLamp
 local Circuit = ZedComm.InternalCircuit
 local Switch = ZedComm.NetworkSwitch
+local Sensors = ZedComm.EnvironmentalSensors
 local serial = 0
 local items = {
     { itemType = "ZedComm.PressurePlate", name = "pressure plate", sprite = "zedcomm_devices_01_20",
@@ -29,6 +30,14 @@ local items = {
         kind = "endpoint", definitionId = "ZedComm.DebugByteSource", fixtureType = "Source" },
     { itemType = Switch.ID, name = "network switch", sprite = Switch.OFF_NORTH,
         kind = "endpoint", definitionId = Switch.ID, fixtureType = "Switch", mount = "wall" },
+    { itemType = Sensors.CLOCK, name = "time-of-day sensor", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = Sensors.CLOCK, fixtureType = "Clock" },
+    { itemType = Sensors.POWER, name = "power sensor", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = Sensors.POWER, fixtureType = "Power Sensor" },
+    { itemType = Sensors.DAYLIGHT, name = "daylight sensor", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = Sensors.DAYLIGHT, fixtureType = "Daylight Sensor" },
+    { itemType = Sensors.RAIN, name = "rain intensity sensor", sprite = "zedcomm_devices_01_431",
+        kind = "endpoint", definitionId = Sensors.RAIN, fixtureType = "Rain Sensor" },
 }
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }

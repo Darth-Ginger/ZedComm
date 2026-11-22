@@ -22,6 +22,10 @@ This file is written by `tools/make-recipes.py`. Change recipes there, not here.
 | 5 × Signal Wire | - | 1 | 1 Electric Wire or Wire | No |
 | 50 × Signal Wire | - | 1 | 10 Wire | No |
 | Network Switch | - | 2 | 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
+| Time-of-day Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
+| Power Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
+| Daylight Sensor | 2 | 5 | 1 Basic Adapter, 2 Electronics Scrap, 1 Electric Wire or Wire | Yes |
+| Rain Intensity Sensor | 2 | 5 | 1 Basic Adapter, 2 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Pressure Plate | 1 | 4 | 1 Sheet Metal, 1 Basic Adapter | Yes |
 | Occupancy Plate | 2 | 5 | 1 Sheet Metal, 1 Electronics Scrap, 1 Basic Adapter | Yes |
 | Weight Plate | 2 | 6 | 1 Sheet Metal, 2 Electronics Scrap, 1 Basic Adapter | Yes |

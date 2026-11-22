@@ -24,11 +24,11 @@ function Definitions.readFixtureTag(object)
 end
 local entries, ids = {}, {}
 local fields = { id = true, role = true, ports = true, match = true,
-    sample = true, readingKind = true, receiverModule = true, bindFixture = true }
+    sample = true, sampleInterval = true, readingKind = true, receiverModule = true, bindFixture = true }
 
 local function copy(def)
     local out = { id = def.id, role = def.role, match = def.match,
-        sample = def.sample, readingKind = def.readingKind,
+        sample = def.sample, sampleInterval = def.sampleInterval, readingKind = def.readingKind,
         receiverModule = def.receiverModule, bindFixture = def.bindFixture, ports = {} }
     for i = 1, #def.ports do out.ports[i] = def.ports[i] end
     return out
@@ -49,12 +49,18 @@ function Definitions.register(def)
     if type(def.match) ~= "function" then return false, "match must be a function" end
     if def.role == "source" then
         if type(def.sample) ~= "function" then return false, "source requires sample" end
+        local interval = def.sampleInterval
+        if interval ~= nil and (type(interval) ~= "number" or interval - interval ~= 0 or interval <= 0) then
+            return false, "source sampleInterval must be positive finite seconds"
+        end
         if def.readingKind ~= nil and def.readingKind ~= "weight" then return false, "unsupported source reading kind" end
         if def.receiverModule ~= nil or def.bindFixture ~= nil then
             return false, "source cannot define receiver behavior"
         end
     else
-        if def.sample ~= nil or def.readingKind ~= nil then return false, "receiver cannot define source sampling" end
+        if def.sample ~= nil or def.sampleInterval ~= nil or def.readingKind ~= nil then
+            return false, "receiver cannot define source sampling"
+        end
         if type(def.receiverModule) ~= "string" or def.receiverModule == ""
             or type(def.bindFixture) ~= "function" then
             return false, "receiver requires a module ID and fixture binding"
