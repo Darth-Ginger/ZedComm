@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Time-of-day, Power, Daylight, Rain Intensity, Storage, Fluid Fill and configurable IR sensors. The Combined Smoke Test tracks their native behavior and setup.
+
 - Advanced packets support fluid volume in liters for displays and Cache. A developer-only rain gauge probe exercises the game's native fluid component.
 
 - A connected door's Open input releases manual movement when its signal is unavailable. A valid zero still commands Close.

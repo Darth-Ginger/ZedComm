@@ -33,6 +33,17 @@ On shared tiles, cycle through numbered wires or open a specific wire's submenu.
 
 To change a Pressure Plate's occupied value, right-click it and choose **ZedComm → Plate → Set pressure plate output**. Use **Read numeric display** or **Read full signal** to inspect a receiver.
 
+## Additional sensors
+
+| Sensor | Use |
+| --- | --- |
+| Time-of-day | Choose **Set daily schedule** and enter two times as **HH:MM, HH:MM**. It sends 255 from the start up to the end. A schedule can cross midnight. Equal times leave it off. |
+| Power | Sends 255 when the tile has grid or generator power, and 0 without it. A NOT module can signal a power cut. |
+| Daylight and Rain Intensity | Place under open sky. They send outdoor light or rain strength as a byte. Sheltered conditions read zero. The rain sensor also reads zero in snow. |
+| Storage | Fit to a supported crate or shelf, choose its compartment, and select **Fullness** or **Free capacity**. The reading follows the native inventory capacity scale. |
+| Fluid Fill | Fit to a vanilla wooden Rain Collector to read its fill percentage as a byte. Native filling and draining control the contents. |
+| IR proximity | Set the radius to 1–10 tiles and choose player, zombie, or both. Fixed sends a configured byte, Count sends the count, and Nearest increases as the nearest visible actor approaches. Walls and closed doors block detection. |
+
 ## Cabinets and local circuits
 
 An **adapter** connects the fixture to the wire. A **module** processes a signal or adds a connection inside a board. Basic cabinets handle bytes. Advanced cabinets can handle full readings and let you configure each output's signal mode. Small and Tabletop cabinets use 6Ã—6 boards with one fixed IN/OUT pair. Large and Wall use 8Ã—8 with two pairs, and XL uses 10Ã—10 with three.

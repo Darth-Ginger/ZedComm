@@ -9,7 +9,6 @@ Requires Build 42.13.0 or later. Multiplayer support is outside the current rele
 - [Player Guide](docs/player-placement.md)
 - [Crafting Recipes](docs/recipes.md)
 - [Architecture Reference](docs/architecture.md)
-- [Developer Rain Gauge Probe](tools/probes/ZedCommRainGaugeProbe/README.md)
 
 ## Layout
 
