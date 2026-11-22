@@ -1,6 +1,7 @@
 {
     "ZedComm.PressurePlate": "ZedComm Pressure Plate",
     "ZedComm.OccupancyPlate": "ZedComm Occupancy Plate",
+    "ZedComm.IRSensor": "ZedComm IR Proximity Sensor",
     "ZedComm.WeightPlate": "ZedComm Weight Plate",
     "ZedComm.SignalWire": "ZedComm Signal Wire",
     "ZedComm.NumericDisplay": "ZedComm Numeric Display",

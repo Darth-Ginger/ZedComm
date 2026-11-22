@@ -523,6 +523,18 @@ local function configureSchedule(player, registry, target)
     end)
 end
 
+local function configureIR(player, registry, target, field, prompt)
+    local sensor = ZedComm.IRSensor
+    editSetting(player, registry, target, prompt, tostring(sensor.setting(target.piece.state, field)), function(input)
+        local value = sensor.validate(field, input:lower())
+        if value == nil then return prompt end
+        local state = registry.network:record(target.id).state or {}
+        state[field] = value
+        local ok, reason = registry:setDeviceState(target.id, state)
+        return ok and ("IR sensor " .. field .. " set to " .. tostring(value) .. ".") or reason
+    end)
+end
+
 local function clickedSquare(worldObjects)
     for _, object in ipairs(worldObjects) do
         local square = object:getSquare()
@@ -1051,6 +1063,15 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                         compartment = selection, mode = mode }, group)
                 end
             end
+        elseif entry.piece.definitionId == ZedComm.IRSensor.ID then
+            local function setting(field, label, prompt)
+                local value = ZedComm.IRSensor.setting(entry.piece.state, field)
+                addDevice(label .. " (" .. value .. ")", configureIR, registry, entry, field, prompt)
+            end
+            setting("radius", "Detection radius", "Enter a radius from 1 to 10 tiles")
+            setting("target", "Detect actors", "Enter player, zombie or both")
+            setting("mode", "Output mode", "Enter fixed, nearest or count")
+            setting("byte", "Fixed output", "Enter a whole byte from 0 to 255")
         elseif entry.piece.definitionId == ZedComm.NetworkSwitch.ID then
             local on = not (entry.piece.state and entry.piece.state.on)
             action(on and "Turn network switch on" or "Turn network switch off", {

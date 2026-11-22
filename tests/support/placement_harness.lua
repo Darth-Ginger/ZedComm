@@ -29,7 +29,7 @@ return function()
             or (contactIndex and contactIndex < 96) or (contactFloor and contactFloor < 48)
             or (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40)
             or (switchFloor and switchFloor < 20) or (weightGlyph and weightGlyph < 62)
-            or (cabinet and cabinet < 11) then
+            or (cabinet and cabinet < 11) or name == "zedcomm_ir_01_0" then
             if not registeredSprites[name] then
                 local floorOverlay = doorFloor ~= nil or contactFloor ~= nil or displayIndex ~= nil or switchFloor ~= nil
                     or (index and ((index >= 20 and index <= 25) or (index >= 419 and index <= 431)))

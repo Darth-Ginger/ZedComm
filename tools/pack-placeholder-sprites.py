@@ -797,6 +797,11 @@ def main():
     cropped_cabinet = cabinet.crop((left, top, right, bottom))
     cabinet_metadata = sprite_record(CABINET_FRAME, 0, 0, right - left, bottom - top, left, top)
     cabinet_page = texture_page(SET + "_cabinet", cropped_cabinet, cabinet_metadata, 1)
+    ir_source = CONCEPT_ART / "pir-sensor.png"
+    write_icon(ir_source, textures / "Item_ZedCommIRSensor.png")
+    ir_art, ir_x, ir_y = sprite_frame(ir_source, 42, 229)
+    ir_record = sprite_record(0, 0, 0, ir_art.width, ir_art.height, ir_x, ir_y, tileset="zedcomm_ir_01")
+    ir_page = texture_page("zedcomm_ir_01", ir_art, ir_record, 1)
     switch_frames = switch_page(textures)
     door_status_icons(textures)
     write_icon(FLOOR_CABINET, textures / "Item_ZedCommSmallCabinet.png")
@@ -807,12 +812,12 @@ def main():
     packs = MEDIA / "texturepacks"
     packs.mkdir(parents=True, exist_ok=True)
     (packs / f"{SET}.pack").write_bytes(
-        b"PZPK" + ints(1, 16) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
-        + weight_face + door_pages() + contact_pages(textures) + cabinet_variants_page() + contact_pages(textures, window=True)
+        b"PZPK" + ints(1, 17) + original + routes + legacy_displays + display_faces + cabinet_page + switch_frames
+        + weight_face + door_pages() + contact_pages(textures) + cabinet_variants_page() + contact_pages(textures, window=True) + ir_page
     )
 
     # Draw these nonblocking props in the same floor pass as vanilla overlays.
-    tiles = b"tdef" + ints(1, 12) + f"{SET}\n{SET}.png\n".encode("ascii")
+    tiles = b"tdef" + ints(1, 13) + f"{SET}\n{SET}.png\n".encode("ascii")
     assert count == CABINET_FRAME
     assert SWITCH_FRAME == CABINET_FRAME + 1
     switch_count = len(WALL_MOUNTS) * len(SWITCH_ART)
@@ -857,6 +862,7 @@ def main():
     tiles += ints(0) * 2 + ints(1) + b"IsTableTop\n\n" + b"".join(wall_overlays) * 2
     tiles += b"zedcomm_window_contact_01\nzedcomm_window_contact_01.png\n" + ints(12, 4, 12, 48)
     tiles += ints(0) * 48
+    tiles += b"zedcomm_ir_01\nzedcomm_ir_01.png\n" + ints(1, 1, 13, 1) + ints(0)
     (MEDIA / f"{SET}.tiles").write_bytes(tiles)
 
 

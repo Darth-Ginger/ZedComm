@@ -24,6 +24,8 @@ local items = {
         kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay", fixtureType = "Display" },
     { itemType = "ZedComm.OccupancyPlate", name = "occupancy plate", sprite = "zedcomm_devices_01_419",
         kind = "endpoint", definitionId = "ZedComm.OccupancyPlate", fixtureType = "Plate" },
+    { itemType = "ZedComm.IRSensor", name = "IR proximity sensor", sprite = "zedcomm_ir_01_0",
+        kind = "endpoint", definitionId = "ZedComm.IRSensor", fixtureType = "IR sensor" },
     { itemType = "ZedComm.WeightPlate", name = "weight plate", sprite = "zedcomm_devices_01_425",
         kind = "endpoint", definitionId = "ZedComm.WeightPlate", fixtureType = "Plate" },
     { itemType = "ZedComm.DebugByteSource", name = "test byte source", sprite = "zedcomm_devices_01_431",

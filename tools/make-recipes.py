@@ -46,6 +46,7 @@ RECIPES = [
     ("Wire and devices", "RainIntensitySensor", 2, 70, {BASIC: 1, SCRAP: 2, WIRE: 1}, 1, True, 5),
     ("Wire and devices", "PressurePlate", 1, 80, {SHEET: 1, BASIC: 1}, 1, True, 4),
     ("Wire and devices", "OccupancyPlate", 2, 80, {SHEET: 1, SCRAP: 1, BASIC: 1}, 1, True, 5),
+    ("Wire and devices", "IRSensor", 2, 100, {BASIC: 1, SCRAP: 2, WIRE: 1}, 1, True, 6),
     ("Wire and devices", "WeightPlate", 2, 100, {SHEET: 1, SCRAP: 2, BASIC: 1}, 1, True, 6),
     ("Wire and devices", "NumericDisplay", 2, 80, {SCRAP: 2, BASIC: 1}, 1, True, 5),
     ("Wire and devices", "AdvancedDisplay", 3, 100, {SCRAP: 3, ADVANCED: 1}, 1, True, 8),

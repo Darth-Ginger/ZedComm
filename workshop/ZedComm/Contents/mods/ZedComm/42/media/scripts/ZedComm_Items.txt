@@ -54,6 +54,15 @@ module ZedComm
         Icon = ZedCommOccupancyPlate,
     }
 
+    item IRSensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.5,
+        Icon = ZedCommIRSensor,
+    }
+
     item WeightPlate
     {
         DisplayCategory = ZedComm,
@@ -696,6 +705,27 @@ module ZedComm
         outputs
         {
             item 1 ZedComm.OccupancyPlate,
+        }
+    }
+
+    craftRecipe ZedCommMakeIRSensor
+    {
+        timedAction = MakingElectrical,
+        time = 100,
+        SkillRequired = Electricity:2,
+        xpAward = Electricity:6,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 2 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.IRSensor,
         }
     }
 

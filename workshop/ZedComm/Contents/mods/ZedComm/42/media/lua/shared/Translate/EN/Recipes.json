@@ -14,6 +14,7 @@
     "ZedCommMakeRainIntensitySensor": "Make Rain Intensity Sensor",
     "ZedCommMakePressurePlate": "Make ZedComm Pressure Plate",
     "ZedCommMakeOccupancyPlate": "Make ZedComm Occupancy Plate",
+    "ZedCommMakeIRSensor": "Make ZedComm IR Proximity Sensor",
     "ZedCommMakeWeightPlate": "Make ZedComm Weight Plate",
     "ZedCommMakeNumericDisplay": "Make ZedComm Numeric Display",
     "ZedCommMakeAdvancedDisplay": "Make ZedComm Advanced Display",

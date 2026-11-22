@@ -33,6 +33,7 @@ local function boot(client, server)
     package.loaded["ZedComm/Devices/NetworkSwitch"] = nil
     package.loaded["ZedComm/Devices/PressureSensor"] = nil
     package.loaded["ZedComm/Devices/OccupancyPlate"] = nil
+    package.loaded["ZedComm/Devices/IRSensor"] = nil
     package.loaded["ZedComm/Devices/WeightPlate"] = nil
     package.loaded["ZedComm/Devices/NumericDisplay"] = nil
     package.loaded["ZedComm/Devices/DebugByteSource"] = nil

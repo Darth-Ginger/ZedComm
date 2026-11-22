@@ -30,6 +30,7 @@ This file is written by `tools/make-recipes.py`. Change recipes there, not here.
 | Rain Intensity Sensor | 2 | 5 | 1 Basic Adapter, 2 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Pressure Plate | 1 | 4 | 1 Sheet Metal, 1 Basic Adapter | Yes |
 | Occupancy Plate | 2 | 5 | 1 Sheet Metal, 1 Electronics Scrap, 1 Basic Adapter | Yes |
+| IR Proximity Sensor | 2 | 6 | 1 Basic Adapter, 2 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Weight Plate | 2 | 6 | 1 Sheet Metal, 2 Electronics Scrap, 1 Basic Adapter | Yes |
 | Numeric Display | 2 | 5 | 2 Electronics Scrap, 1 Basic Adapter | Yes |
 | Advanced Display | 3 | 8 | 3 Electronics Scrap, 1 Advanced Adapter | Yes |
