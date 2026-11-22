@@ -56,14 +56,14 @@ function Sensors.configureSchedule(registry, id, input)
     return registry:setDeviceState(id, state)
 end
 
-local function register(id, sample)
+local function register(id, sample, interval)
     local ok, reason = Definitions.register({
         id = id,
         role = "source",
         ports = { "signal" },
         match = function(object, context) return context.getDefinitionId(object) == id end,
         sample = sample,
-        sampleInterval = 1,
+        sampleInterval = interval,
     })
     if not ok then error(id .. ": " .. reason) end
 end
@@ -77,17 +77,17 @@ end)
 
 register(Sensors.POWER, function(object, context)
     return context.isSensorPowered(object) and 255 or 0
-end)
+end, 1)
 
 register(Sensors.DAYLIGHT, function(object, context)
     if not Sensors.isExposed(object:getSquare()) then return 0 end
     local climate = context.getClimate()
     return climate and toByte(climate:getDayLightStrength())
-end)
+end, 1)
 
 register(Sensors.RAIN, function(object, context)
     return toByte(Sensors.rainIntensity(object:getSquare(), context.getClimate()))
-end)
+end, 1)
 
 ZedComm.EnvironmentalSensors = Sensors
 return Sensors

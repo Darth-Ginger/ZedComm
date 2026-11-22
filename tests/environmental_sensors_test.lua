@@ -110,4 +110,15 @@ sample(0.1)
 check(registry.network.pieces.clock.state.endMinute == 360 and Runtime.getDisplay(clockDisplay) == 255,
     "saved schedule is used immediately after reload")
 
+assert(Sensors.configureSchedule(registry, "clock", "12:01, 12:02"))
+hour, minute = 12, 0
+sample(0.1)
+check(Runtime.getDisplay(clockDisplay) == 0, "one-minute schedule starts off")
+minute = 1
+sample(0.1)
+check(Runtime.getDisplay(clockDisplay) == 255, "fast-forward reaches a one-minute window between weather samples")
+minute = 2
+sample(0.1)
+check(Runtime.getDisplay(clockDisplay) == 0, "fast-forward clears the one-minute window at its end")
+
 test.finish()
