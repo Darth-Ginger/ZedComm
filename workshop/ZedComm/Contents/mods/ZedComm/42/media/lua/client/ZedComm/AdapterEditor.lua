@@ -666,7 +666,7 @@ local function jackReading(panel, id)
         local amount = tostring(value.amount)
         local exact = amount .. " " .. value.unit
         local compact = #amount <= 5 and amount or tostring(math.floor(value.amount + 0.5))
-        local face = #compact <= 5 and compact .. " " .. value.unit or "Weight"
+        local face = #compact <= 5 and compact .. " " .. value.unit or (value.kind == "fluidVolume" and "Volume" or "Weight")
         return face, exact .. (byte ~= nil and (" (byte " .. byte .. ")") or "")
     end
     if byte ~= nil then return tostring(byte), "byte " .. byte end

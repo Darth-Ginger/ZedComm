@@ -148,12 +148,17 @@ evaluatorBoard.links[1].input = "data"
 evaluatorBoard.links[2].input = "enable"
 local cache = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 local weight = packet.weight(1150.25, 115)
+local volume = packet.fluidVolume(0.375)
+check(cache({ input = volume, second = packet.basic(1) }).output == nil,
+    "Cache cannot turn volume into a basic reading")
 check(cache({ input = weight, second = packet.basic(255) }).output.value == 115,
     "Cache forwards the sender fallback at a basic jack")
 evaluatorBoard.outputModes = { output = "advanced" }
 cache = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
 check(packet.equal(cache({ input = weight, second = packet.basic(1) }).output, weight),
     "Cache preserves the full weight at an advanced jack")
+check(packet.equal(cache({ input = volume, second = packet.basic(1) }).output, volume),
+    "Cache preserves fluid volume and unit at an advanced jack")
 check(cache({ input = weight, second = packet.basic(0) }).output == nil
     and cache({ input = weight }).output == nil, "Cache clears when enable is off or missing")
 check(cache({ second = packet.basic(255) }).output == nil, "enabled Cache clears if its data is missing")
@@ -210,6 +215,8 @@ evaluatorBoard.links[1].input, evaluatorBoard.links[2].input = "a", "b"
 evaluatorBoard.modules.module = { kind = "adder", column = 3, row = 3, rotation = 0, fullReading = true }
 check(not Circuit.compilePackets(evaluatorBoard, true, "basic"), "a Basic cabinet rejects Full Reading")
 local read = assert(Circuit.compilePackets(evaluatorBoard, true, "advanced"))
+check(read({ input = volume, second = weight }).output == nil
+    and read({ input = weight, second = volume }).output == nil, "weight math rejects volume in either operand")
 local sum = read({ input = packet.weight(1150.25, 115), second = packet.weight(1600, 160) }).output
 check(sum.value.amount == 2750.25 and sum.basicValue == 255, "full adder sums the original weights before deriving fallback")
 check(read({ input = weight, second = packet.basic(5) }).output == nil, "typed weight math rejects an untyped byte")

@@ -223,7 +223,11 @@ local context = {
     end,
     setDisplayPacket = function(object, packet)
         local value = Modules.Packet.basicValue(packet)
-        readings[object] = { value = value, lit = value ~= nil and value ~= 0, packet = Modules.Packet.copy(packet) }
+        local lit = value ~= nil and value ~= 0
+        if packet and packet.type == "signal.advanced" and packet.value.kind == "fluidVolume" then
+            lit = packet.value.amount > 0
+        end
+        readings[object] = { value = value, lit = lit, packet = Modules.Packet.copy(packet) }
     end,
 }
 

@@ -6,6 +6,7 @@ ZedComm targets Project Zomboid Build 42 singleplayer. Server Lua owns world rec
 
 - A run is an explicit chain with one source. A jack can remain wired when its source is unavailable. Valid zero, unavailable input and physical detach have distinct meanings.
 - The network carries the latest packet. Basic uses an integer from 0 to 255. Advanced uses a typed reading and may supply a byte fallback. A Basic receiver with no usable fallback sees no signal. An Advanced receiver gets a Basic byte unchanged.
+- Advanced `fluidVolume` packets carry a finite nonnegative amount in liters (`L`). They have no Basic fallback. An Advanced Display shows the numeric face and reports exact liters through Read full signal. Cache forwards volume through an Advanced output. Full Reading weight arithmetic requires weight operands.
 - An adapter connects a fixture. A board module processes packets or adds a connection. Logic produces byte decisions, Cache preserves the incoming packet, and supported Full Reading arithmetic can produce typed weight. A cabinet output's mode controls what leaves its jack. Splitter branches are separate runs.
 - Read [ADR-306](adr/ADR-306-cable-runs-as-chains__zedcomm.md), [ADR-309](adr/ADR-309-maintained-signal-packets__zedcomm.md) and [ADR-310](adr/ADR-310-board-signal-boundaries__zedcomm.md) for the design decisions.
 

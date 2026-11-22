@@ -53,7 +53,9 @@ function Definitions.register(def)
         if interval ~= nil and (type(interval) ~= "number" or interval - interval ~= 0 or interval <= 0) then
             return false, "source sampleInterval must be positive finite seconds"
         end
-        if def.readingKind ~= nil and def.readingKind ~= "weight" then return false, "unsupported source reading kind" end
+        if def.readingKind ~= nil and def.readingKind ~= "weight" and def.readingKind ~= "fluidVolume" then
+            return false, "unsupported source reading kind"
+        end
         if def.receiverModule ~= nil or def.bindFixture ~= nil then
             return false, "source cannot define receiver behavior"
         end

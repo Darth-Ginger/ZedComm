@@ -292,7 +292,7 @@ local function orderParts(parts, drivers)
 end
 
 local function weightAmount(packet)
-    if packet and packet.type == "signal.advanced" then return packet.value.amount end
+    if packet and packet.type == "signal.advanced" and packet.value.kind == "weight" then return packet.value.amount end
 end
 
 local function operate(part, spec, a, b)

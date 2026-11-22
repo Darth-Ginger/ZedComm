@@ -1,0 +1,4 @@
+name=ZedComm Rain Gauge Probe
+id=ZedCommRainGaugeProbe
+require=ZedComm
+description=Singleplayer native fluid component verification fixture.

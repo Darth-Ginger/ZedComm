@@ -27,12 +27,12 @@ function Packet.basic(value)
     return { type = BASIC, value = value }
 end
 
-local function isWeight(amount)
+local function isAmount(amount)
     return type(amount) == "number" and amount >= 0 and amount - amount == 0
 end
 
 function Packet.weight(amount, basicValue)
-    if not isWeight(amount) then
+    if not isAmount(amount) then
         return nil, "expected a finite, nonnegative weight"
     end
     return {
@@ -40,6 +40,11 @@ function Packet.weight(amount, basicValue)
         value = { kind = "weight", amount = amount, unit = "kg" },
         basicValue = isByte(basicValue) and basicValue or nil,
     }
+end
+
+function Packet.fluidVolume(amount)
+    if not isAmount(amount) then return nil, "expected a finite, nonnegative volume" end
+    return { type = ADVANCED, value = { kind = "fluidVolume", amount = amount, unit = "L" } }
 end
 
 function Packet.validate(packet)
@@ -51,11 +56,11 @@ function Packet.validate(packet)
     end
     if packet.type == ADVANCED then
         local value = packet.value
-        if isPlainTable(value) and value.kind == "weight" and value.unit == "kg"
-            and isWeight(value.amount) then
-            return true
+        if isPlainTable(value) and isAmount(value.amount) then
+            if value.kind == "weight" and value.unit == "kg" then return true end
+            if value.kind == "fluidVolume" and value.unit == "L" and packet.basicValue == nil then return true end
         end
-        return false, "invalid advanced weight payload"
+        return false, "invalid advanced payload"
     end
     return false, "unknown signal packet type"
 end
@@ -63,7 +68,7 @@ end
 function Packet.basicValue(packet)
     if packet == nil then return nil end
     if packet.type == BASIC then return packet.value end
-    if packet.type == ADVANCED and isByte(packet.basicValue) then return packet.basicValue end
+    if packet.type == ADVANCED and packet.value.kind == "weight" and isByte(packet.basicValue) then return packet.basicValue end
 end
 
 -- Call with validated packets. Normalize an invalid optional fallback to
@@ -72,12 +77,14 @@ function Packet.equal(first, second)
     if first == second then return true end
     if first == nil or second == nil or first.type ~= second.type then return false end
     if first.type == BASIC then return first.value == second.value end
-    return first.value.amount == second.value.amount and Packet.basicValue(first) == Packet.basicValue(second)
+    return first.value.kind == second.value.kind and first.value.amount == second.value.amount
+        and Packet.basicValue(first) == Packet.basicValue(second)
 end
 
 function Packet.copy(packet)
     if packet == nil then return nil end
     if packet.type == BASIC then return Packet.basic(packet.value) end
+    if packet.value.kind == "fluidVolume" then return Packet.fluidVolume(packet.value.amount) end
     return Packet.weight(packet.value.amount, packet.basicValue)
 end
 
@@ -88,7 +95,7 @@ end
 
 function Sender.supports(moduleId, readingKind)
     if moduleId == Modules.BASIC_SENDER then return readingKind == nil or readingKind == "weight" end
-    return moduleId == Modules.ADVANCED_SENDER and readingKind == "weight"
+    return moduleId == Modules.ADVANCED_SENDER and (readingKind == "weight" or readingKind == "fluidVolume")
 end
 
 -- A sender chooses its wire representation without consulting any receiver.
@@ -97,7 +104,8 @@ function Sender.encode(reading, readingKind, moduleId)
     if not Sender.supports(moduleId, readingKind) then return nil, "incompatible sender module" end
     if reading == nil then return nil end
     if readingKind == nil then return Packet.basic(reading) end
-    if not isWeight(reading) then return nil, "expected a finite, nonnegative weight" end
+    if readingKind == "fluidVolume" then return Packet.fluidVolume(reading) end
+    if not isAmount(reading) then return nil, "expected a finite, nonnegative weight" end
 
     local byte = 0
     if reading > 0 then

@@ -14,6 +14,18 @@ local function check(ok, description)
 end
 
 local Packet = modules.Packet
+local volume = assert(sender.encode(0.1875, "fluidVolume", modules.ADVANCED_SENDER))
+local copy = Packet.copy(volume)
+check(Packet.validate(volume) and copy.value.kind == "fluidVolume" and copy.value.unit == "L"
+    and copy.value.amount == 0.1875 and copy.value ~= volume.value and Packet.equal(copy, volume),
+    "volume copies retain exact liters independently")
+check(not Packet.equal(volume, Packet.weight(0.1875)) and Packet.basicValue(volume) == nil
+    and sender.encode(1, "fluidVolume", modules.BASIC_SENDER) == nil, "volume has no byte representation")
+copy.basicValue = 0
+check(not Packet.validate(copy) and Packet.basicValue(copy) == nil, "volume cannot claim a fallback")
+copy.basicValue, copy.value.unit = nil, "kg"
+check(not Packet.validate(copy) and Packet.fluidVolume(math.huge) == nil and Packet.fluidVolume(-1) == nil
+    and Packet.fluidVolume(0).value.amount == 0, "volume requires finite nonnegative liters")
 check(sender.fromBoolean(false) == 0 and sender.fromBoolean(true) == 255,
     "occupancy maps to the existing 0/255 byte values")
 check(sender.fromBoolean(0) == nil, "Lua truthiness cannot silently turn byte zero into true")

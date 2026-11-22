@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Advanced packets support fluid volume in liters for displays and Cache. A developer-only rain gauge probe exercises the game's native fluid component.
+
 - A connected door's Open input releases manual movement when its signal is unavailable. A valid zero still commands Close.
 
 - Fixture names and separate lock and door status icons sit closer to their fixtures and below game windows. A door sprite that catches a right-click exposes the menu for reachable fixtures behind it.
