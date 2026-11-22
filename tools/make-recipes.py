@@ -36,6 +36,8 @@ RECIPES = [
 
     ("Wire and devices", "DoorContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
     ("Wire and devices", "WindowContact", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Wire and devices", "StorageSensor", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
+    ("Wire and devices", "FluidFillSensor", 1, 50, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),
     ("Wire and devices", "SignalWire", None, 30, {WIRE: 1}, 5, False, 1),
     ("Wire and devices", "NetworkSwitch", None, 60, {SCRAP: 1, WIRE: 1}, 1, True, 2),
     ("Wire and devices", "TimeOfDaySensor", 1, 70, {BASIC: 1, SCRAP: 1, WIRE: 1}, 1, True, 4),

@@ -59,24 +59,28 @@ function Installation.contactMaterials(character, definitionId)
     return item
 end
 
-function Installation.installContact(character, registry, host, id, definitionId)
+function Installation.installContact(character, registry, host, id, definitionId, selection)
     definitionId = definitionId or Contact.ID
     if not Contact.canFit(host, definitionId) then return false, "Choose an intact fixture without a contact sensor." end
     local item, reason = Installation.contactMaterials(character, definitionId)
     if not item then return false, reason end
     local square = host:getSquare()
     local profile = Contact.profiles[definitionId]
-    local object = IsoObject.new(square, "zedcomm_door_floor_01_0", profile.name)
-    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = definitionId }
+    local state = profile.installState and profile.installState(host, selection)
+    if profile.installState and not state then return false, "Choose an available compartment." end
+    local object = IsoObject.new(square, profile.sprite or "zedcomm_door_floor_01_0", profile.name)
+    object:getModData().zedcomm = { id = id, kind = "endpoint", definitionId = definitionId, state = state }
     character:getInventory():Remove(item)
-    host:getModData().zedcommContact = id
+    local hostData = host:getModData()
+    local previousMarker = hostData.zedcommContact
+    hostData.zedcommContact = id
     local called, ok, errorMessage = pcall(function()
         square:AddTileObject(object)
         return registry:addPiece(object)
     end)
     if not called or not ok then
         if registry.network.pieces[id] then registry:removePiece(id) end
-        host:getModData().zedcommContact = nil
+        hostData.zedcommContact = previousMarker
         object:getModData().zedcomm = nil
         pcall(square.transmitRemoveItemFromSquare, square, object)
         character:getInventory():AddItem(item)

@@ -25,7 +25,7 @@ local function position(entry, door)
     local x, y = piece.x + 0.5, piece.y + 0.5
     local contact = ZedComm.DoorContact
     local host = door and entry.object
-        or (contact.profiles[piece.definitionId] and contact.host(entry.object))
+        or contact.host(entry.object, true)
     if host then
         if host:isNorth() then y = piece.y else x = piece.x end
         return x, y, ZedComm.Door.oppositeSquare(host)

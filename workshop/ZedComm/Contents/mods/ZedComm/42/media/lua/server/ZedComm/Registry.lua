@@ -295,19 +295,13 @@ function SZedCommSystem:loadIsoObject(isoObject)
 end
 
 function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
-    local contactId = isoObject:hasModData() and isoObject:getModData().zedcommContact
-    if contactId then
+    if isoObject:hasModData() and isoObject:getModData().zedcommContact then
+        local fixture, id = ZedComm.DoorContact.fixtureForHost(isoObject)
         isoObject:getModData().zedcommContact = nil
-        if self.network.pieces[contactId] then self:removePiece(contactId) end
-        local square = isoObject:getSquare()
-        local objects = square:getObjects()
-        for i = objects:size() - 1, 0, -1 do
-            local object = objects:get(i)
-            local contactTag = tagOf(object)
-            if contactTag and contactTag.id == contactId then
-                object:getModData().zedcomm = nil
-                square:transmitRemoveItemFromSquare(object)
-            end
+        if fixture then
+            if self.network.pieces[id] then self:removePiece(id) end
+            fixture:getModData().zedcomm = nil
+            isoObject:getSquare():transmitRemoveItemFromSquare(fixture)
         end
     end
     local tag = tagOf(isoObject)

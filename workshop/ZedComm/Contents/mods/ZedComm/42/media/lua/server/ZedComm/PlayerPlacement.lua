@@ -42,6 +42,7 @@ local items = {
 local relaySpec = { name = "relay lamp", kind = "endpoint", definitionId = Relay.ID, nativePickup = true,
     fixtureType = "Lamp" }
 local Door, Contact = ZedComm.Door, ZedComm.DoorContact
+local Sensors = ZedComm.ContainerSensors
 local contactSpecs = {}
 for id, profile in pairs(Contact.profiles) do
     contactSpecs[id] = { name = profile.name:lower(), kind = "endpoint", definitionId = id,
@@ -128,7 +129,7 @@ end
 
 local function edgeFixture(object)
     if Door.isEligible(object) or (object and instanceof(object, "IsoWindow")) then return object end
-    if object then return Contact.host(object) end
+    if object then return Contact.host(object, true) end
 end
 
 function Placement.oppositeFace(square, object)
@@ -232,6 +233,14 @@ end
 
 function Placement.windowContactCandidates(square)
     return fixtureCandidates(square, function(object) return Contact.canFit(object, Contact.WINDOW_ID) end)
+end
+
+function Placement.containerSensorCandidates(square, definitionId)
+    local out = {}
+    for _, object in ipairs(squareObjects(square)) do
+        if Contact.canFit(object, definitionId) then out[#out + 1] = object end
+    end
+    return out
 end
 
 local function collectPieces(registry, square, out, face)
@@ -807,19 +816,21 @@ local wireRunMessages = {
 }
 
 local function contactInstallation(contactId, message)
+    local profile = Contact.profiles[contactId]
     return {
         duration = 120,
         message = message,
         validate = function(character, command)
             return Contact.canFit(command.object, contactId) and command.object:getSquare() == command.square
                 and ZedComm.DoorInstallation.contactMaterials(character, contactId) ~= nil
+                and (not profile.installState or profile.installState(command.object, command.compartment) ~= nil)
         end,
         execute = function(registry, character, command)
             if not onSquare(command.object, command.square) then
                 return false, "That fixture is no longer on the tile."
             end
             return ZedComm.DoorInstallation.installContact(character, registry, command.object,
-                chooseId(registry, command.square), contactId)
+                chooseId(registry, command.square), contactId, command.compartment)
         end,
     }
 end
@@ -1045,11 +1056,25 @@ local commands = {
     ["install-door-contact"] = contactInstallation(Contact.ID,
         "Door contact installed. Its output reports actual door position."),
     ["install-window-contact"] = contactInstallation(Contact.WINDOW_ID, "Window contact fitted."),
+    ["install-storage-sensor"] = contactInstallation(Sensors.STORAGE, "Storage sensor fitted."),
+    ["install-fluid-fill-sensor"] = contactInstallation(Sensors.FLUID, "Fluid fill sensor fitted."),
+    ["configure-storage-sensor"] = {
+        target = true,
+        acceptsTarget = function(target) return target.piece.definitionId == Sensors.STORAGE end,
+        execute = function(registry, _, command, target)
+            local host = Contact.host(target.object)
+            local selection = Sensors.storageState(host, command.compartment, command.mode)
+            if not selection then return false, "Choose an available compartment and output mode." end
+            local state = registry.network:record(target.id).state or {}
+            for key, value in pairs(selection) do state[key] = value end
+            return registry:setDeviceState(target.id, state)
+        end,
+    },
     ["remove-door-contact"] = {
         target = true,
         acceptsTarget = function(target) return contactSpecs[target.piece.definitionId] ~= nil end,
         duration = 120,
-        message = "Contact sensor returned to inventory.",
+        message = "Sensor returned to inventory.",
         execute = function(registry, character, _, target)
             if not character:getInventory():getFirstType("Base.Screwdriver") then return false, "Bring a screwdriver." end
             return ZedComm.DoorInstallation.removeContact(character, registry, target)

@@ -1,5 +1,23 @@
 module ZedComm
 {
+    item StorageSensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.15,
+        Icon = ZedCommWindowContact,
+    }
+
+    item FluidFillSensor
+    {
+        DisplayCategory = ZedComm,
+        Tags = zedcomm:endpoint;zedcomm:source,
+        ItemType = base:normal,
+        Weight = 0.15,
+        Icon = ZedCommWindowContact,
+    }
+
     item WindowContact
     {
         DisplayCategory = ZedComm,
@@ -458,6 +476,48 @@ module ZedComm
         outputs
         {
             item 1 ZedComm.WindowContact,
+        }
+    }
+
+    craftRecipe ZedCommMakeStorageSensor
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:4,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.StorageSensor,
+        }
+    }
+
+    craftRecipe ZedCommMakeFluidFillSensor
+    {
+        timedAction = MakingElectrical,
+        time = 50,
+        SkillRequired = Electricity:1,
+        xpAward = Electricity:4,
+        Tags = InHandCraft;Electrical,
+        category = ZedComm,
+        inputs
+        {
+            item 1 tags[base:screwdriver] mode:keep flags[NoBrokenItems],
+            item 1 [ZedComm.BasicAdapter],
+            item 1 [Base.ElectronicsScrap],
+            item 1 [Base.ElectricWire;Base.Wire],
+        }
+        outputs
+        {
+            item 1 ZedComm.FluidFillSensor,
         }
     }
 

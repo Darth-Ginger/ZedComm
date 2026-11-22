@@ -4,5 +4,16 @@
     "IGUI_ZedComm_FixtureLabels": "Show fixture name labels",
     "IGUI_ZedComm_FixtureLabelsTooltip": "Show the world-space names of fixtures with their name label enabled.",
     "IGUI_ZedComm_DoorMarkers": "Show door status markers",
-    "IGUI_ZedComm_DoorMarkersTooltip": "Show the floating maglock icon and lock and door state."
+    "IGUI_ZedComm_DoorMarkersTooltip": "Show the floating maglock icon and lock and door state.",
+    "IGUI_ZedComm_StorageSensor": "Storage Sensor",
+    "IGUI_ZedComm_FluidFillSensor": "Fluid Fill Sensor",
+    "IGUI_ZedComm_StorageCompartment": "%1. %2",
+    "IGUI_ZedComm_StorageFullness": "Fullness",
+    "IGUI_ZedComm_StorageFree": "Free capacity",
+    "IGUI_ZedComm_StorageOutput": "%1 - %2",
+    "IGUI_ZedComm_StorageSelected": "%1 (selected)",
+    "IGUI_ZedComm_FitStorageSensor": "Fit storage sensor to %1",
+    "IGUI_ZedComm_FitFluidFillSensor": "Fit fluid fill sensor",
+    "IGUI_ZedComm_RemoveSensor": "Remove sensor",
+    "IGUI_ZedComm_DisconnectSensorWire": "Disconnect sensor wire"
 }

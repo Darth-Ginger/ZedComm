@@ -964,6 +964,14 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     local adapter = inventory:getFirstType(circuit.ADVANCED_ADAPTER_ITEM)
     local padlock = inventory:getFirstType("Base.Padlock")
     local wireNumber = 0
+    local sensors, contact = ZedComm.ContainerSensors, ZedComm.DoorContact
+    local function compartmentLabel(selection)
+        local container = selection.container
+        local title = container:getCustomName() or getTextOrNull("IGUI_ContainerTitle_" .. container:getType())
+            or getTextOrNull("IGUI_ContainerTitle_" .. container:getDisplayType()) or container:getType()
+        return getText("IGUI_ZedComm_StorageCompartment", selection.index + 1, title)
+    end
+
     for _, entry in ipairs(targets) do
         local name = fixtureLabel(entry)
         local cabinet = circuit.cabinets[entry.piece.definitionId] ~= nil
@@ -1026,6 +1034,23 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             addDevice("Set pressure plate output (" .. value .. ")", configurePressurePlate, registry, entry)
         elseif entry.piece.definitionId == ZedComm.EnvironmentalSensors.CLOCK then
             addDevice("Set daily schedule", configureSchedule, registry, entry)
+        elseif entry.piece.definitionId == sensors.STORAGE then
+            local state = entry.piece.state or {}
+            local host = contact.host(entry.object)
+            for _, selection in ipairs(sensors.compartments(host)) do
+                for _, mode in ipairs({ "fullness", "free" }) do
+                    local modeLabel = getText(mode == "free" and "IGUI_ZedComm_StorageFree"
+                        or "IGUI_ZedComm_StorageFullness")
+                    local label = getText("IGUI_ZedComm_StorageOutput", compartmentLabel(selection), modeLabel)
+                    if state.mode == mode and state.compartment == selection.index
+                        and state.compartmentCount == host:getContainerCount()
+                        and state.containerType == selection.container:getType() then
+                        label = getText("IGUI_ZedComm_StorageSelected", label)
+                    end
+                    action(label, { kind = "configure-storage-sensor", targetId = entry.id, object = entry.object,
+                        compartment = selection, mode = mode }, group)
+                end
+            end
         elseif entry.piece.definitionId == ZedComm.NetworkSwitch.ID then
             local on = not (entry.piece.state and entry.piece.state.on)
             action(on and "Turn network switch on" or "Turn network switch off", {
@@ -1071,9 +1096,12 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                 action("Remove door adapters", { kind = "remove-door-adapters", targetId = entry.id, object = entry.object },
                     group, padlockId and "Remove padlock first" or nil)
             elseif ZedComm.DoorContact.profiles[entry.piece.definitionId] then
-                action("Remove " .. entry.spec.name, { kind = "remove-door-contact", targetId = entry.id, object = entry.object }, group)
+                local profile = contact.profiles[entry.piece.definitionId]
+                local label = profile.edge and ("Remove " .. entry.spec.name) or getText("IGUI_ZedComm_RemoveSensor")
+                action(label, { kind = "remove-door-contact", targetId = entry.id, object = entry.object }, group)
                 if entry.piece.ports.signal then
-                    action("Disconnect contact wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
+                    action(profile.edge and "Disconnect contact wire"
+                        or getText("IGUI_ZedComm_DisconnectSensorWire"), { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
                 end
             else
                 action("Remove lamp adapter", { kind = "remove-lamp-adapter", targetId = entry.id, object = entry.object }, group)
@@ -1114,6 +1142,24 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         and ZedComm.DoorInstallation.contactMaterials(player, ZedComm.DoorContact.WINDOW_ID) then
         for _, window in ipairs(placement.windowContactCandidates(square)) do
             action("Install window contact", { kind = "install-window-contact", object = window }, fixtureMenu("Window"))
+        end
+    end
+
+    if inventory:getFirstType(sensors.STORAGE)
+        and ZedComm.DoorInstallation.contactMaterials(player, sensors.STORAGE) then
+        for _, host in ipairs(placement.containerSensorCandidates(square, sensors.STORAGE)) do
+            local group = fixtureMenu(getText("IGUI_ZedComm_StorageSensor"))
+            for _, selection in ipairs(sensors.compartments(host)) do
+                action(getText("IGUI_ZedComm_FitStorageSensor", compartmentLabel(selection)),
+                    { kind = "install-storage-sensor", object = host, compartment = selection }, group)
+            end
+        end
+    end
+    if inventory:getFirstType(sensors.FLUID)
+        and ZedComm.DoorInstallation.contactMaterials(player, sensors.FLUID) then
+        for _, host in ipairs(placement.containerSensorCandidates(square, sensors.FLUID)) do
+            action(getText("IGUI_ZedComm_FitFluidFillSensor"), { kind = "install-fluid-fill-sensor", object = host },
+                fixtureMenu(getText("IGUI_ZedComm_FluidFillSensor")))
         end
     end
 

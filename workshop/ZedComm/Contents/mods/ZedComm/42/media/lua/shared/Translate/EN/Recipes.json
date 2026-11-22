@@ -3,6 +3,8 @@
     "ZedCommMakeAdvancedAdapter": "Make ZedComm Advanced Adapter",
     "ZedCommMakeDoorContact": "Make ZedComm Door Contact",
     "ZedCommMakeWindowContact": "Make ZedComm Window Contact",
+    "ZedCommMakeStorageSensor": "Make ZedComm Storage Sensor",
+    "ZedCommMakeFluidFillSensor": "Make ZedComm Fluid Fill Sensor",
     "ZedCommMakeSignalWire": "Make ZedComm Signal Wire",
     "ZedCommMakeSignalWireFromWireRoll": "Make ZedComm Signal Wire (whole Wire roll)",
     "ZedCommMakeNetworkSwitch": "Make ZedComm Network Switch",

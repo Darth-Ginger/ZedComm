@@ -40,5 +40,7 @@
     "ZedComm.RainIntensitySensor": "Rain Intensity Sensor",
     "ZedComm.NetworkSwitch": "ZedComm Network Switch",
     "ZedComm.DoorContact": "ZedComm Door Contact",
+    "ZedComm.StorageSensor": "ZedComm Storage Sensor",
+    "ZedComm.FluidFillSensor": "ZedComm Fluid Fill Sensor",
     "ZedComm.WindowContact": "ZedComm Window Contact"
 }

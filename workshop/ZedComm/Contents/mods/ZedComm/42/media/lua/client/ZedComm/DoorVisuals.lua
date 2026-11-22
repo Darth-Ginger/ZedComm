@@ -78,6 +78,7 @@ function Visuals.update(network, cell)
     local seen = {}
     for id, piece in pairs(network and network.pieces or {}) do
         local contact = ZedComm.DoorContact.profiles[piece.definitionId]
+        if contact and not contact.edge then contact = nil end
         if contact or piece.definitionId == ZedComm.InternalCircuit.DOOR_ID then
             local square = cell and cell:getGridSquare(piece.x, piece.y, piece.z)
             local object = findObject(square, id)
