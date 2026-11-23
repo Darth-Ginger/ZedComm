@@ -1,13 +1,13 @@
 # ZedComm Player Guide
 
-ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft parts under **Crafting â†’ ZedComm**. [Recipes and Electrical requirements](recipes.md).
+ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft parts under **Crafting > ZedComm**. [Recipes and Electrical requirements](recipes.md).
 
 ## Place and wire a circuit
 
 1. Use native **Place** and **Cycle through objects** to select a source and a receiver. For a first circuit, use a Pressure Plate and a Numeric Display.
 2. Cycle to **Signal Wire**. Click a free device jack and choose **Connect to**. If the jack tile cannot take wire, choose a valid neighboring floor tile for the first segment.
 3. Click neighboring tiles to extend the run. Click the receiver or another compatible free end and choose **Connect to**. Joining existing ends uses no spare wire. **Lay wire here** adds a segment when you have one.
-4. To resume a run, right-click its end and choose **ZedComm â†’ Select free end**. Your character walks within reach if needed, and native **Place** opens with Signal Wire selected. Right-click exits Place and keeps a reachable end selected for a context-menu connection. Walking out of reach clears that selection.
+4. To resume a run, right-click its end and choose **ZedComm > Select free end**. Your character walks within reach if needed, and native **Place** opens with Signal Wire selected. Right-click exits Place and keeps a reachable end selected for a context-menu connection. Walking out of reach clears that selection.
 5. Use native **Pickup** to recover equipment or wire. A recovered device retains its settings and installed parts. External wires stay in the world, ready to reconnect.
 
 On shared tiles, cycle through numbered wires or open a specific wire's submenu. Hover a choice to outline that segment in cyan. Up to five wire lanes can share a tile edge. Keep one source per run. Use a Splitter for one signal going to multiple independent runs.
@@ -46,7 +46,7 @@ To change a Pressure Plate's occupied value, right-click it and choose **ZedComm
 
 ## Cabinets and local circuits
 
-An **adapter** connects the fixture to the wire. A **module** processes a signal or adds a connection inside a board. Basic cabinets handle bytes. Advanced cabinets can handle full readings and let you configure each output's signal mode. Small and Tabletop cabinets use 6Ã—6 boards with one fixed IN/OUT pair. Large and Wall use 8Ã—8 with two pairs, and XL uses 10Ã—10 with three.
+An **adapter** connects the fixture to the wire. A **module** processes a signal or adds a connection inside a board. Basic cabinets handle bytes. Advanced cabinets can handle full readings and let you configure each output's signal mode. Small and Tabletop cabinets use 6x6 boards with one fixed IN/OUT pair. Large and Wall use 8x8 with two pairs, and XL uses 10x10 with three.
 
 Double-click a nearby cabinet, choose a carried module and drag it onto the grid. Rotate removable parts with **Rotate Building**. Port extensions and Splitters must sit at an edge with their external jacks facing out. Link an output contact to an input contact, and complete the path to a board output. Right-click a link to remove it. Right-click a part to configure or remove it. Fixed jacks stay in place. The board supplies internal links, while external connections use Signal Wire.
 
@@ -54,11 +54,11 @@ Threshold and Boolean logic emit 0 or 255. Use **Cache** to pass the original re
 
 ## Retrofit a vanilla lamp
 
-With a Screwdriver, fit a **Basic Adapter** at Electrical 1 or **Advanced Adapter** at Electrical 3 from the lamp's ZedComm submenu. An Advanced Adapter has a 3Ã—3 local board. The lamp needs its normal bulb and power. A wired lamp follows the signal and switches off on signal loss. Unplug it or remove the adapter to restore manual control. Native pickup retains the installation but leaves the wire behind.
+With a Screwdriver, fit a **Basic Adapter** at Electrical 1 or **Advanced Adapter** at Electrical 3 from the lamp's ZedComm submenu. An Advanced Adapter has a 3x3 local board. The lamp needs its normal bulb and power. A wired lamp follows the signal and switches off on signal loss. Unplug it or remove the adapter to restore manual control. Native pickup retains the installation but leaves the wire behind.
 
 ## Doors and contacts
 
-Fit two matched Basic or Advanced Adapters to a supported native door. The shared 6Ã—3 board has independent **Lock IN** and **Open IN** controls. Lock ON blocks new openings and waits if the door is already open. Open ON opens an unlocked door, and a valid 0 closes it when the door can move. Loss of signal unlocks a connected Lock input and releases Open to manual. Physically disconnecting Lock restores the original native lock state. Install a Door or Window Contact separately when you need the fixture's actual state as an output.
+Fit two matched Basic or Advanced Adapters to a supported native door. The shared 6x3 board has independent **Lock IN** and **Open IN** controls. Lock ON blocks new openings and waits if the door is already open. Open ON opens an unlocked door, and a valid 0 closes it when the door can move. Loss of signal unlocks a connected Lock input and releases Open to manual. Physically disconnecting Lock restores the original native lock state. Install a Door or Window Contact separately when you need the fixture's actual state as an output.
 
 ## Names, access and overlays
 
