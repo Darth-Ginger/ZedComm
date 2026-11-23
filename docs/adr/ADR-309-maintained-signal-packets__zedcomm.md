@@ -1,25 +1,11 @@
 ---
-project: zedcomm
-created_date: "Thursday, November 12th 2026, 2:18:49 pm"
-last_update: "Thursday, November 12th 2026, 2:34:35 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 309
-aliases: []
 authors:
   - Codex
   - Darth-Ginger
 deciders:
   - Darth-Ginger
-decision_topic: "Use Maintained Signal Packets"
 decision_date: 2026-11-12
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - architecture
-  - signals
 ---
 
 # ADR-309: Use Maintained Signal Packets
@@ -30,7 +16,7 @@ ADR-301 defines a straight-through byte circuit in terms of eight logical lanes.
 
 ## Decision
 
-Supersede ADR-301. A connected wire run carries the source's latest logical packet unchanged. The network models maintained values and availability. Serialization, lane representation, bit timing, and per-wire propagation time stay implicit. Each segment keeps one source under the existing topology rules.
+Supersede [ADR-301](ADR-301-parallel-straight-through-byte-signals__zedcomm.md). A connected wire run carries the source's latest logical packet unchanged. The network models maintained values and availability. Serialization, lane representation, bit timing, and per-wire propagation time stay implicit. Each segment keeps one source under the existing topology rules.
 
 - The Basic Sender publishes a `signal.basic` packet with an integer `value` from 0 to 255.
 - The Advanced Sender publishes a `signal.advanced` packet with a typed `value`. That value can represent a larger number, text, or structured data. The sender can also supply an optional `basicValue` byte when it has a meaningful conversion.
@@ -59,13 +45,9 @@ Recompute and deliver changed maintained values through the existing simulation 
 
 ## Related
 
-```dataview
-TABLE
-    file.folder AS "Folder",
-    adr-status AS "Status",
-    adr_domain AS "Domain",
-    decision_topic AS "Topic",
-    last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-301](ADR-301-parallel-straight-through-byte-signals__zedcomm.md)
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-303](ADR-303-unacknowledged-state-fail-off__zedcomm.md)
+- [ADR-305](ADR-305-dirty-networks-drained-per-tick__zedcomm.md)
+- [ADR-306](ADR-306-cable-runs-as-chains__zedcomm.md)
+- [ADR-307](ADR-307-four-network-object-roles__zedcomm.md)

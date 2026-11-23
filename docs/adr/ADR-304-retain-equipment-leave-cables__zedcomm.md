@@ -1,23 +1,10 @@
 ---
-project: zedcomm
-created_date: "Saturday, October 24th 2026, 10:47:52 pm"
-last_update: "Saturday, November 21st 2026, 5:25:51 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 304
-aliases: []
 authors:
   - ChatGPT
 deciders:
   - Darth-Ginger
-decision_topic: "Retain Equipment Modules and Leave Cables on Relocation"
 decision_date: 2026-10-24
-fileClass: adr
-related-adr: []
-related-cards:
-tags:
-  - zedcomm
-  - architecture
 ---
 
 # ADR-304: Retain Equipment Modules and Leave Cables on Relocation
@@ -25,8 +12,6 @@ tags:
 ## Context
 
 Players will eventually place devices and cabinets, install modules through context-menu actions and attach laid cable ends explicitly. Relocating equipment should preserve assembly work without requiring every cable to be relaid.
-
-Source: Design discussion. Darth-Ginger approved this record during the decision review. Implementation and validation have not yet occurred.
 
 ## Decision
 
@@ -47,14 +32,3 @@ Native Place, Move, and Pickup own equipment placement and relocation. The ZedCo
 - Requires preserving per-item module state when those features are implemented.
 - Leaves disconnected cable ends that future UI must make identifiable.
 - Couplers and module installation add later implementation work.
-
-## Related
-
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```

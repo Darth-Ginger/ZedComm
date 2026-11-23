@@ -1,25 +1,11 @@
 ---
-project: zedcomm
-created_date: "Friday, November 6th 2026, 3:45:00 pm"
-last_update: "Friday, November 6th 2026, 3:45:00 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 307
-aliases: []
 authors:
   - Claude
   - Darth-Ginger
 deciders:
   - Darth-Ginger
-decision_topic: "Four network object roles: source, receiver, cable, infrastructure"
 decision_date: 2026-11-06
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - architecture
-  - topology
 ---
 
 # ADR-307: Four Network Object Roles
@@ -56,11 +42,6 @@ The MVP ships only sources, receivers and cables. Infrastructure is named here s
 
 ## Related
 
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-301](ADR-301-parallel-straight-through-byte-signals__zedcomm.md)
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-306](ADR-306-cable-runs-as-chains__zedcomm.md)

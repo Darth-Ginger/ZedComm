@@ -1,23 +1,10 @@
 ---
-project: zedcomm
-created_date: "Saturday, October 24th 2026, 10:47:50 pm"
-last_update: "Saturday, October 24th 2026, 10:47:50 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 303
-aliases: []
 authors:
   - ChatGPT
 deciders:
   - Darth-Ginger
-decision_topic: "Deliver Unacknowledged State with Endpoint Failure Policies"
 decision_date: 2026-10-24
-fileClass: adr
-related-adr: []
-related-cards:
-tags:
-  - zedcomm
-  - architecture
 ---
 
 # ADR-303: Deliver Unacknowledged State with Endpoint Failure Policies
@@ -26,7 +13,7 @@ tags:
 
 A sensor should publish without tracking whether a receiver exists. The display must distinguish valid zero from a broken connection and recover predictably after reconnection. Real-world simple binary wires do not inherently expose connection health; this is an intentional simulation abstraction.
 
-Source: Design discussion. Darth-Ginger approved this record with the abstract OFF default and overridable endpoint-definition clarification. The maintained level, OFF default and recovery behavior are implemented. Offline coverage includes unloading and reloading the source.
+The maintained level, OFF default and recovery behavior are implemented. Offline coverage includes unloading and reloading the source.
 
 ## Decision
 
@@ -49,14 +36,3 @@ If a source tile or definition is unavailable, the circuit keeps its saved topol
 - No end-to-end delivery guarantee or acknowledgement is provided.
 - Explicit connectivity knowledge is more abstract than an unsupervised electrical switch.
 - Fail-off can be inappropriate for other devices; those devices must define their own policy.
-
-## Related
-
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```

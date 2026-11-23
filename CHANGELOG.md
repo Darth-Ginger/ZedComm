@@ -37,6 +37,7 @@
 
 - Networked doors have a placeholder attached maglock housing with four mounting faces and both hinge layouts, separate hinge-side risers, floor-overlay leads and an actual-lock light. Native door sprites are retained. Visual alignment awaits gameplay verification.
 
+- Single-panel map and player-built doors can be fitted with two matching adapters. Lock and Open are independent inputs. Lock ON waits for an already-open door to close, unavailable Lock unlocks, and unwired functions return native control. Basic has fixed paths. Advanced provides a 6x3 board using existing modules. Installation/removal are timed and return adapters and modules on removal.
 
 - Registry integration checks are split into independent persistence, runtime, placement, rendering, lamp, plate, debug-menu and editor suites with shared fixtures. The Lua runner reports total checks and names suites skipped without installed game Lua.
 
@@ -93,3 +94,4 @@
 - Bash versions of both tools (`build.sh`, `link-dev.sh`, shared `lib.sh`) for Linux and Git Bash, plus `selftest.sh`.
 - CI runs the PowerShell and Git Bash tools on Windows and the bash tools on Linux.
 - `preview.png` for the Workshop, drawn by `tools/make-preview.py`.
+- Added ADR-101, ADR-102 and ADR-301 to ADR-304 to the repository.

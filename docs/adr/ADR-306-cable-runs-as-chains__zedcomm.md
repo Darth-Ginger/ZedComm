@@ -1,25 +1,11 @@
 ---
-project: zedcomm
-created_date: "Friday, November 6th 2026, 3:45:00 pm"
-last_update: "Friday, November 6th 2026, 3:45:00 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 306
-aliases: []
 authors:
   - Claude
   - Darth-Ginger
 deciders:
   - Darth-Ginger
-decision_topic: "Cable runs are explicit chains with one source"
 decision_date: 2026-11-06
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - cabling
-  - topology
 ---
 
 # ADR-306: Cable Runs Are Explicit Chains With One Source
@@ -28,7 +14,7 @@ tags:
 
 Open decision 6 in the Design and MVP note left cable route ordering undecided. ADR-304 already requires cable ends to connect explicitly to equipment ports, so adjacency alone never terminates an endpoint. That left the question of how cable pieces connect to each other: by sitting on neighbouring squares, or by explicit links laid with the run.
 
-Adjacency between cable pieces would make two parallel runs on neighbouring squares merge without anyone choosing it, and would let a single piece touch up to four others, which turns every run into a possible branch. The offline network model written on 2026-11-06 (`shared/ZedComm/Network.lua`) took the explicit route; Darth-Ginger reviewed and confirmed it.
+Adjacency between cable pieces would make two parallel runs on neighbouring squares merge without anyone choosing it, and would let a single piece touch up to four others, which turns every run into a possible branch. The offline network model written on 2026-11-06 (`shared/ZedComm/Network.lua`) uses explicit connections.
 
 A second question came with it: what a network does when more than one source drives it. Choosing a winner, merging values or routing between them all need rules the MVP does not need.
 
@@ -57,11 +43,6 @@ For the MVP a network carries exactly one source. A link that would put a second
 
 ## Related
 
-- Design and MVP (open decision 6)
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-304](ADR-304-retain-equipment-leave-cables__zedcomm.md)
+- [ADR-307](ADR-307-four-network-object-roles__zedcomm.md)

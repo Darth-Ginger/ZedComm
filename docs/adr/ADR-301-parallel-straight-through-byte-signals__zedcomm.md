@@ -1,34 +1,19 @@
 ---
-project: zedcomm
-created_date: "Saturday, October 24th 2026, 10:47:46 pm"
-last_update: "Thursday, November 12th 2026, 2:18:49 pm"
 adr-status: superseded
-adr_domain: Architecture
-adr_number: 301
-aliases: []
 authors:
   - ChatGPT
 deciders:
   - Darth-Ginger
-decision_topic: "Use Parallel Straight Through Byte Signals"
 decision_date: 2026-10-24
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - architecture
 ---
 
 # ADR-301: Use Parallel Straight Through Byte Signals
 
-> Superseded by ADR-309.
+> Superseded by [ADR-309](ADR-309-maintained-signal-packets__zedcomm.md).
 
 ## Context
 
 Earlier exploration considered serial packets, framing and eight-conductor cables. The selected MVP needs persistent on/off sensing and a simple route to mixed values without a serial protocol.
-
-Source: Design discussion. Darth-Ginger approved this record with the infrastructure-device clarification during the decision review. Implementation and validation have not yet occurred.
 
 ## Decision
 
@@ -49,11 +34,4 @@ Represent the cable as eight simultaneous logical bit lanes forming an unsigned 
 
 ## Related
 
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-309](ADR-309-maintained-signal-packets__zedcomm.md)

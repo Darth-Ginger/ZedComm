@@ -1,25 +1,10 @@
 ---
-project: zedcomm
-created_date: "Saturday, November 21st 2026, 5:25:51 pm"
-last_update: "Saturday, November 21st 2026, 5:25:51 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 310
-aliases: []
 authors:
   - Codex
 deciders:
   - Darth-Ginger
-decision_topic: "Define Circuit Board Signal Boundaries"
 decision_date: 2026-11-21
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - architecture
-  - signals
-  - circuit-boards
 ---
 
 # ADR-310: Define Circuit Board Signal Boundaries
@@ -50,13 +35,6 @@ An adapter provides a fixture's network connection. Modules installed in a board
 
 ## Related
 
-```dataview
-TABLE
-    file.folder AS "Folder",
-    adr-status AS "Status",
-    adr_domain AS "Domain",
-    decision_topic AS "Topic",
-    last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-306](ADR-306-cable-runs-as-chains__zedcomm.md)
+- [ADR-309](ADR-309-maintained-signal-packets__zedcomm.md)

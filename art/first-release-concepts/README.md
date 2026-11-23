@@ -1,5 +1,6 @@
 # ZedComm first-release sprite sources
 
+These transparent PNGs were generated with the built-in ImageGen tool. Keep these as source art for prototyping. Validate anchors, dimensions, occlusion and state registration in Build 42 before packing.
 
 ## Base image prompts
 
@@ -119,4 +120,3 @@ Redesign this ZedComm tabletop network cabinet as a purpose-built early-1990s in
 ### Projection pass prompt
 
 Keep this purpose-built bench cabinet with the same wide low panel, flat top vents, dark rubber feet, compact front port bank and complete lack of any mounting brackets or tabs. Correct only the camera projection and front-to-back depth for a Build 42 isometric game world sprite. The cabinet sits square to a 2:1 tile diamond, its front long edges run diagonally down-right at approximately 26.5 degrees, and its short depth edges run diagonally up-right at approximately 26.5 degrees. Both sets of edges have visibly similar opposing slopes, as on an exact 2:1 isometric box, with all cabinet verticals upright. Make the short right end visible, the box squat and about 2.5 times as wide as its own front face height. Keep the feet attached to the bottom, wide base with no projections. Preserve the muted 1990s steel finish and silhouette readability at 70 px. One full isolated transparent RGBA sprite, no surfaces, floor shadow, drawing guides, labels, extra objects or extra views.
-

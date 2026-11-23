@@ -1,25 +1,10 @@
 ---
-project: zedcomm
-created_date: "Saturday, November 21st 2026, 5:25:51 pm"
-last_update: "Saturday, November 21st 2026, 5:25:51 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 311
-aliases: []
 authors:
   - Codex
 deciders:
   - Darth-Ginger
-decision_topic: "Define Networked Door Control"
 decision_date: 2026-11-21
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - architecture
-  - doors
-  - fixture-control
 ---
 
 # ADR-311: Define Networked Door Control
@@ -55,13 +40,7 @@ The optional Door Contact is an independent sender. A closed door publishes 255,
 
 ## Related
 
-```dataview
-TABLE
-    file.folder AS "Folder",
-    adr-status AS "Status",
-    adr_domain AS "Domain",
-    decision_topic AS "Topic",
-    last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-303](ADR-303-unacknowledged-state-fail-off__zedcomm.md)
+- [ADR-308](ADR-308-modify-existing-objects-in-place__zedcomm.md)
+- [ADR-309](ADR-309-maintained-signal-packets__zedcomm.md)
+- [ADR-310](ADR-310-board-signal-boundaries__zedcomm.md)

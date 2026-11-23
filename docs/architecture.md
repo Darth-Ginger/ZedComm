@@ -27,10 +27,8 @@ The registry writes one global-object record per square and stores its pieces by
 
 New sources can declare a positive finite sample interval in simulation seconds. The runtime resamples on load or when saved configuration changes. Retrofitted container sensors resolve a marker on the native host so a replacement on the same square cannot inherit the fitting.
 
-
 ## Placement and Build 42 verification
 
 The native Moveables bridge integrates supported items and pickup targets. The server placement command handlers validate reach, the selected item, and the target before applying a change. Fixture identity and durable state move with picked-up equipment; wires stay in the world. See [ADR-304](adr/ADR-304-retain-equipment-leave-cables__zedcomm.md).
 
 Run **tests/run.sh** with Lua 5.1. Set **PZ_LUA** to the installed game's **media/lua** directory to include the native cursor suites. Offline harnesses do not prove Java-side behavior or sprite occlusion in a running save.
-

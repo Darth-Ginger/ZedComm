@@ -1,25 +1,11 @@
 ---
-project: zedcomm
-created_date: "Friday, November 6th 2026, 3:59:00 pm"
-last_update: "Friday, November 6th 2026, 3:59:00 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 308
-aliases: []
 authors:
   - Claude
   - Darth-Ginger
 deciders:
   - Darth-Ginger
-decision_topic: "Existing objects join ZedComm by in-place modification"
 decision_date: 2026-11-06
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - devices
-  - extensibility
 ---
 
 # ADR-308: Existing Objects Join ZedComm by In-Place Modification
@@ -64,15 +50,11 @@ Existing objects join ZedComm by in-place modification, modelled on vanilla lamp
 
 The lamp pickup spike verified attribute retention through vanilla movable data on the tested lamp. For the playable retrofit, the installed receiver module supplies the port and interprets the signal. A shared fixture adapter applies the requested state to eligible lamps using a state check before any toggle. The installed module is the persistent record from which the networked label and visual attachment are derived. Gate logic stays in dedicated infrastructure modules.
 
-Keep the retrofit separate from the sensor-to-display MVP. While attached, the wire controls the lamp, including the fail-off state when the signal is unavailable. The native switch resumes normal control on detach. Game-level validation of the switch adapter and visual attachment remains open. See Relay retrofit architecture.
+Keep the retrofit separate from the sensor-to-display MVP. While attached, the wire controls the lamp, including the fail-off state when the signal is unavailable. The native switch resumes normal control on detach. Game-level validation of the switch adapter and visual attachment remains open.
 
 ## Related
 
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-303](ADR-303-unacknowledged-state-fail-off__zedcomm.md)
+- [ADR-304](ADR-304-retain-equipment-leave-cables__zedcomm.md)
+- [ADR-307](ADR-307-four-network-object-roles__zedcomm.md)

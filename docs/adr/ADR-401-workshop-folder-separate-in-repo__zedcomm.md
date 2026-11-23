@@ -1,31 +1,17 @@
 ---
-project: zedcomm
-created_date: "Wednesday, October 28th 2026, 12:48:00 pm"
-last_update: "Wednesday, October 28th 2026, 12:48:00 pm"
 adr-status: accepted
-adr_domain: Infrastructure
-adr_number: 401
-aliases: []
 authors:
   - Claude
 deciders:
   - Darth-Ginger
-decision_topic: "Keep the Workshop item in its own repo folder"
 decision_date: 2026-10-28
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - repo
-  - build
 ---
 
 # ADR-401: Keep the Workshop Item in Its Own Repo Folder
 
 ## Context
 
-Project Zomboid only loads a mod laid out as a Workshop item: `workshop.txt` and `preview.png` at the item root, then `Contents/mods/ZedComm/` with a `common/` folder and a `42/` version folder holding `mod.info` and `media/`. The Workshop uploader sends that item folder as it is. Darth-Ginger wants the ADRs kept beside the code for his own knowledge tracking, along with tests and tooling, none of which belong in the game or the upload.
+Project Zomboid only loads a mod laid out as a Workshop item: `workshop.txt` and `preview.png` at the item root, then `Contents/mods/ZedComm/` with a `common/` folder and a `42/` version folder holding `mod.info` and `media/`. The Workshop uploader sends that item folder as it is. The source repository also contains decision records, tests and tooling that should stay outside the Workshop package.
 
 Options considered:
 
@@ -37,9 +23,9 @@ Options considered:
 
 The repo keeps the Workshop item, exactly as the game expects it, in `workshop/ZedComm/`. Documentation and ADRs live in `docs/`, tests in `tests/`, and scripts in `tools/`, all outside that folder.
 
-For day-to-day testing, `tools/link-dev.ps1` creates a directory junction from `%USERPROFILE%\Zomboid\Workshop\ZedComm` to `workshop/ZedComm/` on the Windows PC that runs the game, so edits load without a build. For releases, `tools/build.ps1` copies the item to `dist/ZedComm/` (gitignored), leaving out `.gitkeep` files, and stops if the item holds a file type the game does not use, if `mod.info` lacks `name`, `id` or `versionMin`, or if `tests/run.ps1` fails. `-Zip` adds an archive and `-Deploy` copies the build into the game's Workshop folder, refusing while the dev link is in place. The in-game uploader lists items from the game's Workshop folder, so a release is built with `-Deploy` and uploaded from that checked copy.
+For day-to-day testing, `tools/link-dev.ps1` creates a directory junction from `%USERPROFILE%\Zomboid\Workshop\ZedComm` to `workshop/ZedComm/` on Windows, so edits load without a build. For releases, `tools/build.ps1` copies the item to `dist/ZedComm/` (gitignored), leaving out `.gitkeep` files, and stops if the item holds a file type the game does not use or if `mod.info` lacks `name`, `id` or `versionMin`. `-Zip` adds an archive and `-Deploy` copies the build into the game's Workshop folder, refusing while the dev link is in place. The in-game uploader lists items from the game's Workshop folder, so a release is built with `-Deploy` and uploaded from that checked copy.
 
-
+Each tool has a PowerShell and a bash version (`build.sh`, `link-dev.sh`), for packaging and local testing on Windows or Linux. GitHub Actions runs both sets on every push (PowerShell and Git Bash on Windows, bash on Linux) and exercises the link, the deploy guard and the stray-file check.
 
 ## Consequences
 
@@ -57,13 +43,5 @@ For day-to-day testing, `tools/link-dev.ps1` creates a directory junction from `
 
 ## Related
 
-```dataview
-TABLE 
-    file.folder AS "Folder",
-    adr-status AS "Status",
-    adr_domain AS "Domain",
-    decision_topic AS "Topic",
-    last_update as "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-101](ADR-101-target-b42-stable__zedcomm.md)
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)

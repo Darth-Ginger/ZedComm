@@ -1,24 +1,10 @@
 ---
-project: zedcomm
-created_date: "Thursday, October 29th 2026, 8:41:00 am"
-last_update: "Thursday, October 29th 2026, 8:41:00 am"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 305
-aliases: []
 authors:
   - Claude
 deciders:
   - Darth-Ginger
-decision_topic: "Mark changed networks, update them once per tick"
 decision_date: 2026-10-29
-fileClass: adr
-related-adr:
-related-cards:
-tags:
-  - zedcomm
-  - simulation
-  - timing
 ---
 
 # ADR-305: Mark Changed Networks, Update Them Once per Tick
@@ -31,7 +17,7 @@ Options considered:
 
 - **Recompute every tick.** One loop with a fixed order, so it is predictable and easy to carry to multiplayer later. Its cost grows with the size of every network on every tick, even when nothing changed. The PZ event docs warn that `OnTick` handlers cost frame time and garbage collection.
 - **Recompute inside events.** No work while idle and immediate updates. But a handler that changes state can trigger more events, so updates can chain or repeat and their order depends on which event fired first; several changes in one frame each cause a full recompute. Some changes have no event at all: nothing fires when a zombie steps onto a square.
-- **Events mark, the tick updates.** Darth-Ginger's starting point was tick-based updating, with events only starting a signal that arrives mid-tick. This option keeps the tick as the one place work happens and uses events only to say where.
+- **Events mark, the tick updates.** Events mark affected networks for the next simulation tick.
 
 Pause behaviour was checked against the PZ event documentation (the B42 Lua events reference, page version 42.0.2, and the older PZwiki event pages, read from their GitHub sources on 2026-10-29 because pzwiki.net blocks automated fetches): `OnTickEvenPaused` is "the same as OnTick, but triggered when the game is paused as well", and its tick count is "always zero while paused". `OnTick` therefore does not run while the game is paused.
 
@@ -65,13 +51,6 @@ The simulation updates in one pass per game tick, driven by `Events.OnTick`, ove
 
 ## Related
 
-```dataview
-TABLE 
-    file.folder AS "Folder",
-    adr-status AS "Status",
-    adr_domain AS "Domain",
-    decision_topic AS "Topic",
-    last_update as "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```
+- [ADR-301](ADR-301-parallel-straight-through-byte-signals__zedcomm.md)
+- [ADR-302](ADR-302-separate-framework-endpoint-behavior__zedcomm.md)
+- [ADR-303](ADR-303-unacknowledged-state-fail-off__zedcomm.md)

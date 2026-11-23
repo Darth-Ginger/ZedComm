@@ -1,23 +1,10 @@
 ---
-project: zedcomm
-created_date: "Saturday, October 24th 2026, 10:47:48 pm"
-last_update: "Saturday, October 24th 2026, 10:47:48 pm"
 adr-status: accepted
-adr_domain: Architecture
-adr_number: 302
-aliases: []
 authors:
   - ChatGPT
 deciders:
   - Darth-Ginger
-decision_topic: "Separate Communications Framework and Endpoint Behavior"
 decision_date: 2026-10-24
-fileClass: adr
-related-adr: []
-related-cards:
-tags:
-  - zedcomm
-  - architecture
 ---
 
 # ADR-302: Separate Communications Framework and Endpoint Behavior
@@ -25,8 +12,6 @@ tags:
 ## Context
 
 Sensors, player actions and automated devices have different triggers but should not each implement cable traversal or multiplayer synchronization. ZedComm should support third-party endpoints while shipping useful native devices.
-
-Source: Design discussion. Darth-Ginger approved this record during the decision review. Implementation and validation have not yet occurred.
 
 ## Decision
 
@@ -44,14 +29,3 @@ Ship a communications framework and native endpoints together, with an extensibl
 
 - Requires a small, explicit endpoint contract even in the prototype.
 - A stable external API and compatibility policy still need later validation and design.
-
-## Related
-
-- Design and MVP
-- Decision index
-
-```dataview
-TABLE file.folder AS "Folder", adr-status AS "Status", adr_domain AS "Domain", decision_topic AS "Topic", last_update AS "Updated"
-FROM ""
-WHERE contains(this.related-adr, file.link)
-```

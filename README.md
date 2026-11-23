@@ -9,6 +9,7 @@ Requires Build 42.13.0 or later. Multiplayer support is outside the current rele
 - [Player Guide](docs/player-placement.md)
 - [Crafting Recipes](docs/recipes.md)
 - [Architecture Reference](docs/architecture.md)
+- [Sprite Sources](art/first-release-concepts/README.md)
 
 ## Layout
 
@@ -32,7 +33,9 @@ Everything that ships lives under `workshop/ZedComm/`. Keep docs, notes and scri
 
 Keep all Lua under a `ZedComm/` subfolder of `shared`, `client` and `server`. Files at the same path in two mods overwrite each other. Never change `id=ZedComm` in `mod.info`.
 
-## Two sets of tools
+## Contributor tools
+
+The game reads the Workshop item directly. Contributors can use the scripts to link a working copy, run tests, or create a checked release package.
 
 The build and link tools have PowerShell (`.ps1`) and bash (`.sh`) versions. The bash scripts run on Linux and in Git Bash on Windows. Both link tools use a directory junction on Windows. Bash options are `--zip`, `--deploy`, `--remove` and `--workshop-dir <dir>`. PowerShell options are `-Zip`, `-Deploy`, `-Remove` and `-WorkshopDir <dir>`.
 
@@ -46,12 +49,9 @@ Once, from the repo root in PowerShell (or `tools/link-dev.sh` in Git Bash):
 
 That creates a junction `%USERPROFILE%\Zomboid\Workshop\ZedComm` pointing at `workshop\ZedComm`. Enable ZedComm in the game's Mods menu; edits load on the next game or Lua reload, with no build step. `.\tools\link-dev.ps1 -Remove` deletes the link only.
 
+## Running offline tests
 
-- The server clone is separate from the PC's test checkout. Pull the changes into the PC checkout or sync the files, then restart the game to load changed Lua.
-- The server has no Lua 5.1. Run the suite in a container: `docker run --rm -v <repo>:/src:ro -v <pz-reference>:<pz-reference>:ro -w /src alpine:3.20 sh -c "apk add -q lua5.1 bash && ZEDCOMM_REQUIRE_LUA=1 bash tests/run.sh"`.
-- Integration suites share fixtures in `tests/support/` and run independently. Without `PZ_LUA`, they use the two global-object stand-ins in `tests/support/pz`. The runner names `native_placement_test.lua` and `placement_cursor_test.lua` as skipped because they need the game's cursor classes.
-- Set `PZ_LUA` to the installed game's `media/lua` and run `tests/run.sh`. Run one suite directly with `lua5.1 tests/cabinet_editor_test.lua`.
-- Live test captures go in the shared test-log folder. Earlier PC captures are in `%USERPROFILE%\Zomboid\zedcomm-test-logs`.
+Install Lua 5.1 and run `tests/run.sh` from Bash. The integration suites share fixtures in `tests/support/`. Set `PZ_LUA` to the installed game's `media/lua` directory to include the native cursor suites. Without it, the runner skips those two suites. Run a single suite with `lua5.1 tests/cabinet_editor_test.lua`.
 
 ## Building a release
 
@@ -71,3 +71,4 @@ CI (`.github/workflows/build.yml`) runs both tool sets on every push: PowerShell
 
 ## Decisions
 
+See the [architecture decision records](docs/adr/) for design rationale.
