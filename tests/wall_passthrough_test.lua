@@ -36,9 +36,29 @@ check(not test.join(far, first, false, second, false) and not connect(first, sec
 far.doorOrWindow = true
 check(#placement.wallPassthroughs(near) == 0, "a blocked door or window does not qualify")
 far.doorOrWindow = nil
-check(finish(near, "East wall passthrough", "Drill passthrough")
-    and wall:getModData().zedcommWallPassthrough.west == "bare",
-    "drilling on the east installs a single bare fitting on the wall owner")
+local approach, start = test.floorTile(48, 50), test.floorTile(47, 50)
+function approach:canStand() return true end
+function far:canStand() return true end
+function test.player:getVehicle() return nil end
+function getGameSpeed() return 1 end
+ISPathFindAction = {
+    pathToNearest = function(_, _, locations)
+        return {
+            location = approach, locations = locations,
+            setOnComplete = function(self, callback) self.arrive = callback end,
+        }
+    end,
+}
+local drill = test.optionsAt(near, "East wall passthrough")["Drill passthrough"]
+test.player.tile = start
+drill()
+local walking = test.queuedWalk
+check(walking and walking:isValid() and #walking.locations == 3 and walking.locations[1] == 48.5,
+    "distant wall work walks to reachable floor on the selected side")
+test.player.tile, test.queuedWalk = approach, nil
+walking.arrive()
+check(test.queued and test.queued:complete() and wall:getModData().zedcommWallPassthrough.west == "bare",
+    "arriving at the wall drills the fitting")
 check(finish(far, "West wall passthrough (bare, 0/5)", "Fit metal cover")
     and not test.inventory:contains(scrap), "the opposite face can fit a cover using one scrap")
 check(not placement.canReach(test.player, near) and far:isBlockedTo(near),
@@ -49,10 +69,21 @@ check(finish(near, "East wall passthrough (metal, 0/5)", "Connect to wire 1"),
     "the selected local wire can join an existing wire through the wall menu")
 
 local fed = wireAt(near)
-test.give("ZedComm.SignalWire")
+local item = test.give("ZedComm.SignalWire")
+local cursor = { character = test.player, player = 0, clearCache = function() end }
+local actions = ZedComm.NativePlacementActions
+actions.openWire = function() return cursor end
 test.optionsAt(near, "Wire 2 of 2")["Select free end"]()
-check(finish(near, "East wall passthrough (metal, 1/5)", "Feed wire through"),
-    "the same menu can extend a run with a new far-side segment")
+test.queued = nil
+local choice = test.menu()
+ISContextMenu.get = function() return choice end
+function getMouseX() return 0 end
+function getMouseY() return 0 end
+check(actions.canPlace(cursor, item, far), "native Place recognizes the passthrough on the far tile")
+actions.place(cursor, item, far)
+assert(choice.options["Feed wire through"])()
+check(test.queued and test.queued:complete() and not test.inventory:contains(item) and test.player.tile == near,
+    "native Place feeds a far-side segment while the survivor stays on their side")
 
 local network = test.registry.network
 local runs = {}

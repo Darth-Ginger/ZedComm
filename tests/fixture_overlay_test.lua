@@ -19,6 +19,8 @@ player.tile = tile
 door.open = true
 require "ZedComm/DebugCircuits"
 
+function getMouseX() return 100 end
+function getMouseY() return 100 end
 function screenToIsoX() return 71.5 end
 function screenToIsoY() return 70.5 end
 local function menuFromDoor()
@@ -32,6 +34,10 @@ local menu = menuFromDoor()
 local sourceMenu = menu and menu.children["Source (Open Source)"]
 check(sourceMenu and sourceMenu.options["Set test byte"] and menu.children.Door,
     "an open door picked in front of a reachable source exposes both fixture menus")
+local sourceOption = sourceMenu.entries["Set test byte"]
+local sourceObject = test.placement.resolve(test.registry, source).object
+check(sourceOption.onHighlight and sourceOption.onHighlightParams[1] == sourceObject,
+    "a source action highlights the corresponding fixture")
 tile.blocked = obscured
 menu = menuFromDoor()
 check(menu and not menu.children["Source (Open Source)"], "a hidden fixture outside normal reach stays unavailable")
@@ -76,19 +82,35 @@ require "ZedComm/FixtureLabels"
 test.fire("OnPostUIDraw")
 check(#icons == 0 and not labels["Open Source"], "fixture overlays do not draw after the game UI")
 test.fire("OnPreUIDraw")
+check(#icons == 1 and icons[1].path:find("MaglockUnlocked", 1, true),
+    "a door without an Open command shows only its lock marker")
+local laid, wire = test.lay(tile, test.give("ZedComm.SignalWire"), source, "signal")
+assert(laid, wire)
+assert(test.join(tile, wire, false, id, "open"))
+assert(ZedComm.DeviceRuntime.setTestByte(test.registry, source, 255))
+test.fire("OnTick")
+icons = {}
+test.fire("OnPreUIDraw")
 check(#icons == 2 and icons[1].path:find("MaglockUnlocked", 1, true)
     and icons[2].path:find("DoorOpen", 1, true) and icons[1].x == 1393 and icons[1].y == 1320,
     "the unlocked and open icons sit on the visible doorway even when its owning tile is occluded")
 check(labels["Open Source"] and labels["Open Source"].x == 1430 and labels["Open Source"].y == 1371,
     "the test source name sits just above its floor sprite")
 
-door.open, door.locked = false, true
+assert(ZedComm.DeviceRuntime.setTestByte(test.registry, source, 0))
+test.fire("OnTick")
+door.locked = true
 zoom = 2
 icons = {}
 test.fire("OnPreUIDraw")
 check(#icons == 2 and icons[1].path:find("MaglockLocked", 1, true)
     and icons[2].path:find("DoorClosed", 1, true) and icons[1].y == 1352,
     "closed and locked change independently and the anchor follows world zoom")
+assert(test.registry:unlink(wire, source))
+test.fire("OnTick")
+icons = {}
+test.fire("OnPreUIDraw")
+check(#icons == 1, "a connected jack loses its Open marker when its source is disconnected")
 icons, labels = {}, {}
 controls.doorMarkers = false
 test.fire("OnPreUIDraw")

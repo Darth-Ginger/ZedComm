@@ -93,4 +93,56 @@ sourceMenu = nil
 doubleClick()
 check(sourceMenu == nil and not state.showFixtureName, "both fixture preferences can be toggled off")
 
+local start = floorTile(64, 40)
+local approach = floorTile(65, 40)
+local targetTile = floorTile(66, 40)
+local blocked = floorTile(67, 40)
+targetTile.blocked = blocked
+function approach:canStand() return true end
+function blocked:canStand() return true end
+function player:getVehicle() return nil end
+function getGameSpeed() return 1 end
+ISPathFindAction = { pathToNearest = function(_, _, locations)
+    return {
+        location = approach, locations = locations,
+        setOnComplete = function(self, callback) self.arrive = callback end,
+    }
+end }
+
+local item = give("ZedComm.PressurePlate")
+local build = assert(optionsAt(targetTile)["Place pressure plate"])
+local function startFromDistance(option)
+    testState.queuedWalk, testState.queued = nil, nil
+    player.tile = start
+    option()
+    return testState.queuedWalk
+end
+local function arrive(walking)
+    testState.queuedWalk = nil
+    player.tile = walking.location
+    walking.arrive()
+end
+local walking = startFromDistance(build)
+check(walking and walking:isValid() and #walking.locations == 3 and walking.locations[1] == 65.5
+    and not testState.queued and inventory:contains(item),
+    "distant build queues a walk to a reachable tile and excludes the blocked side")
+arrive(walking)
+check(testState.queued and testState.queued:complete() and #targetTile.objects == 1,
+    "the build runs after arrival")
+
+local installTile = floorTile(65, 41)
+local lamp = testState.worldObject(installTile)
+lamp.class = "IsoLightSwitch"
+function lamp:getCanBeModified() return true end
+function player:getPerkLevel() return 5 end
+give("Base.Screwdriver")
+local fit = assert(optionsAt(installTile, "Lamp")["Fit Advanced Adapter"])
+walking = startFromDistance(fit)
+check(walking and not testState.queued and inventory:contains(adapter),
+    "lamp retrofit uses the same approach before consuming the adapter")
+installTile:transmitRemoveItemFromSquare(lamp)
+arrive(walking)
+check(not testState.queued and inventory:contains(adapter),
+    "the installation is dropped if the lamp is removed during the walk")
+
 testState.finish()

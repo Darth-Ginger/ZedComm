@@ -19,9 +19,9 @@ local items = {
         kind = "endpoint", definitionId = "ZedComm.PressureSensor", fixtureType = "Plate" },
     { itemType = "ZedComm.SignalWire", name = "wire", sprite = "zedcomm_devices_01_1", kind = "cable" },
     { itemType = "ZedComm.NumericDisplay", name = "numeric display", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.NumericDisplay", fixtureType = "Display" },
+        kind = "endpoint", definitionId = "ZedComm.NumericDisplay", fixtureType = "Display", supportsSurface = true },
     { itemType = "ZedComm.AdvancedDisplay", name = "advanced display", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay", fixtureType = "Display" },
+        kind = "endpoint", definitionId = "ZedComm.AdvancedDisplay", fixtureType = "Display", supportsSurface = true },
     { itemType = "ZedComm.OccupancyPlate", name = "occupancy plate", sprite = "zedcomm_devices_01_419",
         kind = "endpoint", definitionId = "ZedComm.OccupancyPlate", fixtureType = "Plate" },
     { itemType = "ZedComm.IRSensor", name = "IR proximity sensor", sprite = "zedcomm_ir_01_0",
@@ -29,7 +29,7 @@ local items = {
     { itemType = "ZedComm.WeightPlate", name = "weight plate", sprite = "zedcomm_devices_01_425",
         kind = "endpoint", definitionId = "ZedComm.WeightPlate", fixtureType = "Plate" },
     { itemType = "ZedComm.DebugByteSource", name = "test byte source", sprite = "zedcomm_devices_01_431",
-        kind = "endpoint", definitionId = "ZedComm.DebugByteSource", fixtureType = "Source" },
+        kind = "endpoint", definitionId = "ZedComm.DebugByteSource", fixtureType = "Source", supportsSurface = true },
     { itemType = Switch.ID, name = "network switch", sprite = Switch.OFF_NORTH,
         kind = "endpoint", definitionId = Switch.ID, fixtureType = "Switch", mount = "wall" },
     { itemType = Sensors.CLOCK, name = "time-of-day sensor", sprite = "zedcomm_devices_01_431",
@@ -86,7 +86,7 @@ end
 
 function Placement.surfaceOffset(square, itemType)
     local spec = specFor(itemType)
-    if not spec or spec.mount ~= "surface" or not square or not ISMoveableSpriteProps
+    if not spec or (spec.mount ~= "surface" and not spec.supportsSurface) or not square or not ISMoveableSpriteProps
         or square:has("IsTableTop") then return nil end
     local height = ISMoveableSpriteProps:getTotalTableHeight(square)
     if height > 0 and height <= 64 then return height end
@@ -139,11 +139,13 @@ function Placement.oppositeFace(square, object)
     if fixture and fixture:getSquare() == square then return Door.oppositeSquare(fixture) end
 end
 
+local function canReachFrom(from, square, opposite)
+    return from ~= nil and (from == opposite or (distance(from, square) <= 1 and clearBetween(from, square)))
+end
+
 function Placement.canReach(character, square, object)
-    local from = character:getCurrentSquare()
-    if not loadedSquare(square) or not from then return false end
-    return (distance(from, square) <= 1 and clearBetween(from, square))
-        or from == Placement.oppositeFace(square, object)
+    return loadedSquare(square)
+        and canReachFrom(character:getCurrentSquare(), square, Placement.oppositeFace(square, object))
 end
 
 local function withinView(from, square)
@@ -167,19 +169,23 @@ function Placement.canView(character, square, object)
     return opposite ~= nil and withinView(from, opposite)
 end
 
-function Placement.surfaceApproachLocations(square)
+function Placement.approachLocations(square, object, adjacentOnly, anchor)
     local locations = {}
     if not loadedSquare(square) then return locations end
     local cell = getCell()
     local x, y, z = square:getX(), square:getY(), square:getZ()
+    local opposite = Placement.oppositeFace(square, object)
+    local anchorFace = anchor and Placement.oppositeFace(anchor.square, anchor.object)
+    local function add(candidate)
+        if not candidate or not candidate:canStand() or not canReachFrom(candidate, square, opposite) then return end
+        if anchor and not canReachFrom(candidate, anchor.square, anchorFace) then return end
+        locations[#locations + 1] = candidate:getX() + 0.5
+        locations[#locations + 1] = candidate:getY() + 0.5
+        locations[#locations + 1] = candidate:getZ()
+    end
+    if not adjacentOnly then add(square) end
     for _, step in ipairs(cardinalOffsets) do
-        local adjacentX, adjacentY = x + step[1], y + step[2]
-        local candidate = cell:getGridSquare(adjacentX, adjacentY, z)
-        if candidate and candidate:canStand() and clearBetween(candidate, square) then
-            locations[#locations + 1] = adjacentX + 0.5
-            locations[#locations + 1] = adjacentY + 0.5
-            locations[#locations + 1] = z
-        end
+        add(cell:getGridSquare(x + step[1], y + step[2], z))
     end
     return locations
 end
@@ -193,8 +199,9 @@ end
 
 local function onSquare(object, square)
     if not loadedSquare(square) or object:getSquare() ~= square then return false end
-    for _, candidate in ipairs(squareObjects(square)) do
-        if candidate == object then return true end
+    local objects = square:getObjects()
+    for i = 0, objects:size() - 1 do
+        if objects:get(i) == object then return true end
     end
     return false
 end
@@ -346,15 +353,14 @@ local function link(registry, first, firstPort, second, secondPort)
 end
 
 local function tileAvailable(square, spec)
-    if not square:TreatAsSolidFloor()
-        or (spec.mount ~= "surface" and (square:isSolid() or square:isSolidTrans())) then
+    local height = Placement.surfaceOffset(square, spec.itemType)
+    if spec.mount == "surface" and not height then
+        return false, "Choose an empty table or countertop."
+    end
+    if not square:TreatAsSolidFloor() or (not height and (square:isSolid() or square:isSolidTrans())) then
         return false, "Choose a clear floor tile."
     end
-    local height
-    if spec.mount == "surface" then
-        height = Placement.surfaceOffset(square, spec.itemType)
-        if not height then return false, "Choose an empty table or countertop." end
-    elseif spec.mount == "wall" and not Switch.mount(square) then
+    if spec.mount == "wall" and not Switch.mount(square) then
         return false, "Choose a tile next to an eligible wall."
     end
     if spec.kind == "endpoint" then
@@ -1159,6 +1165,9 @@ end
 local function commandRegistry(character, command)
     local registry = Placement.getRegistry()
     if not registry or registry.network ~= command.network then return nil, "This circuit is no longer loaded." end
+    if command.object and not onSquare(command.object, command.square) then
+        return nil, "That device or wire is no longer on the tile."
+    end
     if not Placement.canReach(character, command.square, command.object) then
         return nil, "Move onto or next to the target tile."
     end

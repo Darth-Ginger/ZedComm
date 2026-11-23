@@ -47,7 +47,8 @@ local function drawStatus(entry, x, y)
     local object = entry.object
     local locked = object:isLocked() or object:isLockedByKey()
     local lock = getTexture(iconFolder .. (locked and "ZedCommMaglockLocked.png" or "ZedCommMaglockUnlocked.png"))
-    local door = getTexture(iconFolder .. (object:isOpen() and "ZedCommDoorOpen.png" or "ZedCommDoorClosed.png"))
+    local door = ZedComm.DeviceRuntime.hasDoorOpenCommand(entry.id)
+        and getTexture(iconFolder .. (object:isOpen() and "ZedCommDoorOpen.png" or "ZedCommDoorClosed.png"))
     if lock then UIManager.DrawTexture(lock, x - lock:getWidth() - 1, y - lock:getHeight()) end
     if door then UIManager.DrawTexture(door, x + 1, y - door:getHeight()) end
 end

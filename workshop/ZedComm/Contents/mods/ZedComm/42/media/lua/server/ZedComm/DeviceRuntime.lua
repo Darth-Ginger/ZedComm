@@ -456,6 +456,11 @@ function Runtime.blocksManualDoorOpening(object)
     return requests.lockAction == true or requests.openAction == false
 end
 
+function Runtime.hasDoorOpenCommand(id)
+    local host = boards[id]
+    return host ~= nil and host.controller ~= nil and host.controller.requests.openAction ~= nil
+end
+
 function Runtime.getDoorState(id)
     local host = boards[id]
     if not host or not host.controller then return nil end

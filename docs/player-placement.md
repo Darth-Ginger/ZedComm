@@ -4,6 +4,8 @@ ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft p
 
 ## Place and wire a circuit
 
+For physical actions such as placing a device or fitting an adapter, your character walks to a reachable tile before starting work. If every approach is blocked, the action stops.
+
 1. Use native **Place** and **Cycle through objects** to select a source and a receiver. For a first circuit, use a Pressure Plate and a Numeric Display.
 2. Cycle to **Signal Wire**. Click a free device jack and choose **Connect to**. If the jack tile cannot take wire, choose a valid neighboring floor tile for the first segment.
 3. Click neighboring tiles to extend the run. Click the receiver or another compatible free end and choose **Connect to**. Joining existing ends uses no spare wire. **Lay wire here** adds a segment when you have one.
@@ -15,7 +17,7 @@ On shared tiles, cycle through numbered wires or open a specific wire's submenu.
 ## Mounts and passthroughs
 
 - **Floor:** Place plates, displays and floor cabinets on clear tiles.
-- **Tabletop:** Place or pick up a Tabletop Cabinet from the floor beside a clear table or counter. Its jack can be wired from the adjacent floor.
+- **Tabletop:** Place or pick up a Tabletop Cabinet, display, or test byte source from the floor beside a clear table or counter. Their jacks can be wired from the adjacent floor.
 - **Wall:** With a Network Switch or Wall Cabinet in Place, hold left-click and drag toward an eligible wall face, then release. Click a placed switch within reach to toggle it.
 - **Wall passthrough:** At a solid wall, choose the wall's ZedComm submenu and **Drill passthrough** with a Hand Drill. Select a local free end, then use **Feed wire through** or **Connect to wire** to join an existing far-side end. A fitting carries up to five independent runs. Add a cover with a Screwdriver and a Plastic Tray or Scrap Metal. Free all crossings before sealing. The wall still blocks movement.
 

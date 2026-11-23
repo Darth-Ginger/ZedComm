@@ -62,6 +62,7 @@ for _, item in ipairs(carried) do addId(item) end
 
 local spriteProperties = { has = function() return false end }
 ISMoveableSpriteProps = {
+    getTotalTableHeight = function() return 0 end,
     invalidColor = { r = 1, g = 0, b = 0 },
     new = function(sprite)
         return {
@@ -135,6 +136,28 @@ check(selectType(nativePlateTile, "Base.TestMoveable").object == vanilla and nat
     "native cycling retains vanilla Moveables")
 native:tryBuild(nativePlateTile:getX(), nativePlateTile:getY(), 0)
 check(vanillaClicks == 1, "unrelated Moveables delegate to vanilla placement")
+
+do
+    local alternate = floorTile(59, 53)
+    function alternate:canStand() return true end
+    function getGameSpeed() return 1 end
+    function player:getVehicle() return nil end
+    ISPathFindAction = {
+        pathToNearestPreferred = function(_, _, first, alternatives)
+            return {
+                location = alternate, first = first, alternatives = alternatives,
+                setOnComplete = function(self, callback) self.onCompleteFunc = callback end,
+            }
+        end,
+    }
+    selectType(nativePlateTile, "ZedComm.PressurePlate")
+    click(nativePlateTile)
+    local walking = testState.queuedWalk
+    check(walking and walking:isValid() and walking.first[1] == 60.5 and #walking.alternatives == 3
+        and walking.alternatives[1] == 59.5, "native floor placement prefers the target and allows nearby floor")
+    testState.queuedWalk = nil
+    function alternate:canStand() return false end
+end
 
 local plateCandidate = selectType(nativePlateTile, "ZedComm.PressurePlate")
 click(nativePlateTile)
@@ -537,6 +560,22 @@ do
         click(counter)
         check(not testState.queuedWalk and testState.queued and testState.queued:complete()
             and inventory:getFirstType(cabinetItem:getFullType()), "native Pickup also works from beside the countertop")
+    end
+    for _, itemType in ipairs({ "ZedComm.NumericDisplay", "ZedComm.AdvancedDisplay", "ZedComm.DebugByteSource" }) do
+        local device = give(itemType)
+        player.tile = approach
+        native:setMoveableMode("place")
+        native:clearCache()
+        selectType(counter, itemType)
+        check(native.canCreate and native.yOffset == 34 and placement.canPlace(origin, itemType),
+            itemType .. " previews on a countertop and still supports floor placement")
+        testState.queued, testState.queuedWalk = nil, nil
+        click(counter)
+        local placed = testState.queued and testState.queued:complete()
+        local fixture = placement.piecesAt(testState.registry, counter)[1]
+        check(placed and not inventory:contains(device) and fixture and fixture.object:getRenderYOffset() == 34,
+            itemType .. " sits at the same height as its preview")
+        assert(testState.target(counter, fixture.id, "pickup"))
     end
     getCell():setDrag(nil, 0)
 end

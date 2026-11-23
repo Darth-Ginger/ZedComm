@@ -76,6 +76,7 @@ return function()
                         + math.floor(b * 255) * 65536 + math.floor(a * 255) * 16777216
                 end
             end
+            function object:setNoPicking(value) self.noPicking = value end
             function object.isOutlineHighlight(_, index) return object.outlined[index] == true end
             function object.setOutlineHighlight(_, index, enabled) object.outlined[index] = enabled end
             return object
@@ -85,7 +86,9 @@ return function()
     local function floorTile(x, y)
         local tile = square(x, y, 0)
         function tile.TreatAsSolidFloor() return true end
+        function tile.canStand() return false end
         function tile.isSolid() return false end
+        function tile.has() return false end
         function tile.isSolidTrans() return false end
         function tile.isBlockedTo(_, other) return tile.blocked == other end
         function tile:getWall(north) return north and self.northWall or not north and self.westWall or nil end

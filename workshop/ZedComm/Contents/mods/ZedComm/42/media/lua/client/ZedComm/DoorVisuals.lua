@@ -1,4 +1,4 @@
--- Housings attach to native doors; grounded leads render above finished floors.
+-- Door housings render at the frame without inheriting door-leaf cutaway.
 require "ZedComm/ModuleVisuals"
 local Visuals = {}
 local entries = {}
@@ -35,32 +35,45 @@ local function setAttachment(entry, name)
     end
 end
 
-local function removeLead(entry)
-    local lead = entry.lead
-    if lead and lead:getSquare() then lead:getSquare():transmitRemoveItemFromSquare(lead) end
-    entry.lead = nil
+local leadKey, housingKey = "zedcommDoorLead", "zedcommDoorHousing"
+
+local function removeHelper(object)
+    if object and object:getSquare() then object:getSquare():transmitRemoveItemFromSquare(object) end
 end
 
-local function syncLead(entry, square, id, name)
-    if entry.lead and entry.lead:getSquare() ~= square then entry.lead = nil end
-    if not entry.lead then
+local function syncHelper(object, square, id, key, name)
+    if not object or object:getSquare() ~= square then
+        object = nil
         local objects = square:getObjects()
         for i = 0, objects:size() - 1 do
-            local object = objects:get(i)
-            if object:hasModData() and object:getModData().zedcommDoorLead == id then entry.lead = object end
+            local candidate = objects:get(i)
+            if candidate:hasModData() and candidate:getModData()[key] == id then
+                object = candidate
+                break
+            end
         end
     end
-    if not name then removeLead(entry); return end
-    if not entry.lead then
-        entry.lead = IsoObject.new(square, name, "ZedComm door lead")
-        entry.lead:getModData().zedcommDoorLead = id
-        square:AddTileObject(entry.lead)
+    local sprite = name and getSprite(name)
+    if not sprite then
+        removeHelper(object)
+        return nil
     end
-    local sprite = getSprite(name)
-    if sprite and entry.lead:getSprite() ~= sprite then
-        entry.lead:setSprite(sprite)
-        entry.lead:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
+    if not object then
+        object = IsoObject.new(square, name, "ZedComm door fixture visual")
+        object:getModData()[key] = id
+        square:AddTileObject(object)
+    elseif object:getSprite() ~= sprite then
+        object:setSprite(sprite)
+        object:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_MODIFY)
     end
+    if key == housingKey then object:setNoPicking(true) end
+    return object
+end
+
+local function clearEntry(entry)
+    setAttachment(entry, nil)
+    removeHelper(entry.housing)
+    removeHelper(entry.lead)
 end
 
 local function findObject(square, id)
@@ -86,9 +99,12 @@ function Visuals.update(network, cell)
             if contact and object then door = ZedComm.DoorContact.host(object) end
             if door and (contact or ZedComm.Door.isEligible(door)) then
                 local entry = entries[id]
-                if entry and entry.door ~= door then setAttachment(entry, nil); removeLead(entry); entry = nil end
-                entry = entry or { door = door, matches = contact and contactSprite or actuatorSprite }
+                if entry and entry.door ~= door then clearEntry(entry); entry = nil end
                 local isWindow = piece.definitionId == ZedComm.DoorContact.WINDOW_ID
+                if not entry then
+                    entry = { door = door, matches = contact and contactSprite or actuatorSprite }
+                    if not isWindow then setAttachment(entry, nil) end
+                end
                 local reverse = not isWindow and ZedComm.Door.reverseHinge(door) and 1 or 0
                 local mount = viewerMount(door, viewer)
                 local name, floorName
@@ -107,14 +123,22 @@ function Visuals.update(network, cell)
                         floorName = "zedcomm_door_floor_01_" .. (mount * 72 + reverse * 36 + wireFrame)
                     end
                 end
-                if entry.name ~= name then setAttachment(entry, name); entry.name = name end
-                syncLead(entry, square, id, floorName)
+                if isWindow then
+                    if entry.name ~= name then setAttachment(entry, name) end
+                elseif entry.name ~= name or not entry.housing or entry.housing:getSquare() ~= square then
+                    entry.housing = syncHelper(entry.housing, square, id, housingKey, name)
+                end
+                if not entry.name or entry.floorName ~= floorName
+                    or (floorName and (not entry.lead or entry.lead:getSquare() ~= square)) then
+                    entry.lead = syncHelper(entry.lead, square, id, leadKey, floorName)
+                end
+                entry.name, entry.floorName = name, floorName
                 seen[id] = entry
             end
         end
     end
     for id, entry in pairs(entries) do
-        if not seen[id] then setAttachment(entry, nil); removeLead(entry) end
+        if not seen[id] then clearEntry(entry) end
     end
     entries = seen
 end
@@ -125,8 +149,9 @@ Events.LoadGridsquare.Add(function(square)
     local objects = square:getObjects()
     for i = objects:size() - 1, 0, -1 do
         local object = objects:get(i)
-        local id = object:hasModData() and object:getModData().zedcommDoorLead
-        if id and not registry.network.pieces[id] then square:transmitRemoveItemFromSquare(object) end
+        local data = object:hasModData() and object:getModData()
+        local id = data and (data[leadKey] or data[housingKey])
+        if id and not registry.network.pieces[id] then removeHelper(object) end
     end
 end)
 

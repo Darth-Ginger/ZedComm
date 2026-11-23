@@ -8,7 +8,7 @@ require "Vehicles/TimedActions/ISPathFindAction"
 local Action = ISBaseTimedAction:derive("ISZedCommPlacementAction")
 local Cursor = { Type = "ISZedCommPlacementCursor" }
 local runs = {}
-local wireHover = {}
+local fixtureHover = {}
 local hoverOrder = 0
 local lastFixtureClick
 local doubleClickMs = 400
@@ -141,36 +141,49 @@ local function enqueuePlacement(player, command)
     ISTimedActionQueue.add(action)
 end
 
-local function queue(player, command, walk, surface)
+local function queue(player, command)
+    local placement = ZedComm.PlayerPlacement
     local run = command.run
     if run and (runs[player] ~= run or runBusy(player, run)) then return end
-    local destination = command.walkSquare or command.square
+    local destination = command.walkSquare
+    local preferred = command.preferredSquare
+    local current = player:getCurrentSquare()
     local walking
-    if walk and surface and not ZedComm.PlayerPlacement.canReach(player, command.square) then
-        local locations = ZedComm.PlayerPlacement.surfaceApproachLocations(command.square)
-        if #locations == 0 then
-            say(player, "No open floor next to the surface.")
+    if (destination and current ~= destination) or (preferred and current ~= preferred)
+        or not placement.canReach(player, command.square, command.object) then
+        local anchor = run and run.id and resolveAnchor(player, run)
+        local locations = placement.approachLocations(command.square, command.object,
+            command.adjacentOnly or preferred ~= nil, anchor)
+        local exact = destination or (preferred and #locations == 0 and preferred)
+        if exact then
+            if not ISWalkToTimedAction then
+                say(player, "The walking action is unavailable.")
+                return
+            end
+            walking = ISWalkToTimedAction:new(player, exact, function()
+                return run and runs[player] ~= run
+            end)
+        elseif preferred then
+            local first = { preferred:getX() + 0.5, preferred:getY() + 0.5, preferred:getZ() }
+            walking = ISPathFindAction:pathToNearestPreferred(player, first, locations)
+        elseif #locations > 0 then
+            walking = ISPathFindAction:pathToNearest(player, locations)
+        else
+            say(player, "No reachable floor next to the target.")
             return
         end
-        walking = ISPathFindAction:pathToNearest(player, locations)
-        function walking:isValid()
-            return runs[player] == run and not player:getVehicle() and getGameSpeed() <= 2
+        if not exact then
+            function walking:isValid()
+                return (not run or runs[player] == run) and not player:getVehicle() and getGameSpeed() <= 2
+            end
         end
-    elseif walk and not surface and player:getCurrentSquare() ~= destination then
-        if not ISWalkToTimedAction then
-            say(player, "The walking action is unavailable.")
-            return
-        end
-        walking = ISWalkToTimedAction:new(player, destination, function()
-            return runs[player] ~= run
-        end)
     end
     if walking then
         walking:setOnComplete(function()
-            run.walk = nil
+            if run then run.walk = nil end
             enqueuePlacement(player, command)
         end)
-        run.walk = walking
+        if run then run.walk = walking end
         ISTimedActionQueue.add(walking)
         return
     end
@@ -226,6 +239,48 @@ local function connectionChoices(placement, registry, anchor, port, square, play
     return choices
 end
 
+local function passageOptions(placement, registry, anchor, passage, item)
+    local choices = {}
+    if not passage.cover or anchor.square ~= passage.square or anchor.piece.kind ~= "cable"
+        or placement.wallCrossings(registry, passage.square, passage.other) >= placement.WALL_PASSTHROUGH_LIMIT then
+        return choices
+    end
+    if item and placement.canPlace(passage.other, placement.WIRE_TYPE) then
+        choices[#choices + 1] = { label = "Feed wire through" }
+    end
+    local number = 0
+    for _, remote in ipairs(orderedPieces(placement, registry, passage.other)) do
+        if remote.piece.kind == "cable" then
+            number = number + 1
+            if placement.canJoinThroughWall(registry.network, passage, anchor, remote) then
+                local name = registry:getRunName(remote.id)
+                local label = "Connect to wire " .. number .. (name and " (" .. name .. ")" or "")
+                choices[#choices + 1] = { label = label, entry = remote }
+            end
+        end
+    end
+    return choices
+end
+
+local function passageCommand(run, passage, item, entry)
+    return { kind = "connect-through-wall", run = run, network = run.network, square = passage.square,
+        side = passage.side, wall = passage.wall, anchorId = run.id, item = item,
+        targetId = entry and entry.id, remoteWire = entry and entry.object }
+end
+
+local function cursorPassage(placement, registry, anchor, square, item)
+    if not anchor or anchor.piece.kind ~= "cable" or anchor.square:getZ() ~= square:getZ()
+        or math.abs(anchor.square:getX() - square:getX()) + math.abs(anchor.square:getY() - square:getY()) ~= 1 then
+        return
+    end
+    for _, passage in ipairs(placement.wallPassthroughs(anchor.square)) do
+        if passage.other == square then
+            local choices = passageOptions(placement, registry, anchor, passage, item)
+            if #choices > 0 then return passage, choices end
+        end
+    end
+end
+
 local function cursorTarget(cursor, square, run)
     local player = cursor.character
     if not square or not run or runBusy(player, run)
@@ -239,6 +294,7 @@ local function cursorTarget(cursor, square, run)
         if not anchor then return end
         local item = run.item or player:getInventory():getFirstType(placement.WIRE_TYPE)
         if item and placement.canLay(anchor, run.port, square, player) then return run, item end
+        if cursorPassage(placement, registry, anchor, square, item) then return run, item end
         if #connectionChoices(placement, registry, anchor, run.port, square, player) > 0 then return run end
     elseif placement.canPlace(square, run.item:getFullType())
         or (run.item:getFullType() == placement.WIRE_TYPE and #openEnds(placement, registry, square, player) > 0) then
@@ -305,10 +361,12 @@ local function placeFromCursor(player, run, item, square, anchorId, port)
     if spec.mount == "wall" then
         mount = placement.wallMount(square, item, run.cursor.zedcommMount)
     end
+    local raised = placement.surfaceOffset(square, item:getFullType()) ~= nil
     queue(player, {
         kind = anchorId and "lay" or "place", item = item, square = square,
         network = run.network, anchorId = anchorId, anchorPort = port, run = run, mount = mount,
-    }, true, spec.mount == "surface")
+        preferredSquare = not raised and square or nil, adjacentOnly = raised,
+    })
 end
 
 function Cursor:tryBuild(x, y, z)
@@ -366,13 +424,6 @@ local function startSelectedRun(player, run, label)
     end
 end
 
-local function addApproach(locations, square)
-    if not square or not square:canStand() then return end
-    locations[#locations + 1] = square:getX() + 0.5
-    locations[#locations + 1] = square:getY() + 0.5
-    locations[#locations + 1] = square:getZ()
-end
-
 local function selectEnd(player, network, entry, port, label)
     local placement = ZedComm.PlayerPlacement
     local run = { network = network, id = entry.id, port = port }
@@ -385,9 +436,7 @@ local function selectEnd(player, network, entry, port, label)
         startSelectedRun(player, run, label)
         return
     end
-    local locations = placement.surfaceApproachLocations(anchor.square)
-    addApproach(locations, anchor.square)
-    addApproach(locations, placement.oppositeFace(anchor.square, anchor.object))
+    local locations = placement.approachLocations(anchor.square, anchor.object)
     if #locations == 0 then
         say(player, "No open floor next to the free end.")
         return
@@ -551,13 +600,13 @@ local function restoreHighlight(playerNum, state)
     state.object = nil
 end
 
-local function highlightWire(option, menu, enabled, object)
+local function highlightFixture(option, menu, enabled, object)
     local playerNum = menu.player
-    local state = wireHover[playerNum]
+    local state = fixtureHover[playerNum]
     if enabled then
         if not state then
             state = { hovered = {} }
-            wireHover[playerNum] = state
+            fixtureHover[playerNum] = state
         end
         hoverOrder = hoverOrder + 1
         state.hovered[option] = { object = object, order = hoverOrder }
@@ -568,7 +617,7 @@ local function highlightWire(option, menu, enabled, object)
     end
 
     -- Parent and child options can both be active. Keep the most recent
-    -- hover so leaving an old submenu cannot clear a different wire.
+    -- hover so leaving an old submenu cannot clear a different fixture.
     local latest
     for _, entry in pairs(state.hovered) do
         if entry.object:getSquare() and (not latest or entry.order > latest.order) then latest = entry end
@@ -584,7 +633,7 @@ local function highlightWire(option, menu, enabled, object)
             nextObject:setOutlineHighlight(playerNum, true)
         end
     end
-    if not latest then wireHover[playerNum] = nil end
+    if not latest then fixtureHover[playerNum] = nil end
 end
 
 local function showPlacementChoice(cursor, run)
@@ -596,6 +645,22 @@ end
 local function extendOrConnect(cursor, run, item, square)
     local player, placement = cursor.character, ZedComm.PlayerPlacement
     local registry, anchor = placement.getRegistry(), resolveAnchor(player, run)
+    local passage, choices = cursorPassage(placement, registry, anchor, square, item)
+    if passage then
+        local context = showPlacementChoice(cursor, run)
+        for _, choice in ipairs(choices) do
+            local entry = choice.entry
+            local option = context:addOption(choice.label, player, function()
+                run.choice = nil
+                queue(player, passageCommand(run, passage, item, entry))
+            end)
+            if entry then
+                option.onHighlight = highlightFixture
+                option.onHighlightParams = { entry.object }
+            end
+        end
+        return
+    end
     local ends = connectionChoices(placement, registry, anchor, run.port, square, player)
     if #ends == 0 then
         if item then placeFromCursor(player, run, item, square, run.id, run.port) end
@@ -622,12 +687,10 @@ local function extendOrConnect(cursor, run, item, square)
             end
             queue(player, { kind = "join", run = run, network = run.network, square = entry.square,
                 walkSquare = destination, anchorId = run.id, anchorPort = run.port,
-                targetId = entry.id, object = entry.object, port = port }, true)
+                targetId = entry.id, object = entry.object, port = port })
         end)
-        if entry.piece.kind == "cable" then
-            option.onHighlight = highlightWire
-            option.onHighlightParams = { entry.object }
-        end
+        option.onHighlight = highlightFixture
+        option.onHighlightParams = { entry.object }
     end
 end
 
@@ -675,10 +738,8 @@ function Cursor.placeSelected(cursor, run, item, square)
                 say(player, "Choose a neighboring floor tile to lay the wire.")
             end
         end)
-        if entry.piece.kind == "cable" then
-            option.onHighlight = highlightWire
-            option.onHighlightParams = { entry.object }
-        end
+        option.onHighlight = highlightFixture
+        option.onHighlightParams = { entry.object }
     end
 end
 
@@ -741,13 +802,13 @@ function Native.pickUp(cursor, entry, square)
     local run = { network = network, cursor = cursor, native = true }
     runs[player] = run
     queue(player, { kind = "pickup", targetId = entry.id, object = entry.object,
-        square = square, network = network, run = run }, true, entry.spec.mount == "surface")
+        square = square, network = network, run = run, adjacentOnly = entry.object:getRenderYOffset() > 0 })
 end
 
 function Native.previewPickup(cursor, object)
     if cursor.zedcommPickupWire == object then return end
     cursor.zedcommPickupWire = object
-    highlightWire(cursor, cursor, object ~= nil, object)
+    highlightFixture(cursor, cursor, object ~= nil, object)
 end
 
 function Native.changeSelection(cursor)
@@ -786,9 +847,9 @@ local function onFillInventoryMenu(playerNum, context, items)
     context:addOption("Place with ZedComm cursor", player, placeInventoryItem, first)
 end
 
-local function addOptions(menu, options, player, wire)
+local function addOptions(menu, options, player, highlightedObject)
     for _, entry in ipairs(options) do
-        local object = entry.wire or wire
+        local object = entry.highlightObject or highlightedObject
         local option
         if entry.children then
             option = menu:addOption(entry[1], nil, nil)
@@ -800,7 +861,7 @@ local function addOptions(menu, options, player, wire)
         end
         if entry.disabled then option.notAvailable = true end
         if option and object then
-            option.onHighlight = highlightWire
+            option.onHighlight = highlightFixture
             option.onHighlightParams = { object }
         end
     end
@@ -827,13 +888,13 @@ local function menuTargets(placement, registry, square, player, context, worldOb
     end
 
     addReachableFixtures(ZedComm.Door.oppositeSquare(door))
-    if context.x and context.y then
+    if door:isOpen() then
+        for _, object in ipairs(worldObjects) do addReachableFixtures(object:getSquare()) end
         local z = square:getZ()
-        local x = math.floor(screenToIsoX(context.player, context.x, context.y, z))
-        local y = math.floor(screenToIsoY(context.player, context.x, context.y, z))
-        if math.abs(x - square:getX()) + math.abs(y - square:getY()) <= 1 then
-            addReachableFixtures(getCell():getGridSquare(x, y, z))
-        end
+        local mouseX, mouseY = getMouseX(), getMouseY()
+        local x = math.floor(screenToIsoX(context.player, mouseX, mouseY, z))
+        local y = math.floor(screenToIsoY(context.player, mouseX, mouseY, z))
+        addReachableFixtures(getCell():getGridSquare(x, y, z))
     end
     return targets, extraTiles
 end
@@ -868,15 +929,18 @@ local function onFillMenu(playerNum, context, worldObjects, test)
     end
     local function action(label, command, list, unavailable)
         command.network = network
-        command.square = command.object and command.object:getSquare() or square
+        command.square = command.square or (command.object and command.object:getSquare()) or square
         list = list or options
         if unavailable then
             list[#list + 1] = { label .. " (" .. unavailable .. ")", disabled = true }
         else
+            if command.kind == "place" then
+                command.adjacentOnly = placement.surfaceOffset(command.square, command.item:getFullType()) ~= nil
+            end
             addTo(list, label, queue, command)
         end
     end
-    local function fixtureMenu(label)
+    local function fixtureMenu(label, object)
         local title, suffix = label, 2
         while fixtureMenuNames[title] do
             title = label .. " (" .. suffix .. ")"
@@ -884,7 +948,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         end
         fixtureMenuNames[title] = true
         local children = {}
-        options[#options + 1] = { title, children = children }
+        options[#options + 1] = { title, children = children, highlightObject = object }
         return children
     end
 
@@ -949,23 +1013,10 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                     end
                 end
                 change("Seal passthrough", nil, nil, crossingCount > 0 and "Wired" or nil)
-                if run and anchor.square == square and anchor.piece.kind == "cable"
-                    and crossingCount < placement.WALL_PASSTHROUGH_LIMIT then
-                    local function route(title, entry)
-                        action(title, { kind = "connect-through-wall", side = passage.side, wall = passage.wall,
-                            anchorId = run.id, run = run, targetId = entry and entry.id,
-                            remoteWire = entry and entry.object, item = wire }, group)
-                    end
-                    if wire and placement.canPlace(passage.other, placement.WIRE_TYPE) then route("Feed wire through") end
-                    local number = 0
-                    for _, remote in ipairs(orderedPieces(placement, registry, passage.other)) do
-                        if remote.piece.kind == "cable" then
-                            number = number + 1
-                            if placement.canJoinThroughWall(network, passage, anchor, remote) then
-                                local name = registry:getRunName(remote.id)
-                                route("Connect to wire " .. number .. (name and " (" .. name .. ")" or ""), remote)
-                            end
-                        end
+                if run then
+                    for _, choice in ipairs(passageOptions(placement, registry, anchor, passage, wire)) do
+                        action(choice.label, passageCommand(run, passage, wire, choice.entry), group)
+                        group[#group].highlightObject = choice.entry and choice.entry.object
                     end
                 end
             end
@@ -997,7 +1048,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                 name = "wire " .. number
                 group = {}
                 groupedWire = true
-                options[#options + 1] = { "Wire " .. number, children = group, wire = entry.object }
+                options[#options + 1] = { "Wire " .. number, children = group, highlightObject = entry.object }
             end
             addTo(group or options, group and "Inspect" or "Inspect wire", wireDetails, registry, entry.id, name)
             if registry:getRunName(entry.id) then
@@ -1006,7 +1057,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
         else
             local label = entry.spec.fixtureType
             local heading = fixtureLabel(entry, label)
-            group = fixtureMenu(padlockId and heading .. " (Padlocked)" or heading)
+            group = fixtureMenu(padlockId and heading .. " (Padlocked)" or heading, entry.object)
             fixtureActions[entry.object] = group
             if not entry.piece.definitionUnavailable then
                 local rename = "Rename " .. label
