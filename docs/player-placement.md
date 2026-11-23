@@ -1,6 +1,6 @@
 # ZedComm Player Guide
 
-ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft parts under **Crafting -> ZedComm**. [Recipes and Electrical requirements](recipes.md).
+ZedComm adds wired electronics to Project Zomboid Build 42 singleplayer. Craft parts under **Crafting > ZedComm**. [Recipes and Electrical requirements](recipes.md).
 
 ## Place and wire a circuit
 
@@ -9,7 +9,7 @@ For physical actions such as placing a device or fitting an adapter, your charac
 1. Use native **Place** and **Cycle through objects** to select a source and a receiver. For a first circuit, use a Pressure Plate and a Numeric Display.
 2. Cycle to **Signal Wire**. Click a free device jack and choose **Connect to**. If the jack tile cannot take wire, choose a valid neighboring floor tile for the first segment.
 3. Click neighboring tiles to extend the run. Click the receiver or another compatible free end and choose **Connect to**. Joining existing ends uses no spare wire. **Lay wire here** adds a segment when you have one.
-4. To resume a run, right-click its end and choose **ZedComm -> Select free end**. Your character walks within reach if needed, and native **Place** opens with Signal Wire selected. Right-click exits Place and keeps a reachable end selected for a context-menu connection. Walking out of reach clears that selection.
+4. To resume a run, right-click its end and choose **ZedComm > Select free end**. Your character walks within reach if needed, and native **Place** opens with Signal Wire selected. Right-click exits Place and keeps a reachable end selected for a context-menu connection. Walking out of reach clears that selection.
 5. Use native **Pickup** to recover equipment or wire. A recovered device retains its settings and installed parts. External wires stay in the world, ready to reconnect.
 
 On shared tiles, cycle through numbered wires or open a specific wire's submenu. Hover a choice to outline that segment in cyan. Up to five wire lanes can share a tile edge. Keep one source per run. Use a Splitter for one signal going to multiple independent runs.
@@ -33,7 +33,7 @@ On shared tiles, cycle through numbered wires or open a specific wire's submenu.
 | Numeric Display | Shows the byte. Zero is a valid reading. A wired display with no live signal shows dashes. An unwired face is blank. |
 | Advanced Display | Shows Basic bytes or the typed weight in kilograms. **Read full signal** gives the exact reading when the face rounds or shows **HI**. |
 
-To change a Pressure Plate's occupied value, right-click it and choose **ZedComm -> Plate -> Set pressure plate output**. Use **Read numeric display** or **Read full signal** to inspect a receiver.
+To change a Pressure Plate's occupied value, right-click it and choose **ZedComm > Plate > Set pressure plate output**. Use **Read numeric display** or **Read full signal** to inspect a receiver.
 
 ## Additional sensors
 
@@ -64,7 +64,7 @@ Fit two matched Basic or Advanced Adapters to a supported native door. The share
 
 ## Names, access and overlays
 
-Rename fixtures and runs through their ZedComm submenus. Rename a jack by right-clicking it in the editor. Blank names restore the default. Hover a cable choice to identify it before joining or picking it up. **Options -> Mods -> ZedComm** controls fixture and wire labels and door status markers.
+Rename fixtures and runs through their ZedComm submenus. Rename a jack by right-clicking it in the editor. Blank names restore the default. Hover a cable choice to identify it before joining or picking it up. **Options > Mods > ZedComm** controls fixture and wire labels and door status markers.
 
 Use a vanilla Padlock on a cabinet or a door board. A matching key grants access. **Remember me** also grants access to the survivor who fitted it. Protected circuits keep running. Remove the lock before upgrading or picking up a cabinet or removing door adapters.
 
