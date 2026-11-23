@@ -21,8 +21,8 @@ This file is written by `tools/make-recipes.py`. Change recipes there, not here.
 | Window Contact | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Storage Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Fluid Fill Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
-| 5 × Signal Wire | - | 1 | 1 Electric Wire or Wire | No |
-| 50 × Signal Wire | - | 1 | 10 Wire | No |
+| 5 x Signal Wire | - | 1 | 1 Electric Wire or Wire | No |
+| 50 x Signal Wire | - | 1 | 10 Wire | No |
 | Network Switch | - | 2 | 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Time-of-day Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |
 | Power Sensor | 1 | 4 | 1 Basic Adapter, 1 Electronics Scrap, 1 Electric Wire or Wire | Yes |

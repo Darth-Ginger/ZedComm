@@ -1,6 +1,6 @@
 # Cabinet sprite prototypes
 
-The Small, Wall and Tabletop prototypes are transparent 128 × 256 PNGs. The Large and XL sources are transparent high-resolution renders. The Build 42 packer scales each source to its world frame and inventory icon.
+The Small, Wall and Tabletop prototypes are transparent 128 x 256 PNGs. The Large and XL sources are transparent high-resolution renders. The Build 42 packer scales each source to its world frame and inventory icon.
 
 | Variant | PNG | Visible art width | Nominal art placement |
 | --- | --- | --- | --- |

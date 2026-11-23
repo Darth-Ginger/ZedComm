@@ -4,15 +4,15 @@ Generated with the built-in imagegen tool with transparent backgrounds. The PNGs
 
 ## Module housing
 
-The packer draws the relay housing and lead at Build 42 tile scale. The module uses frames 14–19 for an unplugged socket, same-tile connection, and four adjacent wire directions in +X, +Y, −X, −Y order. The lamp renders the selected frame as an attached sprite. The frame follows the cable connected to the module port, including on tiles shared by multiple cables. Compact housing frames 26–31 share their pixels with mount variants 32–139. The mount is chosen from the lower edge of the lamp’s texture, and the child sprite follows the furniture height. The compact lead indicates which side connects.
+The packer draws the relay housing and lead at Build 42 tile scale. The module uses frames 14-19 for an unplugged socket, same-tile connection, and four adjacent wire directions in +X, +Y, -X, -Y order. The lamp renders the selected frame as an attached sprite. The frame follows the cable connected to the module port, including on tiles shared by multiple cables. Compact housing frames 26-31 share their pixels with mount variants 32-139. The mount is chosen from the lower edge of the lamp's texture, and the child sprite follows the furniture height. The compact lead indicates which side connects.
 
 ## pressure-plate
 
-The packer fits the plate body inside the tile so its lead can reach the wire at the tile edge. Frames 20–25 are floor overlays for the empty socket, a same-tile connection, and adjacent connections in +X, +Y, −X, −Y order. The existing plate sprite and inventory icon remain in the pack.
+The packer fits the plate body inside the tile so its lead can reach the wire at the tile edge. Frames 20-25 are floor overlays for the empty socket, a same-tile connection, and adjacent connections in +X, +Y, -X, -Y order. The existing plate sprite and inventory icon remain in the pack.
 
-The occupancy plate uses the [four-tread source](../first-release-concepts/occupancy-plate.png). Frames 419 to 424 use the same socket and lead sequence. The packer exports a separate 64 × 64 item icon.
+The occupancy plate uses the [four-tread source](../first-release-concepts/occupancy-plate.png). Frames 419 to 424 use the same socket and lead sequence. The packer exports a separate 64 x 64 item icon.
 
-The weight plate uses the [reinforced deck source](../first-release-concepts/weight-plate.png). Frames 425 to 430 use the same connection sequence, with the rear sockets aligned to the deck. It also has a separate 64 × 64 item icon.
+The weight plate uses the [reinforced deck source](../first-release-concepts/weight-plate.png). Frames 425 to 430 use the same connection sequence, with the rear sockets aligned to the deck. It also has a separate 64 x 64 item icon.
 
 Use case: stylized-concept. Asset type: a single placeholder 2D world sprite for a Project Zomboid Build 42 isometric mod set in rural Kentucky in 1993. Match classic grounded pixel-art game props with a 2:1 diamond floor grid projection, viewed from above at a three-quarter angle, neutral soft light from the upper left, crisp silhouettes and muted, slightly worn materials. Prioritize legibility at small sprite size. Center the isolated object with modest transparent margins. True transparent alpha background, no visible floor tile, no scene, no lettering or logos, no watermark, no sprite sheet or alternative views.
 Primary request: a compact, low-profile square industrial pressure mat. Flat dark rubber tread inset into a thin scuffed gray metal rim, a small side-facing electrical terminal, and two small corner screws. Footprint reads as a square floor diamond, flush to the floor. Make the dark rubber and lighter rim distinct at low resolution.

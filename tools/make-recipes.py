@@ -157,7 +157,7 @@ def build(names):
             table += [f"## {group}", "", "| Makes | Electrical | XP | Ingredients | Screwdriver |",
                       "| --- | --- | ---: | --- | --- |"]
         name = display_name(names, "ZedComm." + item)
-        makes = f"{made} × {name}" if made > 1 else name
+        makes = f"{made} x {name}" if made > 1 else name
         table.append(f"| {makes} | {level or '-'} | {xp} | {listed(inputs)} | {'Yes' if tool else 'No'} |")
     text = "\n".join(table)
     for heading in sorted({row[0] for _i, _s, row in recipes}):

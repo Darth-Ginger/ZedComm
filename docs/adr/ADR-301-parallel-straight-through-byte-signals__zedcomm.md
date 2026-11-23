@@ -30,7 +30,7 @@ Represent the cable as eight simultaneous logical bit lanes forming an unsigned 
 ### Negative
 
 - Does not model serial communications or electrical waveforms.
-- Eight lanes bound a single maintained value to 0–255; future wider values need a separate decision.
+- Eight lanes bound a single maintained value to 0-255; future wider values need a separate decision.
 
 ## Related
 
