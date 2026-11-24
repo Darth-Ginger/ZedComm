@@ -54,6 +54,7 @@ local function addInventoryItems(cursor, objects, placement, actions)
                 local detail = key == wireType and runLabel
                 if spec.mount == "wall" then detail = "Hold left-click and drag toward a wall" end
                 if spec.mount == "surface" then detail = "Place on an empty table or countertop" end
+                if spec.floorFrame then detail = "Hold left-click and drag to face the cabinet" end
                 addCandidate(groups, item, spec, key, detail)
             end
         end
@@ -124,6 +125,7 @@ end
 local function cancelSelection(cursor, actions)
     cursor.zedcommKey = nil
     cursor.zedcommMount = nil
+    cursor.zedcommFacing = nil
     actions.changeSelection(cursor)
 end
 
@@ -177,7 +179,7 @@ local function install()
             self.colorMod = class.normalColor
         else
             self.canCreate = actions.canPlace(self, selected.object, square)
-            local name = placement.previewSprite(square, selected.object, self.zedcommMount)
+            local name = placement.previewSprite(square, selected.object, self.zedcommMount, self.zedcommFacing)
             self.objectSprite = (name and getSprite(name)) or props.sprite
             self.colorMod = self.canCreate and class.normalColor or class.invalidColor
         end
@@ -215,6 +217,14 @@ local function install()
     function class:setCursorFacing(facing)
         local square = self.currentSquare
         local selected = self.zedcommKey and selectedAt(self, square)
+        if selected and selected.zedcommKey and not selected.zedcommPickup
+            and placement.floorFacing(selected.object) then
+            if facing and facing ~= self.zedcommFacing then
+                self.zedcommFacing = facing
+                getSoundManager():playUISound("UIObjectMenuObjectRotateOutline")
+            end
+            return
+        end
         if not selected or not selected.zedcommKey or not placement.isWallItem(selected.object:getFullType()) then
             return setCursorFacing(self, facing)
         end
@@ -231,6 +241,13 @@ local function install()
         if not joypad and getCore():isKey(KeybindId.ROTATE_BUILDING, key)
             and (isKeyDown(Keyboard.KEY_LSHIFT) or isKeyDown(Keyboard.KEY_RSHIFT)) then
             local selected = selectedAt(self, self.currentSquare)
+            if selected and selected.zedcommKey and not selected.zedcommPickup then
+                local facing = placement.floorFacing(selected.object, self.zedcommFacing)
+                if facing then
+                    self.zedcommFacing = facing % 4 + 1
+                    return
+                end
+            end
             if selected and selected.zedcommKey and placement.isWallItem(selected.object:getFullType()) then
                 local current = placement.wallMount(self.currentSquare, selected.object, self.zedcommMount)
                 self.zedcommMount = ZedComm.NetworkSwitch.nextMount(self.currentSquare, current)

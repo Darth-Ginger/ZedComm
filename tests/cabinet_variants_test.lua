@@ -26,6 +26,83 @@ check(piece(large).ports["input-2"] == false and piece(large).ports["output-2"] 
     and piece(large).ports["input-3"] == nil and piece(xl).ports["input-3"] == false
     and piece(xl).ports["output-3"] == false, "size-specific fixed jacks register as independent ports")
 
+local rotatedTile = floor(180, 130)
+local drops, rolls, nextRoll = {}, { 4, 24, 0, 64, 0, 0, 74, 0 }, 1
+function rotatedTile:AddWorldInventoryItem(itemType)
+    drops[#drops + 1] = itemType
+end
+ZombRand = function(limit)
+    local roll = assert(rolls[nextRoll], "unexpected salvage roll")
+    assert(roll < limit)
+    nextRoll = nextRoll + 1
+    return roll
+end
+local item = test.give("ZedComm.AdvancedSmallCabinet")
+rotatedTile.actors = { test.player }
+check(not test.runPlacement(rotatedTile, { kind = "place", item = item }) and test.inventory:contains(item),
+    "floor cabinet placement waits for an occupied tile to clear")
+rotatedTile.actors = nil
+local placed, rotated = test.runPlacement(rotatedTile, { kind = "place", item = item, facing = 4 })
+check(placed and piece(rotated).state.facing == 4 and entry(rotated).object.sprite == "zedcomm_cabinet_faces_01_3",
+    "placed floor cabinet retains the selected model facing")
+local cabinet = entry(rotated).object
+check(cabinet.special and cabinet.blockAll and not cabinet.passThrough and cabinet.thumpable
+    and cabinet.health == 500 and rotatedTile.recalculated,
+    "floor cabinet registers as a blocking destructible object")
+cabinet:setHealth(320)
+assert(target(rotatedTile, rotated, "pickup"))
+check(nextRoll == 1 and #drops == 0, "picking up a cabinet skips salvage rolls")
+local recovered = test.inventory:getFirstType("ZedComm.AdvancedSmallCabinet")
+local returned, same = test.runPlacement(rotatedTile, { kind = "place", item = recovered })
+check(returned and same == rotated and piece(same).state.facing == 4,
+    "pickup and replacement keep the floor cabinet facing")
+check(entry(same).object:getHealth() == 320, "pickup and replacement preserve cabinet damage")
+
+local wireTile = floor(181, 130)
+local wired, wire = test.lay(wireTile, test.give("ZedComm.SignalWire"), same, "output")
+assert(wired and piece(same).ports.output == wire)
+local destroyed = entry(same).object
+test.fire("OnDestroyIsoThumpable", destroyed)
+rotatedTile:transmitRemoveItemFromSquare(destroyed)
+check(piece(same) == nil and piece(wire) and piece(wire).links[same] == nil,
+    "destroying a cabinet removes its board and frees the attached wire")
+check(nextRoll == 9 and table.concat(drops, ",") ==
+    "ZedComm.AdvancedAdapter,Base.SheetMetal,Base.ElectronicsScrap,Base.ElectricWire,Base.ElectricWire",
+    "destruction rolls salvage once and uses the cabinet's adapter tier")
+
+drops, rolls, nextRoll = {}, { 4, 25, 64, 0, 1, 75 }, 1
+local basic = place(rotatedTile, "ZedComm.SmallCabinet")
+rotatedTile:transmitRemoveItemFromSquare(entry(basic).object)
+check(nextRoll == 7 and table.concat(drops, ",") == "ZedComm.BasicAdapter,Base.ScrapMetal",
+    "direct demolition can drop the Basic Adapter and metal scrap")
+
+drops, rolls, nextRoll = {}, { 5, 25, 65, 75 }, 1
+local cabinetWithoutSalvage = place(rotatedTile, "ZedComm.SmallCabinet")
+rotatedTile:transmitRemoveItemFromSquare(entry(cabinetWithoutSalvage).object)
+check(nextRoll == 5 and #drops == 0, "salvage can fail all four rolls")
+
+drops, rolls, nextRoll = {}, { 5, 24, 1, 64, 1, 0, 1, 74, 1 }, 1
+local smashedLarge = place(rotatedTile, "ZedComm.LargeCabinet")
+rotatedTile:transmitRemoveItemFromSquare(entry(smashedLarge).object)
+check(nextRoll == 10 and #drops == 7 and drops[2] == "Base.SheetMetal"
+    and drops[3] == "Base.ElectronicsScrap" and drops[4] == "Base.ScrapMetal"
+    and drops[5] == "Base.ElectricWire" and drops[7] == "Base.ElectricWire",
+    "large cabinets can drop two sheets, mixed scrap, and three electrical wires")
+
+drops, rolls, nextRoll = {}, { 4, 24, 2, 64, 3, 1, 1, 1, 1, 74, 2 }, 1
+local smashedXL = place(rotatedTile, "ZedComm.XLCabinet")
+rotatedTile:transmitRemoveItemFromSquare(entry(smashedXL).object)
+check(nextRoll == 12 and #drops == 12 and drops[1] == "ZedComm.BasicAdapter"
+    and drops[4] == "Base.SheetMetal" and drops[8] == "Base.ScrapMetal"
+    and drops[9] == "Base.ElectricWire" and drops[12] == "Base.ElectricWire",
+    "XL cabinets can drop an adapter, three sheets, four scrap pieces and four electrical wires together")
+
+local occupiedFloor = floor(180, 131)
+function occupiedFloor:has(flag) return flag == "IsTable" end
+check(not test.placement.canPlace(occupiedFloor, "ZedComm.LargeCabinet")
+    and test.placement.canPlace(occupiedFloor, "ZedComm.SignalWire"),
+    "floor cabinets reject furniture tiles while wire remains available")
+
 local originalCore = getCore
 getCore = function()
     local core = originalCore()
@@ -71,6 +148,10 @@ local mounted, wall = test.runPlacement(wallTile, { kind = "place", item = wallI
 check(mounted and entry(wall).object.sprite == "zedcomm_cabinets_01_4" and piece(wall).state.mount == "west"
     and piece(wall).ports["output-2"] == false, "wall cabinet uses selected facing and the Large board")
 
+local wallObject = entry(wall).object
+check(wallObject.special and wallObject.thumpable and wallObject.passThrough and not wallObject.blockAll,
+    "a wall cabinet is destructible and leaves collision to the wall")
+
 local tableItem = test.give("ZedComm.TabletopCabinet")
 ISMoveableSpriteProps = { getTotalTableHeight = function(_, square) return square.surfaceHeight or 0 end }
 function tableTile:has(flag) return flag == "IsTableTop" and self.occupiedTop end
@@ -83,6 +164,9 @@ function tableTile:isSolidTrans() return true end
 local placed, tabletop = test.runPlacement(tableTile, { kind = "place", item = tableItem })
 check(placed and entry(tabletop).object.offset == 30 and piece(tabletop).ports["input-2"] == nil,
     "tabletop cabinet uses the furniture offset and Small board even on a solid furniture tile")
+local tableObject = entry(tabletop).object
+check(tableObject.special and tableObject.thumpable and tableObject.passThrough and not tableObject.blockAll,
+    "a tabletop cabinet is destructible and leaves collision to its support")
 local cableOK, cable = test.lay(floor(201, 125), test.give("ZedComm.SignalWire"), tabletop, "output")
 check(cableOK and piece(tabletop).ports.output == cable, "tabletop jack can connect from adjacent floor")
 
@@ -102,4 +186,14 @@ local carried = assert(test.inventory:getFirstType("ZedComm.AdvancedLargeCabinet
 local replaced, replacement = test.runPlacement(largeTile, { kind = "place", item = carried })
 check(replaced and replacement == large and piece(large).state.portLabels["input-2"] == "Second feed",
     "pickup returns the correct upgraded variant and preserves configuration")
+wallTile.AddWorldInventoryItem = rotatedTile.AddWorldInventoryItem
+tableTile.AddWorldInventoryItem = rotatedTile.AddWorldInventoryItem
+drops, rolls, nextRoll = {}, { 4, 24, 1, 64, 1, 0, 1, 74, 1 }, 1
+wallTile:transmitRemoveItemFromSquare(wallObject)
+check(nextRoll == 10 and #drops == 8 and drops[1] == "ZedComm.BasicAdapter" and drops[8] == "Base.ElectricWire",
+    "wall cabinets use Large salvage limits")
+drops, rolls, nextRoll = {}, { 4, 24, 0, 64, 0, 0, 74, 0 }, 1
+tableTile:transmitRemoveItemFromSquare(tableObject)
+check(nextRoll == 9 and #drops == 5 and drops[2] == "Base.SheetMetal" and drops[5] == "Base.ElectricWire"
+    and piece(cable) and piece(cable).links[tabletop] == nil, "tabletop cabinets use Small salvage limits and free their wire")
 test.finish()

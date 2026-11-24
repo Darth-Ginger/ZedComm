@@ -36,12 +36,13 @@ local inputTile, armWireTile, outputTile = floorTile(169, 125), floorTile(170, 1
 local cabinetItem = give("ZedComm.SmallCabinet")
 local cabinetMenu = menuAt(cabinetTile)
 local placementOptions = cabinetMenu.children["Place device"] or cabinetMenu
+player.tile = inputTile
 assert(placementOptions.options["Place basic small cabinet"])()
 assert(testState.queued and testState.queued:isValid() and testState.queued:complete())
 local cabinet = cabinetTile.objects[1]
 local cabinetId = cabinet:getModData().zedcomm.id
 local function cabinetPiece() return testState.registry.network.pieces[cabinetId] end
-check(cabinet.sprite == "zedcomm_devices_01_466" and not inventory:contains(cabinetItem)
+check(cabinet.sprite == "zedcomm_cabinet_faces_01_2" and not inventory:contains(cabinetItem)
     and cabinetPiece().ports.input == false and cabinetPiece().ports.output == false,
     "normal placement creates a cabinet with two fixed external jacks")
 local plateOK, cabinetPlate = runPlacement(plateTile, { kind = "place", item = give("ZedComm.WeightPlate") })

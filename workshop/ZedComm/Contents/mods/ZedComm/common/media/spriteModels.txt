@@ -1,0 +1,235 @@
+spriteModel
+{
+    VERSION = 1,
+
+    tileset
+    {
+        name = zedcomm_devices_01,
+
+        tile
+        {
+            xy = 2 58,
+            modelScript = ZedComm.SmallCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+    }
+
+    tileset
+    {
+        name = zedcomm_cabinet_faces_01,
+
+        tile
+        {
+            xy = 0 0,
+            modelScript = ZedComm.SmallCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 180.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 1 0,
+            modelScript = ZedComm.SmallCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 -90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 2 0,
+            modelScript = ZedComm.SmallCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 3 0,
+            modelScript = ZedComm.SmallCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 4 0,
+            modelScript = ZedComm.LargeCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 180.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 5 0,
+            modelScript = ZedComm.LargeCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 -90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 6 0,
+            modelScript = ZedComm.LargeCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 7 0,
+            modelScript = ZedComm.LargeCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 0 1,
+            modelScript = ZedComm.XLCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 180.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 1 1,
+            modelScript = ZedComm.XLCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 -90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 2 1,
+            modelScript = ZedComm.XLCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 3 1,
+            modelScript = ZedComm.XLCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 90.0 0.0,
+            scale = 1.0,
+        }
+    }
+
+    tileset
+    {
+        name = zedcomm_cabinets_01,
+
+        tile
+        {
+            xy = 0 0,
+            modelScript = ZedComm.LargeCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 1 0,
+            modelScript = ZedComm.XLCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 2 0,
+            modelScript = ZedComm.TabletopCabinetWorld,
+            translate = 0.000 0.000 0.000,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 3 0,
+            modelScript = ZedComm.WallCabinetWorld,
+            translate = -0.120 0.550 -0.370,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 7 0,
+            modelScript = ZedComm.WiredWallCabinetWorld,
+            translate = -0.120 0.550 -0.370,
+            rotate = 0.0 0.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 4 0,
+            modelScript = ZedComm.WallCabinetWorld,
+            translate = -0.370 0.550 -0.120,
+            rotate = 0.0 90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 0 1,
+            modelScript = ZedComm.WiredWallCabinetWorld,
+            translate = -0.370 0.550 -0.120,
+            rotate = 0.0 90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 5 0,
+            modelScript = ZedComm.WallCabinetWorld,
+            translate = 0.120 0.550 0.370,
+            rotate = 0.0 180.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 1 1,
+            modelScript = ZedComm.WiredWallCabinetWorld,
+            translate = 0.120 0.550 0.370,
+            rotate = 0.0 180.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 6 0,
+            modelScript = ZedComm.WallCabinetWorld,
+            translate = 0.370 0.550 0.120,
+            rotate = 0.0 -90.0 0.0,
+            scale = 1.0,
+        }
+
+        tile
+        {
+            xy = 2 1,
+            modelScript = ZedComm.WiredWallCabinetWorld,
+            translate = 0.370 0.550 0.120,
+            rotate = 0.0 -90.0 0.0,
+            scale = 1.0,
+        }
+    }
+}

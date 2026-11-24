@@ -56,6 +56,9 @@ end
 
 function SGlobalObjectSystem.RegisterSystemClass(class)
     Events.OnSGlobalObjectSystemInit.Add(function() class.instance = class:new() end)
+    Events.OnDestroyIsoThumpable.Add(function(o)
+        if class.instance then class.instance:OnObjectAboutToBeRemoved(o) end
+    end)
     Events.OnObjectAdded.Add(function(o) if class.instance then class.instance:OnObjectAdded(o) end end)
     Events.OnObjectAboutToBeRemoved.Add(function(o)
         if class.instance then class.instance:OnObjectAboutToBeRemoved(o) end

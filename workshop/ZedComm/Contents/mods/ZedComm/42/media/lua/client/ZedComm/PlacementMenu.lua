@@ -150,6 +150,7 @@ local function queue(player, command)
     local current = player:getCurrentSquare()
     local walking
     if (destination and current ~= destination) or (preferred and current ~= preferred)
+        or (command.adjacentOnly and current == command.square)
         or not placement.canReach(player, command.square, command.object) then
         local anchor = run and run.id and resolveAnchor(player, run)
         local locations = placement.approachLocations(command.square, command.object,
@@ -314,7 +315,7 @@ function Cursor:isValid(square)
         local placement = ZedComm.PlayerPlacement
         self.zedcommWallSquare = placement.isWallItem(run.item:getFullType()) and square or nil
         self.zedcommSurface = placement.surfaceOffset(square, run.item:getFullType())
-        local sprite = placement.previewSprite(square, run.item, self.zedcommMount)
+        local sprite = placement.previewSprite(square, run.item, self.zedcommMount, self.zedcommFacing)
         if sprite ~= self.previewSprite then
             self:setSprite(sprite)
             self.previewSprite = sprite
@@ -331,6 +332,13 @@ function Cursor:rotateKey(key)
         self.zedcommMount = ZedComm.NetworkSwitch.nextMount(square, current)
         self:isValid(square)
         return
+    end
+    if run and run.item and getCore():isKey(KeybindId.ROTATE_BUILDING, key) then
+        local facing = ZedComm.PlayerPlacement.floorFacing(run.item, self.zedcommFacing)
+        if facing then
+            self.zedcommFacing = facing % 4 + 1
+            return
+        end
     end
     ISBuildingObject.rotateKey(self, key)
 end
@@ -361,11 +369,12 @@ local function placeFromCursor(player, run, item, square, anchorId, port)
     if spec.mount == "wall" then
         mount = placement.wallMount(square, item, run.cursor.zedcommMount)
     end
-    local raised = placement.surfaceOffset(square, item:getFullType()) ~= nil
+    local adjacentOnly = spec.floorFrame ~= nil or placement.surfaceOffset(square, item:getFullType()) ~= nil
     queue(player, {
         kind = anchorId and "lay" or "place", item = item, square = square,
         network = run.network, anchorId = anchorId, anchorPort = port, run = run, mount = mount,
-        preferredSquare = not raised and square or nil, adjacentOnly = raised,
+        facing = run.cursor.zedcommFacing,
+        preferredSquare = not adjacentOnly and square or nil, adjacentOnly = adjacentOnly,
     })
 end
 
@@ -939,7 +948,9 @@ local function onFillMenu(playerNum, context, worldObjects, test)
             list[#list + 1] = { label .. " (" .. unavailable .. ")", disabled = true }
         else
             if command.kind == "place" then
-                command.adjacentOnly = placement.surfaceOffset(command.square, command.item:getFullType()) ~= nil
+                local fullType = command.item:getFullType()
+                command.adjacentOnly = placement.getSpec(fullType).floorFrame ~= nil
+                    or placement.surfaceOffset(command.square, fullType) ~= nil
             end
             addTo(list, label, queue, command)
         end

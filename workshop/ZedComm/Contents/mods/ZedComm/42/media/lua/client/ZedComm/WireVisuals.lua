@@ -11,9 +11,12 @@ local Shape = ZedComm.WireShape
 local ModuleVisuals = ZedComm.ModuleVisuals
 local Relay = ZedComm.RelayLamp
 local Switch = ZedComm.NetworkSwitch
-local wallCabinet = "ZedComm.WallCabinet"
 local Circuit = ZedComm.InternalCircuit
 local leadDirections = { 0, 1, 2, 4, 8 }
+local floorCabinetLeads = {
+    [1] = "zedcomm_devices_01_4", [2] = "zedcomm_devices_01_5",
+    [4] = "zedcomm_devices_01_7", [8] = "zedcomm_devices_01_10",
+}
 local plateSprites = {
     ["ZedComm.PressureSensor"] = { itemType = "ZedComm.PressurePlate", firstFrame = 20 },
     ["ZedComm.OccupancyPlate"] = { itemType = "ZedComm.OccupancyPlate", firstFrame = 419 },
@@ -58,25 +61,32 @@ local function updateLead(square, lead, name, label, tag, marker)
         end
     elseif name and getSprite(name) then
         lead = IsoObject.new(square, name, label)
+        lead:setNoPicking(true)
         lead:getModData()[tag] = marker
         square:AddTileObject(lead)
     end
 end
 
-local function refreshCabinet(object, network, piece, directions)
-    local mount = piece.state and piece.state.mount
-    local sprite = Circuit.wallCabinetSprite(mount)
-    if not sprite then return nil end
+local function refreshCabinet(object, network, piece, mountType, leads)
+    local mount = piece.state.mount
+    local height = math.floor(object:getRenderYOffset() + 0.5)
     local wired = false
     for port in pairs(piece.ports) do
         local direction = Shape.portDirection(network, piece, port)
         if direction then
-            directions[direction] = true
             wired = true
+            if mountType == "wall" and mount then
+                leads[direction] = Switch.floorLead(mount, direction)
+            elseif mountType == "surface" then
+                if height >= 1 and height <= 64 then
+                    leads[direction] = "zedcomm_tabletop_leads_01_" .. ((height - 1) * 5 + Shape.portFrames[direction] - 1)
+                end
+            else
+                leads[direction] = floorCabinetLeads[direction]
+            end
         end
     end
-    setWorldSprite(object, wired and Circuit.wallCabinetSprite(mount, true) or sprite)
-    return mount
+    if mountType == "wall" then setWorldSprite(object, Circuit.wallCabinetSprite(mount, wired)) end
 end
 
 local function refreshSquare(square, network)
@@ -85,7 +95,7 @@ local function refreshSquare(square, network)
     local objects = square:getObjects()
     local endpoint, endpointIndex, changedOrder
     local switchLead, switchLeadObject
-    local cabinetMount, cabinetDirections, cabinetLeads = nil, {}, {}
+    local cabinetSprites, cabinetLeads = {}, {}
     local duplicates
     for i = 0, objects:size() - 1 do
         local object = objects:get(i)
@@ -105,6 +115,7 @@ local function refreshSquare(square, network)
             local piece = network.pieces[tag.id]
             if piece and piece.x == square:getX() and piece.y == square:getY() and piece.z == square:getZ() then
                 local plate = plateSprites[piece.definitionId]
+                local cabinet = Circuit.cabinets[piece.definitionId]
                 if piece.kind == "cable" and tag.placedItem == "ZedComm.SignalWire" then
                     setWorldSprite(object, sprites[tag.id])
                     -- Build 42 draws floor overlays in square object order.
@@ -120,8 +131,8 @@ local function refreshSquare(square, network)
                     if piece.state then
                         switchLead = Switch.floorLead(piece.state.mount, Shape.portDirection(network, piece, "signal"))
                     end
-                elseif piece.definitionId == wallCabinet and tag.definitionId == wallCabinet then
-                    cabinetMount = refreshCabinet(object, network, piece, cabinetDirections)
+                elseif cabinet and piece.definitionId == tag.definitionId then
+                    refreshCabinet(object, network, piece, cabinet.mount, cabinetSprites)
                 elseif plate and piece.definitionId == tag.definitionId
                     and tag.placedItem == plate.itemType then
                     local direction = Shape.portDirection(network, piece, "signal")
@@ -141,9 +152,8 @@ local function refreshSquare(square, network)
     if changedOrder then endpoint:invalidateRenderChunkLevel(FBORenderChunk.DIRTY_OBJECT_ADD) end
     updateLead(square, switchLeadObject, switchLead, "ZedComm switch lead", "zedcommSwitchLead", true)
     for _, direction in ipairs(leadDirections) do
-        -- Cabinet and switch mounts share the same projected wall and floor anchors.
-        local name = cabinetMount and cabinetDirections[direction] and Switch.floorLead(cabinetMount, direction)
-        updateLead(square, cabinetLeads[direction], name, "ZedComm cabinet lead", "zedcommCabinetLead", direction)
+        updateLead(square, cabinetLeads[direction], cabinetSprites[direction],
+            "ZedComm cabinet lead", "zedcommCabinetLead", direction)
     end
     if duplicates then
         for _, duplicate in ipairs(duplicates) do square:transmitRemoveItemFromSquare(duplicate) end
@@ -167,7 +177,7 @@ local function onTick()
     if network == lastNetwork and network.version == lastVersion then return end
     for _, piece in pairs(network.pieces) do
         if piece.kind == "cable" or piece.definitionId == Relay.ID
-            or piece.definitionId == Switch.ID or piece.definitionId == wallCabinet or plateSprites[piece.definitionId] then
+            or piece.definitionId == Switch.ID or Circuit.cabinets[piece.definitionId] or plateSprites[piece.definitionId] then
             local square = cell:getGridSquare(piece.x, piece.y, piece.z)
             if square and not seen[square] then
                 seen[square] = true
@@ -186,7 +196,7 @@ Events.OnObjectAdded.Add(function(object)
         local data = object:getModData()
         local marker = type(data.movableData) == "table" and data.movableData.zedcommRelay
         local tag = data.zedcomm
-        if marker or (type(tag) == "table" and tag.definitionId == wallCabinet) then
+        if marker or (type(tag) == "table" and Circuit.cabinets[tag.definitionId]) then
             pendingSquares[square] = true
         end
     end
@@ -196,7 +206,7 @@ Events.OnObjectAboutToBeRemoved.Add(function(object)
     local data = object:getModData()
     local tag = data.zedcomm
     if data.zedcommSwitchLead or data.zedcommCabinetLead
-        or (type(tag) == "table" and (tag.definitionId == Switch.ID or tag.definitionId == wallCabinet)) then
+        or (type(tag) == "table" and (tag.definitionId == Switch.ID or Circuit.cabinets[tag.definitionId])) then
         local square = object:getSquare()
         if square then pendingSquares[square] = true end
     end

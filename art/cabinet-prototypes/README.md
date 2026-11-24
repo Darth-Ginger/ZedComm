@@ -1,5 +1,15 @@
 # Cabinet sprite prototypes
 
+## Floor cabinet world models
+
+The Small, Large and XL floor cabinets each have four facings. Basic and Advanced variants share the same mesh for each size. Drag during native placement or hold Shift and press Rotate Building to change the facing. Pickup and replacement preserve it. Floor cabinets block movement and can be destroyed. Destruction disconnects attached runs. Pick up and replace a cabinet from an earlier test build to give it collision.
+
+Run `python tools/make-cabinet-models.py` with Pillow to regenerate the DirectX meshes, shared texture, model script, wire sprites and tile mappings. The editable dimensions and socket heights are in the generator. Check the placed scale, orientation, lighting, mouse targeting, wire fit and save/reload in Build 42.
+
+Tabletop and Wall cabinets use mounted meshes and the Small and Large salvage ranges respectively. The tabletop wire wraps around the side of the furniture at its surface height. The wired wall mesh has a vertical cable that meets a separate floor lead.
+
+Compare the Small with one wooden crate, the Large with a metal locker, and the XL with a three-crate stack. Place all reference objects and cabinets on the same floor level.
+
 The Small, Wall and Tabletop prototypes are transparent 128 x 256 PNGs. The Large and XL sources are transparent high-resolution renders. The Build 42 packer scales each source to its world frame and inventory icon.
 
 | Variant | PNG | Visible art width | Nominal art placement |

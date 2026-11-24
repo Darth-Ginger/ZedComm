@@ -294,6 +294,40 @@ function SZedCommSystem:loadIsoObject(isoObject)
     syncFixture(self, isoObject, tag)
 end
 
+local smallCabinetSalvage = { sheets = 1, scrap = 1, wire = 1 }
+local largeCabinetSalvage = { sheets = 2, scrap = 2, wire = 2 }
+local cabinetSalvage = {
+    [ZedComm.InternalCircuit.CABINET_ID] = smallCabinetSalvage,
+    ["ZedComm.LargeCabinet"] = largeCabinetSalvage,
+    ["ZedComm.XLCabinet"] = { sheets = 3, scrap = 4, wire = 3 },
+    ["ZedComm.TabletopCabinet"] = smallCabinetSalvage,
+    ["ZedComm.WallCabinet"] = largeCabinetSalvage,
+}
+
+local function dropCabinetSalvage(square, adapter, salvage)
+    local circuit = ZedComm.InternalCircuit
+    if ZombRand(100) < 5 then
+        local item = adapter == "advanced" and circuit.ADVANCED_ADAPTER_ITEM or circuit.BASIC_ADAPTER_ITEM
+        square:AddWorldInventoryItem(item, 0.5, 0.5, 0)
+    end
+    if ZombRand(100) < 25 then
+        for _ = 1, ZombRand(salvage.sheets) + 1 do
+            square:AddWorldInventoryItem("Base.SheetMetal", 0.6, 0.45, 0)
+        end
+    end
+    if ZombRand(100) < 65 then
+        for _ = 1, ZombRand(salvage.scrap) + 1 do
+            local item = ZombRand(2) == 0 and "Base.ElectronicsScrap" or "Base.ScrapMetal"
+            square:AddWorldInventoryItem(item, 0.45, 0.6, 0)
+        end
+    end
+    if ZombRand(100) < 75 then
+        for _ = 1, ZombRand(salvage.wire) + 2 do
+            square:AddWorldInventoryItem("Base.ElectricWire", 0.64, 0.57, 0)
+        end
+    end
+end
+
 function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
     if isoObject:hasModData() and isoObject:getModData().zedcommContact then
         local fixture, id = ZedComm.DoorContact.fixtureForHost(isoObject)
@@ -305,8 +339,15 @@ function SZedCommSystem:OnObjectAboutToBeRemoved(isoObject)
         end
     end
     local tag = tagOf(isoObject)
-    if not tag then return end
-    self:removePiece(tag.id)
+    local piece = tag and self.network.pieces[tag.id]
+    if not piece then return end
+    local square = isoObject:getSquare()
+    local salvage = cabinetSalvage[piece.definitionId]
+    self:removePiece(piece.id)
+    if square and salvage and self.removingObject ~= isoObject
+        and instanceof(isoObject, "IsoThumpable") then
+        dropCabinetSalvage(square, piece.state.adapter, salvage)
+    end
 end
 
 -- A chunk with ZedComm records loaded: drop records whose object is gone.
