@@ -14,7 +14,7 @@ Requires Build 42.13.0 or later. Multiplayer support is outside the current rele
 ## Layout
 
 ```
-docs/adr/              decision records (canonical copy, see ADR-401)
+docs/adr/              decision records
 tests/                 tests of the simulation core, network model and registry, run outside the game
 tools/link-dev.ps1|sh  links the game's Workshop folder to workshop/ZedComm
 tools/build.ps1|sh     checks and copies workshop/ZedComm into dist/

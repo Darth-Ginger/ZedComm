@@ -19,7 +19,7 @@ Options considered:
 - **Recompute inside events.** No work while idle and immediate updates. But a handler that changes state can trigger more events, so updates can chain or repeat and their order depends on which event fired first; several changes in one frame each cause a full recompute. Some changes have no event at all: nothing fires when a zombie steps onto a square.
 - **Events mark, the tick updates.** Events mark affected networks for the next simulation tick.
 
-Pause behaviour was checked against the PZ event documentation (the B42 Lua events reference, page version 42.0.2, and the older PZwiki event pages, read from their GitHub sources on 2026-10-29 because pzwiki.net blocks automated fetches): `OnTickEvenPaused` is "the same as OnTick, but triggered when the game is paused as well", and its tick count is "always zero while paused". `OnTick` therefore does not run while the game is paused.
+Pause behaviour was checked against the PZ event documentation (the B42 Lua events reference, page version 42.0.2, and the older PZwiki event pages, read on 2026-10-29): `OnTickEvenPaused` is "the same as OnTick, but triggered when the game is paused as well", and its tick count is "always zero while paused". `OnTick` therefore does not run while the game is paused.
 
 ## Decision
 
@@ -47,7 +47,7 @@ The simulation updates in one pass per game tick, driven by `Events.OnTick`, ove
 - A change made by an event shows up on the next tick rather than inside the event, one tick of delay that players should not notice.
 - Sensor sampling is polling and costs a little every tick for every loaded sensor; it must stay allocation-free to avoid the garbage collection cost the docs warn about.
 - The pending set is extra state to keep correct: anything that changes a network and forgets to mark it will not update until something else marks it.
-- Sensors in unloaded chunks are not sampled; what they report is still open on the Signal simulation card.
+- Sensors in unloaded chunks are not sampled; what they report is still an open question.
 
 ## Related
 

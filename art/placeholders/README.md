@@ -1,6 +1,6 @@
 # ZedComm placeholder sprite sources
 
-Generated with the built-in imagegen tool with transparent backgrounds. The PNGs are the original source images. Run `python tools/pack-placeholder-sprites.py` from the checkout with Pillow installed to regenerate the Build 42 pack and tile definitions. Stable sprite IDs are `zedcomm_devices_01_0` (plate), `zedcomm_devices_01_1` (straight wire), and `zedcomm_devices_01_2` (display). The pack declares tile-definition ID 7637, which had no match in the scanned local Workshop and mods folders. The singleplayer wired test rig uses these sprite IDs so they can be checked in a disposable save. Normal item placement and pickup properties will be set when the corresponding items are defined.
+Generated with the built-in imagegen tool with transparent backgrounds. The PNGs are the original source images. Run `python tools/pack-placeholder-sprites.py` from the checkout with Pillow installed to regenerate the Build 42 pack and tile definitions. Stable sprite IDs are `zedcomm_devices_01_0` (plate), `zedcomm_devices_01_1` (straight wire), and `zedcomm_devices_01_2` (display). The pack declares tile-definition ID 7637.
 
 ## Module housing
 

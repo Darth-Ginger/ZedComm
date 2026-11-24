@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added Time-of-day, Power, Daylight, Rain Intensity, Storage, Fluid Fill and configurable IR sensors. The Combined Smoke Test tracks their native behavior and setup.
+- Added Time-of-day, Power, Daylight, Rain Intensity, Storage, Fluid Fill and configurable IR sensors.
 
 - Advanced packets support fluid volume in liters for displays and Cache. A developer-only rain gauge probe exercises the game's native fluid component.
 
@@ -32,6 +32,7 @@
 
 - Two Mod Options independently control fixture name labels and floating door status markers across saves.
 
+- Contact has a dedicated sensor/magnet sprite, icon and hinge-side/floor leads for four faces and both hinges. Door visuals share fixture lookup, attachment and lead lifecycle handling. Unwired reconstruction clears saved leads. Combined fitting transactions live in DoorInstallation.
 
 - Door Contacts are independent crafted source fixtures. Contact-only, input-only and combined fitting use their associated materials. Actual closed sends 255, open sends 0, and unavailable hosts send no signal. Either installation can be removed without disabling the other. Native gameplay checks remain pending.
 
