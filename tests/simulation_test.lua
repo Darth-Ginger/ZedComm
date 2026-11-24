@@ -53,6 +53,9 @@ local function boot(client, server)
     return handlers, printed
 end
 
+local gameTime = { getRealworldSecondsSinceLastUpdate = function() return 0 end }
+function getGameTime() return gameTime end
+
 local function fireTick(handlers)
     for i = 1, #handlers do handlers[i]() end
 end

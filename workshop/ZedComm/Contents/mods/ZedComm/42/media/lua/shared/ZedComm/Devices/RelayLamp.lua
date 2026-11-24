@@ -50,14 +50,22 @@ function Relay.compileCircuit(state)
     return function() return nil end, reason
 end
 
+function Relay.availability(object)
+    if not object:getSquare() then return false, "Lamp is no longer placed." end
+    if object:canSwitchLight() then return true end
+    if not object:hasLightBulb() then return false, "Lamp needs a working bulb." end
+    return false, "Lamp has no usable power."
+end
+
 local function bindLamp(object)
     if not Relay.isEligible(object) or isClient() or isServer() then
         return { apply = function() return "unsupported", "lamp retrofit is singleplayer only" end }
     end
     return {
-        isAvailable = function() return object:getSquare() ~= nil and object:canSwitchLight() end,
+        isAvailable = function() return Relay.availability(object) end,
         apply = function(self, desired)
-            if not self:isAvailable() then return "unavailable", "lamp cannot switch without power and a bulb" end
+            local available, reason = self:isAvailable()
+            if not available then return "unavailable", reason end
             if object:isActivated() ~= desired then object:setActive(desired) end
             if object:isActivated() ~= desired then return "unavailable", "lamp rejected the requested state" end
             return "applied"

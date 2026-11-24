@@ -89,6 +89,12 @@ local before = #test.carried
 check(not test.runPlacement(tile, { kind = "install-door", object = door, tier = "basic", contact = true })
     and #test.carried == before and not door:getModData().zedcomm and not door:getModData().zedcommContact,
     "combined fitting restores all materials and tags when contact registration fails")
+local removalLogged, rollbackLogged
+for _, line in ipairs(test.logged) do
+    removalLogged = removalLogged or line:find("injected callback before physical removal", 1, true)
+    rollbackLogged = rollbackLogged or line:find("injected rollback cleanup failure", 1, true)
+end
+check(removalLogged and rollbackLogged, "contact cleanup logs the original callback errors")
 registry.addPiece = originalAdd
 tile.transmitRemoveItemFromSquare = rollbackRemove
 ok, receiver = test.runPlacement(tile, { kind = "install-door", object = door, tier = "basic", contact = true })

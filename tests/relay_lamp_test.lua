@@ -36,7 +36,8 @@ do
         function lamp.getCanBeModified() return eligible end
         function lamp.getSprite() return nil end
         function lamp.invalidateRenderChunkLevel() lamp.renderDirty = true end
-        function lamp.canSwitchLight() return lamp.powered end
+        function lamp.hasLightBulb() return lamp.bulb ~= false end
+        function lamp.canSwitchLight() return lamp.powered and lamp:hasLightBulb() end
         function lamp.isActivated() return lamp.active end
         function lamp.setActive(_, value)
             if lamp.powered and lamp.active ~= value then
@@ -133,6 +134,14 @@ do
     fire("OnTick")
     fire("OnTick")
     check(fixture.active and fixture.switches == 1, "steady high drives the lamp once without strobing")
+    fixture.bulb = false
+    assert(optionsAt(lampSquare)["Check lamp status"])()
+    local missingBulb = testState.logged[#testState.logged]:find("Lamp needs a working bulb.", 1, true)
+    fixture.bulb, fixture.powered = true, false
+    assert(optionsAt(lampSquare)["Check lamp status"])()
+    check(missingBulb and testState.logged[#testState.logged]:find("Lamp has no usable power.", 1, true),
+        "lamp status distinguishes a broken or missing bulb from loss of power")
+    fixture.powered = true
 
     package.loaded["TimedActions/ISToggleLightAction"] = true
     ISToggleLightAction = {

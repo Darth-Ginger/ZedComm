@@ -12,7 +12,7 @@ ZedComm targets Project Zomboid Build 42 singleplayer. Server Lua owns world rec
 
 ## Device definitions
 
-Register descriptors through **ZedComm/DeviceDefinitions**. Use a unique namespaced ID, the source or receiver role, a dense list of unique port names, and a pure boolean **match(object, context)**. The registry maps a receiver to a network sink. Native definitions load through **NativeDevices**.
+Register descriptors through **ZedComm/DeviceDefinitions**. Use a unique namespaced ID outside the reserved `ZedComm.` namespace, the source or receiver role, a dense list of unique port names, and a pure boolean **match(object, context)**. The registry maps a receiver to a network sink. Native definitions load through **NativeDevices**.
 
 - A source supplies **sample(object, context)**. It returns a byte or the declared raw reading type. The sender encodes it.
 - A receiver names its receiver module and implements **bindFixture**. A single-port binding exposes **apply(request)**, optionally **isAvailable** and **release**. Apply returns **applied**, **unavailable**, or **unsupported**, with an optional reason. A board that drives multiple local actions binds one controller with an adapter per action.

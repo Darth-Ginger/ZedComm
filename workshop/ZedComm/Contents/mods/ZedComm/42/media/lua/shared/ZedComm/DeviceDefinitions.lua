@@ -12,9 +12,9 @@ ZedComm = ZedComm or {}
 local Definitions = {}
 
 function Definitions.readObjectTag(object)
-    if not object or not object.hasModData or not object:hasModData() then return nil end
+    if not object or not object:hasModData() then return nil end
     local data = object:getModData()
-    local tag = data and data.zedcomm
+    local tag = data.zedcomm
     return type(tag) == "table" and tag or nil, data
 end
 

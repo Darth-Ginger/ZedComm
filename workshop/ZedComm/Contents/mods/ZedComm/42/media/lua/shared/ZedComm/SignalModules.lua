@@ -132,9 +132,10 @@ end
 local function apply(self)
     local request = self.request
     if self.moduleId == Modules.ADVANCED_READOUT then request = Packet.copy(request) end
+    -- Adapters return expected failures. Catch and report thrown errors separately.
     local ok, status, reason = pcall(self.adapter.apply, self.adapter, request)
     if not ok then
-        status, reason = "unavailable", "fixture application failed: " .. tostring(status)
+        status, reason = "error", "fixture application failed: " .. tostring(status)
     elseif status ~= "applied" and status ~= "unavailable" and status ~= "unsupported" then
         status, reason = "unsupported", "invalid fixture result"
     end

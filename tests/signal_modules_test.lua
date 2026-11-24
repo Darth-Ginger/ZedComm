@@ -185,7 +185,9 @@ function flaky:apply()
     return "applied"
 end
 local resilient = assert(modules.newReceiver(modules.ON_OFF, flaky))
-check(resilient:receive(255) == "unavailable", "an adapter exception is isolated with the request retained")
+local fault, failure = resilient:receive(255)
+check(fault == "error" and failure:find("fixture error", 1, true) and resilient.request == true,
+    "a thrown adapter error stays distinct from temporary unavailability and retains the request")
 flaky.broken = false
 check(resilient:reconcile() == "applied", "a later event can recover from the adapter exception")
 

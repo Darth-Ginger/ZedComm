@@ -82,7 +82,10 @@ function Installation.installContact(character, registry, host, id, definitionId
         if registry.network.pieces[id] then registry:removePiece(id) end
         hostData.zedcommContact = previousMarker
         object:getModData().zedcomm = nil
-        pcall(square.transmitRemoveItemFromSquare, square, object)
+        local removed, removeError = pcall(square.transmitRemoveItemFromSquare, square, object)
+        if not removed then
+            print("[ZedComm] contact " .. id .. " install rollback: " .. tostring(removeError))
+        end
         character:getInventory():AddItem(item)
         return false, called and errorMessage or tostring(ok)
     end
@@ -113,7 +116,10 @@ function Installation.removeContact(character, registry, entry)
     local host = Contact.host(entry.object)
     local record = registry.network:record(entry.id)
     local cable = entry.piece.ports.signal
-    pcall(entry.square.transmitRemoveItemFromSquare, entry.square, entry.object)
+    local removed, removeError = pcall(entry.square.transmitRemoveItemFromSquare, entry.square, entry.object)
+    if not removed then
+        print("[ZedComm] contact " .. entry.id .. " removal: " .. tostring(removeError))
+    end
     local objects = entry.square:getObjects()
     for i = 0, objects:size() - 1 do
         if objects:get(i) == entry.object then

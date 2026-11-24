@@ -91,6 +91,55 @@ assert(runtimeRegistry:link("wire", "broken"))
 expectReading(nil, false, true, "sample exception fails off without breaking the game tick")
 
 do
+    local sourceTile, receiverTile = square(25, 20, 0), square(26, 20, 0)
+    local available, calls = true, 0
+    local definitionId = "Example.PoweredReceiver"
+    assert(definitions.register({
+        id = definitionId, role = "receiver", ports = { "signal" },
+        match = function() return false end,
+        receiverModule = ZedComm.SignalModules.ON_OFF,
+        bindFixture = function()
+            return {
+                isAvailable = function()
+                    if available == "error" then error("broken power callback") end
+                    return available
+                end,
+                apply = function() calls = calls + 1; return "applied" end,
+            }
+        end,
+    }))
+    for _, object in ipairs({
+        worldObject(sourceTile, { id = "powered-source", kind = "endpoint", definitionId = "ZedComm.DebugByteSource" }),
+        worldObject(sourceTile, { id = "powered-wire", kind = "cable" }),
+        worldObject(receiverTile, { id = "powered-receiver", kind = "endpoint", definitionId = definitionId }),
+    }) do
+        fire("OnObjectAdded", object)
+    end
+    assert(runtimeRegistry:link("powered-wire", "powered-source"))
+    assert(runtimeRegistry:link("powered-wire", "powered-receiver"))
+    fire("OnTick")
+    local applied = calls
+    available = "error"
+    fire("OnTick")
+    fire("OnTick")
+    local errors = 0
+    for _, line in ipairs(testState.logged) do
+        if line:find("availability check failed:", 1, true) and line:find("broken power callback", 1, true) then
+            errors = errors + 1
+        end
+    end
+    check(errors == 1, "a repeating extension power error logs once")
+    available = true
+    fire("OnTick")
+    check(applied > 0 and calls == applied, "an extension exception does not simulate power loss and recovery")
+    available = false
+    fire("OnTick")
+    available = true
+    fire("OnTick")
+    check(calls == applied + 1, "actual power recovery still retries the latest signal")
+end
+
+do
     local registry = start()
     local sourceTile, sinkTile, boardTile = square(40, 40, 0), square(41, 40, 0), square(42, 40, 0)
     local sourceTag = { id = "weight", kind = "endpoint", definitionId = "ZedComm.WeightPlate" }

@@ -476,6 +476,10 @@ local function readDisplay(player, object)
     end
 end
 
+local function readLampStatus(player, entry)
+    say(player, ZedComm.DeviceRuntime.getLampStatus(entry.id, entry.object))
+end
+
 local function wireDetails(player, registry, id, label)
     local network = registry.network
     local wire = network.pieces[id]
@@ -1176,6 +1180,7 @@ local function onFillMenu(playerNum, context, worldObjects, test)
                         or getText("IGUI_ZedComm_DisconnectSensorWire"), { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)
                 end
             else
+                addDevice("Check lamp status", readLampStatus, entry)
                 action("Remove lamp adapter", { kind = "remove-lamp-adapter", targetId = entry.id, object = entry.object }, group)
                 if entry.piece.ports.signal then
                     action("Disconnect lamp wire", { kind = "disconnect-relay", targetId = entry.id, object = entry.object }, group)

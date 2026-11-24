@@ -464,22 +464,21 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
         state = state,
     }
     local entry = { id = id, object = object, square = square }
-    local ok, err = pcall(function()
+    local called, placed, reason = pcall(function()
         square:AddTileObject(object)
-        if not onSquare(object, square) then error("Could not place the object.") end
+        if not onSquare(object, square) then return false, "Could not place the object." end
         triggerEvent("OnObjectAdded", object)
         entry.piece = registry.network.pieces[id]
-        if not entry.piece then error("Could not register the object.") end
-        if laying then
-            local connected, reason = link(registry, anchor, anchorPort, entry, false)
-            if not connected then error(reason) end
-        end
+        if not entry.piece then return false, "Could not register the object." end
+        if laying then return link(registry, anchor, anchorPort, entry, false) end
+        return true
     end)
-    if not ok then
+    if not called or not placed then
+        local failure = called and reason or tostring(placed)
         if onSquare(object, square) and not removeWorldPiece(registry, entry) then
-            return false, "Placement failed and the object could not be removed: " .. tostring(err)
+            return false, "Placement failed and the object could not be removed: " .. failure
         end
-        return false, tostring(err)
+        return false, failure
     end
     inventory:Remove(item)
     return true, id
@@ -512,14 +511,16 @@ local function pickUp(registry, character, entry)
         item:getModData().zedcommPlacement = { id = record.id, state = record.state }
     end
     inventory:AddItem(item)
+    -- A removal callback can throw after the object has already left the tile.
     local ok, removed = pcall(removeWorldPiece, registry, entry)
+    if not ok then
+        print("[ZedComm] pickup " .. entry.id .. ": " .. tostring(removed))
+    end
     if not ok or not removed then
         if onSquare(entry.object, entry.square) then
             inventory:Remove(item)
             return false, "Could not pick up the object."
         end
-        -- If a removal callback threw after the tile changed, keep the item
-        -- and reconcile any remaining registry entry.
         if registry.network.pieces[entry.id] then registry:removePiece(entry.id) end
     end
     return true

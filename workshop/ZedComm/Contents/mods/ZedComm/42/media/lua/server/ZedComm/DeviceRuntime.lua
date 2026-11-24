@@ -338,6 +338,16 @@ local function reportError(piece, message)
     piece.runtimeError = message
 end
 
+function Runtime.getLampStatus(id, object)
+    local available, reason = Relay.availability(object)
+    if not available then return reason end
+    if not Relay.isWired(object) then return "Lamp adapter is unwired." end
+    local receiver = receivers[id]
+    local module = receiver and receiver.object == object and receiver.module
+    if module and module.reason then return module.reason end
+    return object:isActivated() and "Lamp is on." or "Lamp is off."
+end
+
 function Runtime.getTestSourceValue(object)
     return testSources[object]
 end
@@ -366,7 +376,13 @@ local function sampleSource(cell, entry)
         local moduleId
         moduleId, reason = Runtime.getSenderModule(piece, definition)
         if moduleId then
-            local ok, reading = pcall(definition.sample, object, context, piece.state)
+            local ok, reading = true, nil
+            if entry.native then
+                reading = definition.sample(object, context, piece.state)
+            else
+                -- Isolate extension sampler errors so other circuits keep updating.
+                ok, reading = pcall(definition.sample, object, context, piece.state)
+            end
             if ok then
                 if entry.moduleId == moduleId and entry.reading == reading and entry.packet == piece.packet then return end
                 packet, reason = Modules.Sender.encode(reading, definition.readingKind, moduleId)
@@ -410,8 +426,22 @@ end
 local function powerRecovered(receiver)
     local adapter = receiver.module and receiver.module.adapter
     if not adapter or not adapter.isAvailable then return false end
-    local ok, available = pcall(adapter.isAvailable, adapter)
-    available = ok and available == true
+    local available
+    if receiver.piece.definitionId == Relay.ID then
+        available = adapter:isAvailable()
+    else
+        local ok, result = pcall(adapter.isAvailable, adapter)
+        if not ok then
+            local message = tostring(result)
+            if message ~= receiver.availabilityError then
+                print("[ZedComm] device " .. receiver.piece.id .. ": availability check failed: " .. message)
+                receiver.availabilityError = message
+            end
+            return false
+        end
+        receiver.availabilityError = nil
+        available = result == true
+    end
     local recovered = receiver.available == false and available
     receiver.available = available
     return recovered
@@ -569,7 +599,8 @@ local function rebuildEntries()
         if piece.definitionId and not piece.definitionUnavailable then
             local entry = previous[id]
             if not entry or entry.piece ~= piece then
-                entry = { piece = piece, definition = Definitions.get(piece.definitionId) }
+                entry = { piece = piece, definition = Definitions.get(piece.definitionId),
+                    native = piece.definitionId:sub(1, 8) == "ZedComm." }
             end
             local definition = entry.definition
             if piece.board then
@@ -644,10 +675,7 @@ local function rebuildRoutes()
 end
 
 function Runtime.prepare(registry)
-    local time = getGameTime and getGameTime()
-    if time and time.getRealworldSecondsSinceLastUpdate then
-        circuitTime = circuitTime + math.max(0, time:getRealworldSecondsSinceLastUpdate())
-    end
+    circuitTime = circuitTime + math.max(0, getGameTime():getRealworldSecondsSinceLastUpdate())
     local current = registry and registry.network
     if current ~= network then
         for _, previous in pairs(receivers) do releaseReceiver(previous) end

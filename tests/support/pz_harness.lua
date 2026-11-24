@@ -1,5 +1,8 @@
 return function()
     local testState = {}
+    local gameTime = { getRealworldSecondsSinceLastUpdate = function() return 0 end }
+    function getGameTime() return gameTime end
+
     -- Kahlua may omit the standard Lua next global.
     next = nil
     next = nil

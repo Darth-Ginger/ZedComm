@@ -56,7 +56,7 @@ Threshold and Boolean logic emit 0 or 255. Use **Cache** to pass the original re
 
 ## Retrofit a vanilla lamp
 
-With a Screwdriver, fit a **Basic Adapter** at Electrical 1 or **Advanced Adapter** at Electrical 3 from the lamp's ZedComm submenu. An Advanced Adapter has a 3x3 local board. The lamp needs its normal bulb and power. A wired lamp follows the signal and switches off on signal loss. Unplug it or remove the adapter to restore manual control. Native pickup retains the installation but leaves the wire behind.
+With a Screwdriver, fit a **Basic Adapter** at Electrical 1 or **Advanced Adapter** at Electrical 3 from the lamp's ZedComm submenu. An Advanced Adapter has a 3x3 local board. Use **Check lamp status** in the lamp's ZedComm submenu to check the bulb, power, and adapter status. A wired lamp follows the signal and switches off on signal loss. Unplug it or remove the adapter to restore manual control. Native pickup retains the installation but leaves the wire behind.
 
 ## Doors and contacts
 
