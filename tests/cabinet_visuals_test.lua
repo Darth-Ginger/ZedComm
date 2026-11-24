@@ -6,9 +6,9 @@ local eastTile = test.floorTile(81, 80)
 cabinetTile.northWall, eastTile.westWall = {}, {}
 dofile(test.LUA .. "client/ZedComm/WireVisuals.lua")
 
-local function leads()
+local function leads(tile)
     local found, count = {}, 0
-    for _, object in ipairs(cabinetTile.objects) do
+    for _, object in ipairs((tile or cabinetTile).objects) do
         local direction = object:getModData().zedcommCabinetLead
         if direction then
             found[direction], count = object, count + 1
@@ -76,4 +76,27 @@ cabinetTile:transmitRemoveItemFromSquare(test.placement.resolve(test.registry, c
 fire("OnTick")
 check(select(2, leads()) == 0 and not test.registry.network:record(cabinet),
     "world removal clears the grounded helper with no cabinet remaining")
+local tableSquare, tableCableSquare = test.floorTile(89, 80), test.floorTile(90, 80)
+ISMoveableSpriteProps = { getTotalTableHeight = function(_, square) return square == tableSquare and 30 or 0 end }
+local ok, bench = test.runPlacement(tableSquare, { kind = "place", item = test.give("ZedComm.TabletopCabinet") })
+assert(ok, bench)
+local laid, benchWire = test.lay(tableCableSquare, test.give("ZedComm.SignalWire"), bench, "input")
+assert(laid, benchWire)
+fire("OnTick")
+local raised = leads(tableSquare)[1]
+check(raised and raised.sprite == "zedcomm_tabletop_leads_01_146" and raised.noPicking,
+    "tabletop lead matches the actual height and the connected tile edge")
+assert(test.target(tableCableSquare, benchWire, "pickup"))
+fire("OnTick")
+check(select(2, leads(tableSquare)) == 0, "disconnecting the tabletop clears the raised lead")
+
+local floorSquare, floorCableSquare = test.floorTile(95, 80), test.floorTile(95, 81)
+local ok, floorCabinet = test.runPlacement(floorSquare, { kind = "place", item = test.give("ZedComm.SmallCabinet") })
+assert(ok, floorCabinet)
+assert(test.lay(floorCableSquare, test.give("ZedComm.SignalWire"), floorCabinet, "input"))
+fire("OnTick")
+local floorLead = leads(floorSquare)[2]
+check(floorLead and floorLead.sprite == "zedcomm_devices_01_5"
+    and floorLead:getSprite():getProperties():has(IsoFlagType.FloorOverlay),
+    "a floor cabinet extends the cable up to the mesh under the footprint")
 test.finish()

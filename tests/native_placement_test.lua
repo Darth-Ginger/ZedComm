@@ -130,6 +130,15 @@ check(indexes["Base.TestMoveable"] < indexes["ZedComm.PressurePlate"]
     and indexes["ZedComm.NumericDisplay"] < indexes["ZedComm.SmallCabinet"]
     and indexes["ZedComm.SmallCabinet"] < indexes["ZedComm.SignalWire"],
     "native placement keeps vanilla entries and groups ZedComm candidates by item tag")
+local originalSound = getSoundManager
+getSoundManager = function() return { playUISound = function() end } end
+native.currentSquare = nativePlateTile
+selectType(nativePlateTile, "ZedComm.SmallCabinet")
+native:setCursorFacing(4)
+native:isValid(nativePlateTile)
+check(native.objectSprite:getName() == "zedcomm_cabinet_faces_01_3",
+    "native drag changes the floor cabinet placement preview")
+getSoundManager = originalSound
 inventory:Remove(cabinetItem)
 
 check(selectType(nativePlateTile, "Base.TestMoveable").object == vanilla and native.canCreate,

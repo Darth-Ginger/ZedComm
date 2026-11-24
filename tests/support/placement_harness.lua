@@ -13,6 +13,7 @@ return function()
     local placement = ZedComm.PlayerPlacement
     testState.worldTime = 1000
     getTimestampMs = function() return testState.worldTime end
+    ZombRand = function(limit) return limit - 1 end
     local registeredSprites = {}
     getSprite = function(name)
         local index = tonumber(string.match(name, "^zedcomm_devices_01_(%d+)$"))
@@ -20,6 +21,8 @@ return function()
         local switchIndex = tonumber(string.match(name, "^zedcomm_switch_01_(%d+)$"))
         local switchFloor = tonumber(string.match(name, "^zedcomm_switch_floor_01_(%d+)$"))
         local cabinet = tonumber(string.match(name, "^zedcomm_cabinets_01_(%d+)$"))
+        local cabinetFace = tonumber(name:match("^zedcomm_cabinet_faces_01_(%d+)$"))
+        local tableLead = tonumber(name:match("^zedcomm_tabletop_leads_01_(%d+)$"))
         local weightGlyph = tonumber(string.match(name, "^zedcomm_weight_face_01_(%d+)$"))
         local doorIndex = tonumber(name:match("^zedcomm_door_01_(%d+)$") or name:match("^zedcomm_door_reverse_01_(%d+)$"))
         local doorFloor = tonumber(name:match("^zedcomm_door_floor_01_(%d+)$"))
@@ -29,10 +32,10 @@ return function()
             or (contactIndex and contactIndex < 96) or (contactFloor and contactFloor < 48)
             or (index and index <= 474) or (displayIndex and displayIndex < 257) or (switchIndex and switchIndex < 40)
             or (switchFloor and switchFloor < 20) or (weightGlyph and weightGlyph < 62)
-            or (cabinet and cabinet < 11) or name == "zedcomm_ir_01_0" then
+            or (cabinet and cabinet < 11) or (cabinetFace and cabinetFace < 12) or (tableLead and tableLead < 320) or name == "zedcomm_ir_01_0" then
             if not registeredSprites[name] then
                 local floorOverlay = doorFloor ~= nil or contactFloor ~= nil or displayIndex ~= nil or switchFloor ~= nil
-                    or (index and ((index >= 20 and index <= 25) or (index >= 419 and index <= 431)))
+                    or (index and ((index >= 3 and index <= 13) or (index >= 20 and index <= 25) or (index >= 419 and index <= 431)))
                 local properties = { has = function(_, flag) return floorOverlay and flag == IsoFlagType.FloorOverlay end }
                 registeredSprites[name] = { getName = function() return name end, getProperties = function() return properties end }
             end
@@ -83,6 +86,25 @@ return function()
         end,
     }
 
+    IsoThumpable = {
+        new = function(_, tile, sprite)
+            local object = IsoObject.new(tile, sprite)
+            object.class = "IsoThumpable"
+            function object:isDoor() return false end
+            function object:setName(value) self.name = value end
+            function object:setBlockAllTheSquare(value) self.blockAll = value end
+            function object:isBlockAllTheSquare() return self.blockAll end
+            function object:setCanPassThrough(value) self.passThrough = value end
+            function object:setIsThumpable(value) self.thumpable = value end
+            function object:setThumpSound(value) self.thumpSound = value end
+            function object:setMaxHealth(value) self.maxHealth = value end
+            function object:setHealth(value) self.health = value end
+            function object:getHealth() return self.health end
+            function object:transmitCompleteItemToClients() end
+            return object
+        end,
+    }
+
     local function floorTile(x, y)
         local tile = square(x, y, 0)
         function tile.TreatAsSolidFloor() return true end
@@ -97,6 +119,11 @@ return function()
         function tile:getHoppableTo() return self.hoppable end
         function tile.getMovingObjects() return list(tile.actors or {}) end
         function tile.AddTileObject(_, object) tile.objects[#tile.objects + 1] = object end
+        function tile:AddSpecialObject(object)
+            self:AddTileObject(object)
+            object.special = true
+        end
+        function tile:RecalcAllWithNeighbours() self.recalculated = true end
         function tile.transmitRemoveItemFromSquare(_, object)
             if tile.refuseRemoval then return end
             fire("OnObjectAboutToBeRemoved", object)

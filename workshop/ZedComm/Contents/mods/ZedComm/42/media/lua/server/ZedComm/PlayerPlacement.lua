@@ -55,13 +55,16 @@ local doorSpec = { name = "networked door", kind = "endpoint", definitionId = Ci
 Placement.WIRE_TYPE = items[2].itemType
 
 local specs, cabinetSpecs = {}, {}
+local CABINET_HEALTH = 500
+local floorCabinetFrames = { [Circuit.CABINET_ID] = 0, ["ZedComm.LargeCabinet"] = 4, ["ZedComm.XLCabinet"] = 8 }
 for _, spec in ipairs(items) do specs[spec.itemType] = spec end
 for id, profile in pairs(Circuit.cabinets) do
     local advancedItem = "ZedComm.Advanced" .. id:sub(#"ZedComm." + 1)
     local variants = {}
     for tier, itemType in pairs({ basic = id, advanced = advancedItem }) do
         local spec = { itemType = itemType, name = tier .. " " .. profile.name:lower(), sprite = profile.sprite,
-            kind = "endpoint", definitionId = id, adapter = tier, fixtureType = "Cabinet", mount = profile.mount }
+            kind = "endpoint", definitionId = id, adapter = tier, fixtureType = "Cabinet", mount = profile.mount,
+            floorFrame = floorCabinetFrames[id] }
         specs[itemType], variants[tier] = spec, spec
     end
     cabinetSpecs[id] = variants
@@ -92,9 +95,21 @@ function Placement.surfaceOffset(square, itemType)
     if height > 0 and height <= 64 then return height end
 end
 
-function Placement.previewSprite(square, item, mount)
+function Placement.floorFacing(item, preferred)
+    local spec = specFor(item:getFullType())
+    if not spec or not spec.floorFrame then return nil end
+    local saved = item:getModData().zedcommPlacement
+    local state = type(saved) == "table" and saved.state
+    local facing = preferred or (type(state) == "table" and state.facing)
+    if type(facing) == "number" and facing % 1 == 0 and facing >= 1 and facing <= 4 then return facing end
+    return 3
+end
+
+function Placement.previewSprite(square, item, mount, facing)
     local spec = specFor(item:getFullType())
     if not spec then return nil end
+    local face = Placement.floorFacing(item, facing)
+    if face then return "zedcomm_cabinet_faces_01_" .. (spec.floorFrame + face - 1) end
     if spec.mount ~= "wall" or not square then return spec.sprite end
     local facing = Placement.wallMount(square, item, mount)
     if spec.definitionId ~= Switch.ID then
@@ -363,8 +378,14 @@ local function tileAvailable(square, spec)
     if spec.mount == "wall" and not Switch.mount(square) then
         return false, "Choose a tile next to an eligible wall."
     end
+    if spec.floorFrame and square:has("IsTable") then
+        return false, "Choose a clear floor tile."
+    end
     if spec.kind == "endpoint" then
         for _, object in ipairs(squareObjects(square)) do
+            if spec.floorFrame and instanceof(object, "IsoThumpable") and object:isBlockAllTheSquare() then
+                return false, "Choose a clear floor tile."
+            end
             local tag = tagOf(object)
             if tag and tag.kind == "endpoint" then return false, "There is already a device here." end
         end
@@ -406,7 +427,11 @@ local function chooseId(registry, square, retained)
 end
 
 local function removeWorldPiece(registry, entry)
-    entry.square:transmitRemoveItemFromSquare(entry.object)
+    local previous = registry.removingObject
+    registry.removingObject = entry.object
+    local ok, err = pcall(entry.square.transmitRemoveItemFromSquare, entry.square, entry.object)
+    registry.removingObject = previous
+    if not ok then print("[ZedComm] remove " .. entry.id .. ": " .. tostring(err)) end
     if onSquare(entry.object, entry.square) then return false end
     -- The vanilla removal hook normally detaches it. Cover both paths.
     if registry.network.pieces[entry.id] then registry:removePiece(entry.id) end
@@ -418,7 +443,7 @@ function Placement.carries(character, item)
     return item ~= nil and item:getContainer() == inventory and inventory:contains(item)
 end
 
-local function place(registry, character, square, item, anchor, anchorPort, laying, mount, throughWall)
+local function place(registry, character, square, item, anchor, anchorPort, laying, mount, throughWall, facing)
     local inventory = character:getInventory()
     local spec = item and specFor(item:getFullType())
     if not spec or not Placement.carries(character, item) then
@@ -436,7 +461,8 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
         if mount and mount ~= facing then return false, "That wall is no longer available." end
         mount = facing
     end
-    local sprite = Placement.previewSprite(square, item, mount)
+    facing = Placement.floorFacing(item, facing)
+    local sprite = Placement.previewSprite(square, item, mount, facing)
     if not getSprite(sprite) then return false, "The ZedComm sprite is missing." end
     if spec.definitionId and not cabinetSpecs[spec.definitionId] and not definitions.get(spec.definitionId) then
         return false, "The device definition is missing."
@@ -445,14 +471,32 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     local id = chooseId(registry, square, retained)
     if not id then return false, "A device with this identity is already placed." end
 
-    local object = IsoObject.new(square, sprite, item:getName())
+    local object
+    local blocksTile = spec.floorFrame ~= nil
+    if spec.adapter then
+        if blocksTile and square:getMovingObjects():size() > 0 then
+            return false, "Wait for the cabinet tile to clear."
+        end
+        object = IsoThumpable.new(getCell(), square, sprite, false)
+        object:setName(item:getName())
+        object:setBlockAllTheSquare(blocksTile)
+        object:setCanPassThrough(not blocksTile)
+        object:setIsThumpable(true)
+        object:setThumpSound("ZombieThumpMetal")
+        object:setMaxHealth(CABINET_HEALTH)
+        local health = retained and retained.health
+        object:setHealth(type(health) == "number" and math.max(1, math.min(health, CABINET_HEALTH))
+            or CABINET_HEALTH)
+    else
+        object = IsoObject.new(square, sprite, item:getName())
+    end
     if height then object:setRenderYOffset(height) end
     local state = retained and retained.state
     if spec.adapter then
         local cabinetState = {}
         for key, value in pairs(state or {}) do cabinetState[key] = value end
         cabinetState.circuit = cabinetState.circuit or { modules = {}, links = {} }
-        cabinetState.adapter, cabinetState.mount = spec.adapter, mount
+        cabinetState.adapter, cabinetState.mount, cabinetState.facing = spec.adapter, mount, facing
         state = cabinetState
     end
     if spec.definitionId == Switch.ID then
@@ -465,7 +509,12 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
     }
     local entry = { id = id, object = object, square = square }
     local called, placed, reason = pcall(function()
-        square:AddTileObject(object)
+        if spec.adapter then
+            square:AddSpecialObject(object)
+            square:RecalcAllWithNeighbours(true)
+        else
+            square:AddTileObject(object)
+        end
         if not onSquare(object, square) then return false, "Could not place the object." end
         triggerEvent("OnObjectAdded", object)
         entry.piece = registry.network.pieces[id]
@@ -480,6 +529,7 @@ local function place(registry, character, square, item, anchor, anchorPort, layi
         end
         return false, failure
     end
+    if spec.adapter then object:transmitCompleteItemToClients() end
     inventory:Remove(item)
     return true, id
 end
@@ -508,20 +558,16 @@ local function pickUp(registry, character, entry)
         return false, "There is no room in your main inventory."
     end
     if record.kind == "endpoint" then
-        item:getModData().zedcommPlacement = { id = record.id, state = record.state }
+        local saved = { id = record.id, state = record.state }
+        if entry.spec.adapter and instanceof(entry.object, "IsoThumpable") then
+            saved.health = entry.object:getHealth()
+        end
+        item:getModData().zedcommPlacement = saved
     end
     inventory:AddItem(item)
-    -- A removal callback can throw after the object has already left the tile.
-    local ok, removed = pcall(removeWorldPiece, registry, entry)
-    if not ok then
-        print("[ZedComm] pickup " .. entry.id .. ": " .. tostring(removed))
-    end
-    if not ok or not removed then
-        if onSquare(entry.object, entry.square) then
-            inventory:Remove(item)
-            return false, "Could not pick up the object."
-        end
-        if registry.network.pieces[entry.id] then registry:removePiece(entry.id) end
+    if not removeWorldPiece(registry, entry) then
+        inventory:Remove(item)
+        return false, "Could not pick up the object."
     end
     return true
 end
@@ -981,7 +1027,7 @@ local commands = {
                 and Placement.canPlace(command.square, command.item:getFullType())
         end,
         execute = function(registry, character, command)
-            return place(registry, character, command.square, command.item, nil, nil, false, command.mount)
+            return place(registry, character, command.square, command.item, nil, nil, false, command.mount, nil, command.facing)
         end,
     },
     lay = {

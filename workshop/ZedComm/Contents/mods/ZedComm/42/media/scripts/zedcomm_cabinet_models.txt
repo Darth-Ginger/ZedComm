@@ -1,0 +1,39 @@
+module ZedComm
+{
+    model SmallCabinetWorld
+    {
+        mesh = ZedComm/SmallCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+    model LargeCabinetWorld
+    {
+        mesh = ZedComm/LargeCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+    model XLCabinetWorld
+    {
+        mesh = ZedComm/XLCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+    model TabletopCabinetWorld
+    {
+        mesh = ZedComm/TabletopCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+    model WallCabinetWorld
+    {
+        mesh = ZedComm/WallCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+    model WiredWallCabinetWorld
+    {
+        mesh = ZedComm/WiredWallCabinet,
+        texture = Models/ZedComm/CabinetMaterials,
+        scale = 1.0,
+    }
+}
